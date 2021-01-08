@@ -1,0 +1,14 @@
+# plugins to start
+plugins = ["debugger"]
+
+[log]
+# level = "info" # trace, debug, info, warn, error
+## debugger plugin needs debug log level
+# timestamps = "none" # sec, ms, us, ns, none
+
+[promoter]
+# [promoter.resources]
+# [promoter.resources.foo]
+# start = ["foo.mount", "foo.service"]
+# # stop = [] # if unset/empty, services from 'start' will be stopped in reverse order
+# # on-stop-failure =  "echo b > /proc/sysrq-trigger" # shell one-liner executed in a loop if a stop action fails
