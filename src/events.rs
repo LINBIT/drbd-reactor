@@ -4,6 +4,7 @@ use crate::drbd::{
 };
 use anyhow::Result;
 use log::{debug, warn};
+use regex::Regex;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::process::{Command, Stdio};
@@ -13,20 +14,41 @@ use std::thread;
 use std::time::Duration;
 
 pub fn events2(tx: Sender<EventUpdate>) -> Result<()> {
-    // TODO(): add some duration, like if we failed 5 times in the last minute or so
+    // minimum version check
+    let version = Command::new("drbdadm").arg("--version").output()?;
+    if !version.status.success() {
+        return Err(anyhow::anyhow!(
+            "'drbdadm --version' not executed successfully, stdout: '{}', stderr: '{}'",
+            String::from_utf8(version.stdout).unwrap_or("<Could not convert stdout>".to_string()),
+            String::from_utf8(version.stderr).unwrap_or("<Could not convert stderr>".to_string())
+        ));
+    }
+    let pattern = Regex::new(r"^DRBDADM_VERSION_CODE=0x([[:xdigit:]]+)$")?;
+    if String::from_utf8(version.stdout)?
+        .lines()
+        .filter_map(|line| pattern.captures(line))
+        .find(|v| u32::from_str_radix(&v[1], 16).map_or_else(|_err| false, |v| v >= 0x091000))
+        .is_none()
+    {
+        return Err(anyhow::anyhow!(
+            "drbdsetup minimum version ('9.16.0') not fullfilled"
+        ));
+    }
 
+    // TODO(): add some duration, like if we failed 5 times in the last minute or so
     let mut failed = 0;
     loop {
         if failed == 5 {
-            debug!("events: events2: Restarted events tracking too often, giving up");
-            std::process::exit(1);
+            return Err(anyhow::anyhow!(
+                "events: events2_loop: Restarted events tracking too often, giving up"
+            ));
         }
-        debug!("events: events2: starting process_events2 loop");
+
+        debug!("events: events2_loop: starting process_events2 loop");
         match process_events2(&tx) {
             Ok(()) => break,
             Err(e) => {
                 if e.is::<SendError<EventUpdate>>() {
-                    // most likely a send after the chan was already closed
                     debug!("events: events2: send error on chanel, bye");
                     return Err(e);
                 }
@@ -40,8 +62,6 @@ pub fn events2(tx: Sender<EventUpdate>) -> Result<()> {
 }
 
 fn process_events2(tx: &Sender<EventUpdate>) -> Result<()> {
-    // TODO(): add minimal version check here
-
     let mut cmd = Command::new("drbdsetup")
         .arg("events2")
         .arg("--full")

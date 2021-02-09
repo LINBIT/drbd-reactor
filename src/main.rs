@@ -2,6 +2,7 @@ use anyhow::Result;
 use drbdd::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
 use drbdd::events::events2;
 use drbdd::plugin::{debugger, promoter};
+use log::error;
 use std::collections::HashMap;
 use std::sync::mpsc::channel;
 use std::thread;
@@ -61,7 +62,12 @@ impl Core {
 
         let (e2tx, e2rx) = channel();
         let done = e2tx.clone();
-        thread::spawn(|| events2(e2tx));
+        thread::spawn(|| {
+            if let Err(e) = events2(e2tx) {
+                error!("core: events2 processing failed: {}", e);
+                std::process::exit(1);
+            }
+        });
 
         ctrlc::set_handler(move || {
             println!("received Ctrl+C!");
