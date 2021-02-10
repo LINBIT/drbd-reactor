@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use drbdd::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
 use drbdd::events::events2;
 use drbdd::plugin::{debugger, promoter};
@@ -130,37 +130,25 @@ impl Core {
     }
 }
 
-fn main() {
-    let cfg = drbdd::config::from_args().expect("Config file does not exist or is invalid");
-
-    // TODO(): maybe better handle this with enums
-    let verbosity = match &cfg.log.level[..] {
-        "trace" => 4,
-        "debug" => 3,
-        "info" => 2,
-        "warn" => 1,
-        "error" => 0,
-        _ => 0,
-    };
-    let timestamps = match &cfg.log.timestamps[..] {
-        "sec" => stderrlog::Timestamp::Second,
-        "ms" => stderrlog::Timestamp::Millisecond,
-        "us" => stderrlog::Timestamp::Microsecond,
-        "ns" => stderrlog::Timestamp::Nanosecond,
-        _ => stderrlog::Timestamp::Off,
-    };
+fn main() -> Result<()> {
+    let cfg = drbdd::config::from_args()?;
 
     stderrlog::new()
         .module(module_path!())
         .quiet(cfg.log.quiet)
-        .verbosity(verbosity)
-        .timestamp(timestamps)
+        // There is no way to set the log level directly. Instead we have to
+        // use this verbosity setting, which converts back to a LevelFilter
+        // while ignoring the "Off" variant. For example,
+        // LevelFilter::Error -> 1 as usize -> 0 verbosity.
+        // LevelFilter::Off -> 0 as usize -> 0 verbosity.
+        .verbosity((cfg.log.level as usize).saturating_sub(1))
+        .timestamp(cfg.log.timestamps)
         .init()
-        .unwrap();
+        .context("failed to set up logger")?;
 
     Core::new(cfg)
         .run()
-        .expect("core did not exit successfully");
+        .context("core did not exit successfully")?;
 
-    std::process::exit(exitcode::OK);
+    Ok(())
 }
