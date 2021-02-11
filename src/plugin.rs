@@ -4,9 +4,10 @@ use crate::drbd::{EventType, PluginUpdate};
 use anyhow::Result;
 use log::info;
 use std::process::{Command, ExitStatus};
+use std::sync::Arc;
 
-pub fn namefilter<'a>(names: &'a [String]) -> impl Fn(&PluginUpdate) -> bool + 'a {
-    return move |up: &PluginUpdate| {
+pub fn namefilter<'a>(names: &'a [String]) -> impl Fn(&Arc<PluginUpdate>) -> bool + 'a {
+    return move |up: &Arc<PluginUpdate>| {
         for name in names {
             if up.has_name(name) {
                 return true;
@@ -16,8 +17,8 @@ pub fn namefilter<'a>(names: &'a [String]) -> impl Fn(&PluginUpdate) -> bool + '
     };
 }
 
-pub fn typefilter<'a>(ftype: &'a EventType) -> impl Fn(&PluginUpdate) -> bool + 'a {
-    return move |up: &PluginUpdate| up.has_type(ftype);
+pub fn typefilter<'a>(ftype: &'a EventType) -> impl Fn(&Arc<PluginUpdate>) -> bool + 'a {
+    return move |up: &Arc<PluginUpdate>| up.has_type(ftype);
 }
 
 pub fn map_status(status: std::result::Result<ExitStatus, std::io::Error>) -> Result<()> {

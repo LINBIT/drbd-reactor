@@ -288,6 +288,7 @@ pub enum PluginUpdate {
         resource_name: String,
         old: ResourceUpdateState,
         new: ResourceUpdateState,
+        resource: Resource,
     },
     Device {
         event: EventType,
@@ -295,6 +296,7 @@ pub enum PluginUpdate {
         volume: i32,
         old: DeviceUpdateState,
         new: DeviceUpdateState,
+        resource: Resource,
     },
     PeerDevice {
         event: EventType,
@@ -303,6 +305,7 @@ pub enum PluginUpdate {
         peer_node_id: i32,
         old: PeerDeviceUpdateState,
         new: PeerDeviceUpdateState,
+        resource: Resource,
     },
     Connection {
         event: EventType,
@@ -310,6 +313,7 @@ pub enum PluginUpdate {
         peer_node_id: i32,
         old: ConnectionUpdateState,
         new: ConnectionUpdateState,
+        resource: Resource,
     },
 }
 
@@ -367,10 +371,10 @@ impl Resource {
         self.devices.iter_mut().find(|c| c.volume == device.volume)
     }
 
-    pub fn update_device(&mut self, device: Device) {
-        match self.get_device_mut(&device) {
-            Some(existing) => *existing = device,
-            None => self.devices.push(device),
+    pub fn update_device(&mut self, device: &Device) {
+        match self.get_device_mut(device) {
+            Some(existing) => *existing = device.clone(),
+            None => self.devices.push(device.clone()),
         }
     }
 
@@ -378,7 +382,7 @@ impl Resource {
         self.devices.retain(|x| x.volume != volume_id)
     }
 
-    pub fn update_or_delete_device(&mut self, et: &EventType, device: Device) {
+    pub fn update_or_delete_device(&mut self, et: &EventType, device: &Device) {
         if *et == EventType::Destroy {
             self.delete_device(device.volume);
         } else {
@@ -386,7 +390,7 @@ impl Resource {
         }
     }
 
-    pub fn get_device_update(&self, et: &EventType, device: &Device) -> Option<PluginUpdate> {
+    pub fn get_device_update(&mut self, et: &EventType, device: &Device) -> Option<PluginUpdate> {
         let new = DeviceUpdateState {
             disk_state: device.disk_state.clone(),
             client: device.client,
@@ -394,7 +398,7 @@ impl Resource {
             size: device.size,
         };
 
-        match self.get_device(&device) {
+        match self.get_device(device) {
             Some(existing) => {
                 let old = DeviceUpdateState {
                     disk_state: existing.disk_state.clone(),
@@ -403,6 +407,7 @@ impl Resource {
                     size: existing.size,
                 };
 
+                self.update_or_delete_device(et, device);
                 if old == new && *et != EventType::Destroy {
                     return None;
                 }
@@ -413,10 +418,12 @@ impl Resource {
                     volume: device.volume,
                     old,
                     new,
+                    resource: self.clone(),
                 })
             }
 
             None => {
+                self.update_or_delete_device(et, device);
                 if *et == EventType::Destroy {
                     return None;
                 }
@@ -429,6 +436,7 @@ impl Resource {
                         ..Default::default()
                     },
                     new,
+                    resource: self.clone(),
                 })
             }
         }
@@ -446,14 +454,14 @@ impl Resource {
             .find(|c| c.peer_node_id == conn.peer_node_id)
     }
 
-    pub fn update_connection(&mut self, conn: Connection) {
+    pub fn update_connection(&mut self, conn: &Connection) {
         match self.get_connection_mut(&conn) {
-            Some(existing) => *existing = conn,
-            None => self.connections.push(conn),
+            Some(existing) => *existing = conn.clone(),
+            None => self.connections.push(conn.clone()),
         }
     }
 
-    pub fn update_or_delete_connection(&mut self, et: &EventType, conn: Connection) {
+    pub fn update_or_delete_connection(&mut self, et: &EventType, conn: &Connection) {
         if *et == EventType::Destroy {
             self.delete_connection(conn.peer_node_id);
         } else {
@@ -461,7 +469,11 @@ impl Resource {
         }
     }
 
-    pub fn get_connection_update(&self, et: &EventType, conn: &Connection) -> Option<PluginUpdate> {
+    pub fn get_connection_update(
+        &mut self,
+        et: &EventType,
+        conn: &Connection,
+    ) -> Option<PluginUpdate> {
         let new = ConnectionUpdateState {
             congested: conn.congested,
             conn_name: conn.conn_name.clone(),
@@ -469,7 +481,7 @@ impl Resource {
             peer_role: conn.peer_role.clone(),
         };
 
-        match self.get_connection(&conn) {
+        match self.get_connection(conn) {
             Some(existing) => {
                 let old = ConnectionUpdateState {
                     congested: existing.congested,
@@ -478,6 +490,7 @@ impl Resource {
                     peer_role: existing.peer_role.clone(),
                 };
 
+                self.update_or_delete_connection(et, conn);
                 if old == new && *et != EventType::Destroy {
                     return None;
                 }
@@ -488,9 +501,11 @@ impl Resource {
                     peer_node_id: conn.peer_node_id,
                     old,
                     new,
+                    resource: self.clone(),
                 })
             }
             None => {
+                self.update_or_delete_connection(et, conn);
                 if *et == EventType::Destroy {
                     return None;
                 }
@@ -503,6 +518,7 @@ impl Resource {
                         ..Default::default()
                     },
                     new,
+                    resource: self.clone(),
                 })
             }
         }
@@ -547,7 +563,7 @@ impl Resource {
         }
     }
 
-    pub fn update_peerdevice(&mut self, peerdevice: PeerDevice) {
+    pub fn update_peerdevice(&mut self, peerdevice: &PeerDevice) {
         match self.get_connection_peerdevice_mut(&peerdevice) {
             None => {
                 let mut conn = Connection {
@@ -555,7 +571,7 @@ impl Resource {
                     ..Default::default()
                 };
 
-                conn.peerdevices.push(peerdevice);
+                conn.peerdevices.push(peerdevice.clone());
                 self.connections.push(conn)
             }
             Some(conn) => {
@@ -564,8 +580,8 @@ impl Resource {
                     .iter_mut()
                     .find(|c| c.volume == peerdevice.volume)
                 {
-                    Some(pd) => *pd = peerdevice,
-                    None => conn.peerdevices.push(peerdevice),
+                    Some(pd) => *pd = peerdevice.clone(),
+                    None => conn.peerdevices.push(peerdevice.clone()),
                 }
             }
         }
@@ -585,7 +601,7 @@ impl Resource {
         }
     }
 
-    pub fn update_or_delete_peerdevice(&mut self, et: &EventType, peerdevice: PeerDevice) {
+    pub fn update_or_delete_peerdevice(&mut self, et: &EventType, peerdevice: &PeerDevice) {
         if *et == EventType::Destroy {
             self.delete_peerdevice(peerdevice.peer_node_id, peerdevice.volume);
         } else {
@@ -594,7 +610,7 @@ impl Resource {
     }
 
     pub fn get_peerdevice_update(
-        &self,
+        &mut self,
         et: &EventType,
         peerdevice: &PeerDevice,
     ) -> Option<PluginUpdate> {
@@ -605,7 +621,7 @@ impl Resource {
             resync_suspended: peerdevice.resync_suspended,
         };
 
-        match self.get_peerdevice(&peerdevice) {
+        match self.get_peerdevice(peerdevice) {
             Some(existing) => {
                 let old = PeerDeviceUpdateState {
                     peer_client: existing.peer_client,
@@ -614,6 +630,7 @@ impl Resource {
                     resync_suspended: existing.resync_suspended,
                 };
 
+                self.update_or_delete_peerdevice(et, peerdevice);
                 if old == new && *et != EventType::Destroy {
                     return None;
                 }
@@ -625,9 +642,11 @@ impl Resource {
                     peer_node_id: peerdevice.peer_node_id,
                     old,
                     new,
+                    resource: self.clone(),
                 })
             }
             None => {
+                self.update_or_delete_peerdevice(et, peerdevice);
                 if *et == EventType::Destroy {
                     return None;
                 }
@@ -641,12 +660,17 @@ impl Resource {
                         ..Default::default()
                     },
                     new,
+                    resource: self.clone(),
                 })
             }
         }
     }
 
-    pub fn get_resource_update(&self, et: &EventType, update: &Resource) -> Option<PluginUpdate> {
+    pub fn get_resource_update(
+        &mut self,
+        et: &EventType,
+        update: &Resource,
+    ) -> Option<PluginUpdate> {
         let new = ResourceUpdateState {
             may_promote: update.may_promote,
             promotion_score: update.promotion_score,
@@ -659,6 +683,9 @@ impl Resource {
             role: self.role.clone(),
         };
 
+        if *et != EventType::Destroy {
+            self.update(update);
+        }
         if old == new && *et != EventType::Destroy {
             return None;
         }
@@ -668,6 +695,7 @@ impl Resource {
             resource_name: self.name.clone(),
             old,
             new,
+            resource: self.clone(),
         })
     }
 }

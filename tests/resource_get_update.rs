@@ -2,7 +2,7 @@ use drbdd::drbd::{Connection, Device, EventType, PeerDevice, PluginUpdate, Resou
 
 #[test]
 fn get_resource_update() {
-    let r = Resource {
+    let mut r = Resource {
         name: "foo".to_string(),
         role: Role::Primary,
         suspended: true,
@@ -14,7 +14,9 @@ fn get_resource_update() {
     };
 
     // update with self
-    assert!(r.get_resource_update(&EventType::Exists, &r).is_none());
+    assert!(r
+        .get_resource_update(&EventType::Exists, &r.clone())
+        .is_none());
 
     let mut u = r.clone();
     u.may_promote = false;

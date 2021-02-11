@@ -29,8 +29,8 @@ fn get_device_update() -> Resource {
         ..Default::default()
     };
 
-    r.update_device(d0);
-    r.update_device(d1);
+    r.update_device(&d0);
+    r.update_device(&d1);
     assert_eq!(r.devices.len(), 2);
     assert_eq!(r.devices[0].volume, 0);
     assert_eq!(r.devices[1].volume, 1);
@@ -42,7 +42,7 @@ fn get_device_update() -> Resource {
         ..Default::default()
     };
 
-    r.update_device(d1_mod);
+    r.update_device(&d1_mod);
     assert_eq!(r.devices.len(), 2);
     assert_eq!(r.devices[1].volume, 1);
     assert_eq!(r.devices[1].minor, 1);
@@ -77,8 +77,8 @@ fn get_connection_update() -> Resource {
         ..Default::default()
     };
 
-    r.update_connection(c0);
-    r.update_connection(c1);
+    r.update_connection(&c0);
+    r.update_connection(&c1);
     assert_eq!(r.connections.len(), 2);
     assert_eq!(r.connections[0].peer_node_id, 1);
     assert_eq!(r.connections[0].congested, false);
@@ -90,7 +90,7 @@ fn get_connection_update() -> Resource {
         ..Default::default()
     };
 
-    r.update_connection(c0_mod);
+    r.update_connection(&c0_mod);
     assert_eq!(r.connections.len(), 2);
     assert_eq!(r.connections[0].peer_node_id, 1);
     assert_eq!(r.connections[0].congested, true);
@@ -139,10 +139,10 @@ fn get_peerdevice_update() -> Resource {
         ..Default::default()
     };
 
-    r.update_peerdevice(pd10);
-    r.update_peerdevice(pd11);
-    r.update_peerdevice(pd20);
-    r.update_peerdevice(pd21);
+    r.update_peerdevice(&pd10);
+    r.update_peerdevice(&pd11);
+    r.update_peerdevice(&pd20);
+    r.update_peerdevice(&pd21);
     assert_eq!(r.connections.len(), 2);
     assert_eq!(r.connections[0].peerdevices.len(), 2);
     assert_eq!(r.connections[1].peerdevices.len(), 2);
@@ -163,7 +163,7 @@ fn get_peerdevice_update() -> Resource {
         ..Default::default()
     };
 
-    r.update_peerdevice(pd20_mod);
+    r.update_peerdevice(&pd20_mod);
     assert_eq!(r.connections.len(), 2);
     assert_eq!(r.connections[0].peerdevices.len(), 2);
     assert_eq!(r.connections[1].peerdevices.len(), 2);

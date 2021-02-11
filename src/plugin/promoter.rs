@@ -7,10 +7,11 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-pub fn run(cfg: PromoterOpt, rx: Receiver<PluginUpdate>) -> Result<()> {
+pub fn run(cfg: PromoterOpt, rx: Receiver<Arc<PluginUpdate>>) -> Result<()> {
     trace!("promoter: start");
 
     let type_exists = plugin::typefilter(&EventType::Exists);
@@ -44,7 +45,7 @@ pub fn run(cfg: PromoterOpt, rx: Receiver<PluginUpdate>) -> Result<()> {
             .get(&name)
             .expect("Can not happen, name filter is built from the cfg");
 
-        match r {
+        match r.as_ref() {
             PluginUpdate::Resource {
                 ref old, ref new, ..
             } => {

@@ -1,10 +1,11 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use drbdd::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
 use drbdd::events::events2;
 use drbdd::plugin::{debugger, promoter};
 use log::error;
 use std::collections::HashMap;
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::thread;
 
 struct Core {
@@ -54,6 +55,7 @@ impl Core {
         }
 
         let send_to_event_plugins = |up: PluginUpdate| -> Result<()> {
+            let up = Arc::new(up);
             for tx in &event_plugin_txs {
                 tx.send(up.clone())?;
             }
@@ -85,8 +87,6 @@ impl Core {
 
                     if et == EventType::Destroy {
                         self.resources.remove(&r.name);
-                    } else {
-                        res.update(&r);
                     }
                 }
                 EventUpdate::DeviceUpdate(et, d) => {
@@ -95,7 +95,6 @@ impl Core {
                     if let Some(i) = res.get_device_update(&et, &d) {
                         send_to_event_plugins(i)?;
                     }
-                    res.update_or_delete_device(&et, d);
                 }
                 EventUpdate::PeerDeviceUpdate(et, pd) => {
                     let res = self.get_or_create_resource(&pd.name);
@@ -103,7 +102,6 @@ impl Core {
                     if let Some(i) = res.get_peerdevice_update(&et, &pd) {
                         send_to_event_plugins(i)?;
                     }
-                    res.update_or_delete_peerdevice(&et, pd);
                 }
                 EventUpdate::ConnectionUpdate(et, c) => {
                     let res = self.get_or_create_resource(&c.name);
@@ -111,7 +109,6 @@ impl Core {
                     if let Some(i) = res.get_connection_update(&et, &c) {
                         send_to_event_plugins(i)?;
                     }
-                    res.update_or_delete_connection(&et, c)
                 }
                 EventUpdate::Stop => break,
             }

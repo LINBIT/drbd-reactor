@@ -49,38 +49,23 @@ sends update event structs on a channel to the main thread.
 
 The main thread keeps track of the overall DRBD resource state by applying these updates to an internal map of
 resource structs. Think of these as the output of `drbdsetup status --json`. The second purpose is to generate
-`PluginUpdate` enums if properties of a resource changed. For example one variant of the `PluginUpdate` is
-`ResourceRole`, that is generated if the role of a resource changed. These variants follow the same structure:
-They contain the event type, information that identifies the actual DRBD object (resource name, peer ID, volume
-ID,...) and the `old` and `new` states. These old/new states contain the rest of the relevant information
-within this event (e.g., the `may_promote`, and `promotion_score`).
+`PluginUpdate` enums if important properties of a resource changed. For example one variant of the
+`PluginUpdate` is `ResourceRole`, that is generated if the role of a resource changed. These variants follow
+the same structure: They contain the event type, information that identifies the actual DRBD object (resource
+name, peer ID, volume ID,...) and the `old` and `new` states. These old/new states contain the rest of
+the relevant information within this event (e.g., the `may_promote`, and `promotion_score`). Think of `old`
+and `new` structs as easy to consume diffs. A `PluginUpdate` also contains the current, complete state of the
+resource.
 
 ## Plugins
 
 Plugins are maintained in this repository. Every plugin is started as its own thread by the `core`.
 Communication is done via channels where plugins only consume information.
 
-After some initial experiments we found out that there are basically two different kinds of plugins.
+The core expose a `PluginUpdate` channel, the plugin just decides if the want to use the diffs from `old` and
+`new`, and/or the complete current state from `resource`.
 
-- plugins that want a complete picture of a resource if properties change
-- plugins that want to react on the "lower level" events.
-
-An example of the first category would be plugins that do minor transformations to (updated) resources and
-then forward that information in any kind. That could be exposing a json stream of updates, exposing resources
-via a REST API, all sorts of monitoring that exposes or reports the DRBD resource state in a certain format
-(e.g., Prometheus).
-
-The second kind of plugins are ones that are not interested in a complete picture of a resource, but want to
-react on certain events/state changes. This includes plugins that call helper scripts if certain state changes
-happen (e.g., a device changes its disk state from "UpToDate" to something else).
-
-The core expose both kinds of channels, the plugin just decides which one to use.
-
-# Current implementation
+# Current implementation considerations
 Currently plugins have to filter their `PluginUpdate` stream by themselves. This keeps the core simple, but
 allowing some kind of filtered subscription could make sense. If we don't do that, and keep the "all plugins
 get all events" semantic, we could switch to a broadcast channel, there are some crates out there.
-
-Currently only the `PluginUpdate` stream exists, but adding the one that sends whole resource structs is
-trivial. We might just unify these and send updates containing the "diff" and the current state. That is up to
-discussion.
