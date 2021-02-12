@@ -1,20 +1,13 @@
-use crate::plugin::{debugger, promoter};
-use anyhow::{Result, Context};
-use serde::{Deserialize, Serialize, Deserializer, Serializer};
-use std::fs::read_to_string;
-use std::path::PathBuf;
-use structopt::StructOpt;
-use log::LevelFilter;
-use stderrlog::Timestamp;
-use std::str::FromStr;
-use serde::de::Error;
 use std::fmt::Display;
+use std::str::FromStr;
 
-#[derive(Debug, StructOpt)]
-struct CliOpt {
-    #[structopt(short, long, parse(from_os_str), default_value = "/etc/drbdd.toml")]
-    config: PathBuf,
-}
+use anyhow::Result;
+use log::LevelFilter;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::Error;
+use stderrlog::Timestamp;
+
+use crate::plugin::{debugger, promoter};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ConfigOpt {
@@ -25,17 +18,6 @@ pub struct ConfigOpt {
     pub debugger: debugger::DebuggerOpt,
     #[serde(default)]
     pub log: LogOpt,
-}
-
-pub fn from_args() -> Result<ConfigOpt> {
-    let cli_opt = CliOpt::from_args();
-
-    let content = read_to_string(&cli_opt.config)
-        .with_context(|| format!("Could not read config file: {}", cli_opt.config.display()))?;
-    let config: ConfigOpt = toml::from_str(&content)
-        .with_context(|| format!("Could not parse config file content: {}", cli_opt.config.display()))?;
-
-    Ok(config)
 }
 
 #[derive(Serialize, Deserialize, Debug)]

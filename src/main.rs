@@ -1,20 +1,55 @@
+use std::collections::HashMap;
+use std::fs::read_to_string;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::mpsc::channel;
+use std::thread;
+
 use anyhow::{Context, Result};
+use log::error;
+use structopt::StructOpt;
+
+use drbdd::config;
 use drbdd::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
 use drbdd::events::events2;
 use drbdd::plugin::{debugger, promoter};
-use log::error;
-use std::collections::HashMap;
-use std::sync::mpsc::channel;
-use std::sync::Arc;
-use std::thread;
 
+#[derive(Debug, StructOpt)]
+struct CliOpt {
+    #[structopt(short, long, parse(from_os_str), default_value = "/etc/drbdd.toml")]
+    config: PathBuf,
+}
+
+pub fn from_args() -> Result<config::ConfigOpt> {
+    let cli_opt = CliOpt::from_args();
+
+    let content = read_to_string(&cli_opt.config)
+        .with_context(|| format!("Could not read config file: {}", cli_opt.config.display()))?;
+    let config = toml::from_str(&content)
+        .with_context(|| format!("Could not parse config file content: {}", cli_opt.config.display()))?;
+
+    Ok(config)
+}
+
+/// Core handles DRBD events based on the provided configuration
+///
+/// It will
+/// * start a listener thread, which runs "drbdsetup events2" and converts the events to structs
+/// * start "plugin" threads, which expect to be notified about all state changes
+/// * on the main thread, receive structs from the listener, keeping its state-of-the-world in
+///   sync.
+/// * Based on the struct received and the existing state, the main thread will forward the events
+///   to the plugin threads, enhancing the raw event with additional information like
+///   - the old state
+///   - the new state
+///   - the overall resource state
 struct Core {
     resources: HashMap<String, Resource>,
-    config: drbdd::config::ConfigOpt,
+    config: config::ConfigOpt,
 }
 
 impl Core {
-    fn new(cfg: drbdd::config::ConfigOpt) -> Core {
+    fn new(cfg: config::ConfigOpt) -> Core {
         Core {
             resources: HashMap::new(),
             config: cfg,
@@ -128,7 +163,7 @@ impl Core {
 }
 
 fn main() -> Result<()> {
-    let cfg = drbdd::config::from_args()?;
+    let cfg = from_args()?;
 
     stderrlog::new()
         .module(module_path!())
