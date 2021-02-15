@@ -1,14 +1,21 @@
-# plugins to start
-plugins = ["debugger"]
-
-[log]
+# Log configuration. If not configured, defaults to "info" level on stdout/stderr
+[[log]]
+## debugger plugin needs debug log level, default is "info"
 # level = "info" # trace, debug, info, warn, error
-## debugger plugin needs debug log level
-# timestamps = "none" # sec, ms, us, ns, none
+## Path to a fi
+# file = "/var/log/drbdd.log"
 
-[promoter]
-# [promoter.resources]
+## Enable the debugger
+# [[debugger]]
+
+# Configure a promoter
+[[promoter]]
+## Specify which resource should be watched. For example resource 'foo':
 # [promoter.resources.foo]
+## What should be started when the resource is promotable. Use absolute paths for arbitrary commands, otherwise
+## the promoter assumes the item is a systemd unit.
 # start = ["foo.mount", "foo.service"]
-# # stop = [] # if unset/empty, services from 'start' will be stopped in reverse order
-# # on-stop-failure =  "echo b > /proc/sysrq-trigger" # shell one-liner executed in a loop if a stop action fails
+## if unset/empty, services from 'start' will be stopped in reverse order
+# stop = []
+## shell one-liner executed in a loop if a stop action fails
+# on-stop-failure =  "echo b > /proc/sysrq-trigger"

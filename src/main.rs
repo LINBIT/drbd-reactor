@@ -1,18 +1,16 @@
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::mpsc::channel;
-use std::thread;
+use std::{any, fs, sync, thread};
 
 use anyhow::{Context, Result};
 use log::error;
+use simplelog;
 use structopt::StructOpt;
 
-use drbdd::config;
 use drbdd::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
 use drbdd::events::events2;
-use drbdd::plugin::{debugger, promoter};
+use drbdd::{config, plugin};
 
 #[derive(Debug, StructOpt)]
 struct CliOpt {
@@ -20,13 +18,17 @@ struct CliOpt {
     config: PathBuf,
 }
 
-pub fn from_args() -> Result<config::ConfigOpt> {
+pub fn from_args() -> Result<config::Config> {
     let cli_opt = CliOpt::from_args();
 
     let content = read_to_string(&cli_opt.config)
         .with_context(|| format!("Could not read config file: {}", cli_opt.config.display()))?;
-    let config = toml::from_str(&content)
-        .with_context(|| format!("Could not parse config file content: {}", cli_opt.config.display()))?;
+    let config = toml::from_str(&content).with_context(|| {
+        format!(
+            "Could not parse config file content: {}",
+            cli_opt.config.display()
+        )
+    })?;
 
     Ok(config)
 }
@@ -35,24 +37,24 @@ pub fn from_args() -> Result<config::ConfigOpt> {
 ///
 /// It will
 /// * start a listener thread, which runs "drbdsetup events2" and converts the events to structs
-/// * start "plugin" threads, which expect to be notified about all state changes
 /// * on the main thread, receive structs from the listener, keeping its state-of-the-world in
 ///   sync.
 /// * Based on the struct received and the existing state, the main thread will forward the events
-///   to the plugin threads, enhancing the raw event with additional information like
+///   to the plugin channels, enhancing the raw event with additional information like:
 ///   - the old state
 ///   - the new state
 ///   - the overall resource state
 struct Core {
     resources: HashMap<String, Resource>,
-    config: config::ConfigOpt,
 }
 
 impl Core {
-    fn new(cfg: config::ConfigOpt) -> Core {
+    /// Initialize a new Core
+    ///
+    /// The Core is empty (i.e. does not store any state) until it is run.
+    fn new() -> Core {
         Core {
             resources: HashMap::new(),
-            config: cfg,
         }
     }
 
@@ -62,42 +64,24 @@ impl Core {
             .or_insert(Resource::with_name(name))
     }
 
-    fn run(&mut self) -> Result<()> {
-        let mut handles = vec![];
-        let mut event_plugin_txs = vec![];
-
-        for p in &self.config.plugins {
-            let (ptx, prx) = channel();
-            match p.as_ref() {
-                "promoter" => {
-                    let cfg = self.config.promoter.clone();
-                    let handle = thread::spawn(|| promoter::run(cfg, prx));
-                    handles.push(handle);
-                    event_plugin_txs.push(ptx);
-                }
-                "debugger" => {
-                    let cfg = self.config.debugger.clone();
-                    let handle = thread::spawn(|| debugger::run(cfg, prx));
-                    handles.push(handle);
-                    event_plugin_txs.push(ptx);
-                }
-                _ => return Err(anyhow::anyhow!("unknown plugin")),
-            }
-        }
-
-        if handles.is_empty() {
+    /// Start the core
+    ///
+    /// This will start listening for DRBD events, keeping track of any changes, updating the
+    /// state of the world and forwarding this information to all plugins via the given senders.
+    fn run(&mut self, event_plugin_txs: Vec<plugin::PluginSender>) -> Result<()> {
+        if event_plugin_txs.is_empty() {
             return Err(anyhow::anyhow!("You need to enable at least one plugin"));
         }
 
         let send_to_event_plugins = |up: PluginUpdate| -> Result<()> {
-            let up = Arc::new(up);
+            let up = sync::Arc::new(up);
             for tx in &event_plugin_txs {
                 tx.send(up.clone())?;
             }
             Ok(())
         };
 
-        let (e2tx, e2rx) = channel();
+        let (e2tx, e2rx) = sync::mpsc::channel();
         let done = e2tx.clone();
         thread::spawn(|| {
             if let Err(e) = events2(e2tx) {
@@ -149,38 +133,87 @@ impl Core {
             }
         }
 
-        for tx in event_plugin_txs {
-            drop(tx);
-        }
-        for h in handles {
-            if let Err(_) = h.join() {
-                return Err(anyhow::anyhow!("plugin thread panicked"));
-            }
-        }
-
         Ok(())
     }
+}
+
+/// Initialize all configured loggers and set them up as global log sink
+fn init_loggers(log_cfgs: Vec<config::LogConfig>) -> Result<()> {
+    let mut all_loggers = Vec::new();
+    for log_cfg in log_cfgs {
+        let logger: Box<dyn simplelog::SharedLogger> = match log_cfg.file {
+            Some(path) => {
+                let log_file = fs::File::create(&path).with_context(|| {
+                    format!("failed to open configured log file: {}", path.display())
+                })?;
+                simplelog::WriteLogger::new(log_cfg.level, Default::default(), log_file)
+            }
+            None => {
+                simplelog::TermLogger::new(log_cfg.level, Default::default(), Default::default())
+            }
+        };
+
+        all_loggers.push(logger);
+    }
+    simplelog::CombinedLogger::init(all_loggers).context("failed to set up logging")?;
+
+    Ok(())
+}
+
+/// Converts a message generated by `panic!` into an error.
+///
+/// Useful to convert the Result of a thread handle `.join()` into a readable error message.
+fn thread_panic_error(original: Box<dyn any::Any + Send>) -> anyhow::Error {
+    match original.downcast_ref::<&str>() {
+        Some(d) => return anyhow::anyhow!("plugin panicked: {}", d),
+        None => (),
+    };
+
+    match original.downcast_ref::<String>() {
+        Some(d) => return anyhow::anyhow!("plugin panicked: {}", d),
+        None => (),
+    };
+
+    anyhow::anyhow!("plugin panicked with unrecoverable error message")
 }
 
 fn main() -> Result<()> {
     let cfg = from_args()?;
 
-    stderrlog::new()
-        .module(module_path!())
-        .quiet(cfg.log.quiet)
-        // There is no way to set the log level directly. Instead we have to
-        // use this verbosity setting, which converts back to a LevelFilter
-        // while ignoring the "Off" variant. For example,
-        // LevelFilter::Error -> 1 as usize -> 0 verbosity.
-        // LevelFilter::Off -> 0 as usize -> 0 verbosity.
-        .verbosity((cfg.log.level as usize).saturating_sub(1))
-        .timestamp(cfg.log.timestamps)
-        .init()
-        .context("failed to set up logger")?;
+    init_loggers(cfg.log)?;
 
-    Core::new(cfg)
-        .run()
+    let (handles, senders) = plugin::start_from_config(cfg.plugins);
+
+    Core::new()
+        .run(senders)
         .context("core did not exit successfully")?;
 
+    for handle in handles {
+        handle
+            .join()
+            .unwrap_or_else(|e| Err(thread_panic_error(e)))?;
+    }
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_panic_error() {
+        let str_result = thread::spawn(|| panic!("some &str panic")).join();
+        let panic_msg = str_result.expect_err("must panic");
+        let panic_err = thread_panic_error(panic_msg);
+        assert_eq!(panic_err.to_string(), "plugin panicked: some &str panic");
+
+        let string_result = thread::spawn(|| panic!("some String panic: {}", 2)).join();
+        let panic_msg = string_result.expect_err("must panic");
+        let panic_err = thread_panic_error(panic_msg);
+        assert_eq!(
+            panic_err.to_string(),
+            "plugin panicked: some String panic: 2"
+        );
+    }
 }

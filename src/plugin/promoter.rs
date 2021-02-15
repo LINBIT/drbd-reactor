@@ -1,17 +1,17 @@
-use crate::drbd::{EventType, PluginUpdate};
-use crate::plugin;
-use anyhow::Result;
-use log::{info, trace};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::mpsc::Receiver;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-pub fn run(cfg: PromoterOpt, rx: Receiver<Arc<PluginUpdate>>) -> Result<()> {
+use anyhow::Result;
+use log::{info, trace};
+use serde::{Deserialize, Serialize};
+
+use crate::drbd::{EventType, PluginUpdate};
+use crate::plugin;
+
+pub fn run(cfg: PromoterConfig, rx: super::PluginReceiver) -> Result<()> {
     trace!("promoter: start");
 
     let type_exists = plugin::typefilter(&EventType::Exists);
@@ -75,7 +75,7 @@ pub fn run(cfg: PromoterOpt, rx: Receiver<Arc<PluginUpdate>>) -> Result<()> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct PromoterOpt {
+pub struct PromoterConfig {
     #[serde(default)]
     pub resources: HashMap<String, PromoterOptResource>,
 }

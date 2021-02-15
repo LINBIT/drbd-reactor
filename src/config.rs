@@ -1,70 +1,62 @@
-use std::fmt::Display;
-use std::str::FromStr;
+use std::path::PathBuf;
 
-use anyhow::Result;
 use log::LevelFilter;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::de::Error;
-use stderrlog::Timestamp;
+use serde::{Deserialize, Serialize};
 
-use crate::plugin::{debugger, promoter};
+use crate::plugin;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ConfigOpt {
-    pub plugins: Vec<String>,
-    #[serde(default)]
-    pub promoter: promoter::PromoterOpt,
-    #[serde(default)]
-    pub debugger: debugger::DebuggerOpt,
-    #[serde(default)]
-    pub log: LogOpt,
+pub struct Config {
+    #[serde(default = "default_log")]
+    pub log: Vec<LogConfig>,
+
+    #[serde(flatten)]
+    pub plugins: plugin::PluginConfig,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct LogOpt {
-    #[serde(default)]
-    pub quiet: bool,
-    #[serde(default = "default_level", serialize_with = "serialize_levelfilter", deserialize_with = "deserialize_from_str")]
+pub struct LogConfig {
+    #[serde(default = "default_level")]
     pub level: LevelFilter,
-    #[serde(default = "default_timestamp", serialize_with = "serialize_timestamp", deserialize_with = "deserialize_from_str")]
-    pub timestamps: Timestamp,
-}
-
-impl Default for LogOpt {
-    fn default() -> Self {
-        LogOpt {
-            quiet: false,
-            level: default_level(),
-            timestamps: default_timestamp(),
-        }
-    }
+    pub file: Option<PathBuf>,
 }
 
 fn default_level() -> LevelFilter {
     LevelFilter::Info
 }
 
-fn default_timestamp() -> Timestamp {
-    Timestamp::Off
+fn default_log() -> Vec<LogConfig> {
+    return vec![LogConfig {
+        level: default_level(),
+        file: None,
+    }];
 }
 
-fn deserialize_from_str<'de, D, T>(de: D) -> Result<T, D::Error> where D: Deserializer<'de>, T: FromStr, T::Err: Display {
-    let s: &str = Deserialize::deserialize(de)?;
-    let val = s.parse().map_err(D::Error::custom)?;
-    Ok(val)
-}
+#[cfg(test)]
+mod tests {
+    use toml;
 
-fn serialize_levelfilter<S>(l: &LevelFilter, ser: S) -> Result<S::Ok, S::Error> where S: Serializer {
-    ser.serialize_str(l.as_str())
-}
+    use super::*;
 
-fn serialize_timestamp<S>(t: &Timestamp, ser: S) -> Result<S::Ok, S::Error> where S: Serializer {
-    let s = match t {
-        &Timestamp::Off => "off",
-        &Timestamp::Nanosecond => "ns",
-        &Timestamp::Microsecond => "us",
-        &Timestamp::Millisecond => "ms",
-        &Timestamp::Second => "s",
-    };
-    ser.serialize_str(s)
+    const EMPTY_CFG: &str = "";
+    const OVERRIDE_LOG_CFG: &str = r#"[[log]]
+    level = "trace"
+    file = "/var/log/drbdd.log"
+    "#;
+
+    #[test]
+    fn test_default_cfg() {
+        let cfg: Config = toml::from_str(EMPTY_CFG).expect("cfg must parse");
+        assert_eq!(cfg.log.len(), 1);
+        assert_eq!(cfg.log[0].level, default_level());
+        assert_eq!(cfg.log[0].file, None);
+    }
+
+    #[test]
+    fn test_override_log_cfg() {
+        let cfg: Config = toml::from_str(OVERRIDE_LOG_CFG).expect("cfg must parse");
+        assert_eq!(cfg.log.len(), 1);
+        assert_eq!(cfg.log[0].level, LevelFilter::Trace);
+        assert_eq!(cfg.log[0].file, Some(PathBuf::from("/var/log/drbdd.log")));
+    }
 }
