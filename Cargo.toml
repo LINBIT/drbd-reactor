@@ -3,7 +3,7 @@ name = "drbdd"
 version = "0.1.0"
 authors = ["Roland Kammerer <roland.kammerer@linbit.com>", "Moritz Wanzenböck <moritz.wanzenboeck@linbit.com>"]
 edition = "2018"
-description = "Daemon monitoring the state of DRBD resources, and executing plugins acting on state changes."
+description = "Monitors DRBD resources via plugins."
 license = "Apache-2.0"
 readme = "README.md"
 
@@ -20,3 +20,9 @@ ctrlc = "3.1"
 log = { version = "0.4", features = ["serde"] }
 simplelog = "0.9"
 regex = "1"
+
+[package.metadata.deb]
+revision = "1"
+maintainer-scripts = "debian/"
+systemd-units = { enable = false, unit-scripts = "example/" }
+extended-description = "Daemon monitoring the state of DRBD resources, and executing plugins acting on state changes."

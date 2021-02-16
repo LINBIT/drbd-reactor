@@ -1,0 +1,8 @@
+[Unit]
+Description=DRBDD Service
+
+[Service]
+ExecStart=/usr/bin/drbdd
+
+[Install]
+WantedBy=multi-user.target

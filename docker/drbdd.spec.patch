@@ -1,0 +1,26 @@
+--- .rpm/drbdd.spec.orig	2021-02-16 11:27:59.718780688 +0000
++++ .rpm/drbdd.spec	2021-02-16 11:28:47.379036270 +0000
+@@ -5,7 +5,8 @@
+ Name: drbdd
+ Summary: Daemon monitoring the state of DRBD resources, and executing plugins acting on state changes.
+ Version: @@VERSION@@
+-Release: @@RELEASE@@%{?dist}
++Release: @@RELEASE@@
++BuildRequires: systemd
+ License: ASL 2.0
+ Group: Applications/System
+ Source0: %{name}-%{version}.tar.gz
+@@ -22,6 +23,8 @@
+ rm -rf %{buildroot}
+ mkdir -p %{buildroot}
+ cp -a * %{buildroot}
++mkdir -p %{buildroot}/%{_unitdir}
++cp /tmp/src/example/drbdd.service %{buildroot}/%{_unitdir}
+ 
+ %clean
+ rm -rf %{buildroot}
+@@ -29,3 +32,4 @@
+ %files
+ %defattr(-,root,root,-)
+ %{_bindir}/*
++%{_unitdir}/drbdd.service

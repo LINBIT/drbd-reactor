@@ -1,7 +1,7 @@
 FROM centos:centos7
 MAINTAINER Roland Kammerer <roland.kammerer@linbit.com>
 
-RUN yum install -y gcc rpm-build && \
+RUN yum install -y gcc rpm-build systemd && \
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y -q --no-modify-path && \
 	. "${HOME}/.cargo/env" && \
 	cargo install cargo-rpm && \
