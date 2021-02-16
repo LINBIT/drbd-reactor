@@ -5,6 +5,7 @@ authors = ["Roland Kammerer <roland.kammerer@linbit.com>"]
 edition = "2018"
 description = "Daemon monitoring the state of DRBD resources, and executing plugins acting on state changes."
 license = "Apache-2.0"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
