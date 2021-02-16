@@ -12,3 +12,14 @@ If a resource looses "quorum", it stops all the systemd units in reverse order.
 The plugin's configuration can contain an action that is executed if a stop action fails (e.g., triggering a
 reboot). Start/stop actions are interpreted as systemd units and handled as such. Other service
 mangers/scripts are supported by starting the action with an absolute path.
+
+## DRBD resource configuration
+
+Make sure the resource has the following options set:
+
+```
+options {
+   quorum majority;
+   on-no-quorum io-error;
+}
+```
