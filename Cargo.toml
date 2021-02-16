@@ -1,7 +1,7 @@
 [package]
 name = "drbdd"
 version = "0.1.0"
-authors = ["Roland Kammerer <roland.kammerer@linbit.com>"]
+authors = ["Roland Kammerer <roland.kammerer@linbit.com>", "Moritz Wanzenböck <moritz.wanzenboeck@linbit.com>"]
 edition = "2018"
 description = "Daemon monitoring the state of DRBD resources, and executing plugins acting on state changes."
 license = "Apache-2.0"
