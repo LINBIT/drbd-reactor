@@ -18,4 +18,5 @@
 ## if unset/empty, services from 'start' will be stopped in reverse order
 # stop = []
 ## shell one-liner executed in a loop if a stop action fails
+## if unset, this defaults to "true"
 # on-stop-failure =  "echo b > /proc/sysrq-trigger"
