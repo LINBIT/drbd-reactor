@@ -62,7 +62,7 @@ resource.
 Plugins are maintained in this repository. Every plugin is started as its own thread by the `core`.
 Communication is done via channels where plugins only consume information.
 
-The core expose a `PluginUpdate` channel, the plugin just decides if the want to use the diffs from `old` and
+The core expose a `PluginUpdate` channel, the plugin decides if it wants to use the diffs from `old` and
 `new`, and/or the complete current state from `resource`.
 
 # Current implementation considerations
