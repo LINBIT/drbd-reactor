@@ -3,8 +3,8 @@
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 cd /
-mkdir -p /tmp/src
-cd /tmp/src && cp -r /src/* .
+mkdir -p /tmp/src/drbdd
+cd /tmp/src/drbdd && cp -r /src/* .
 
 source "$HOME/.cargo/env"
 case $1 in
@@ -15,7 +15,7 @@ case $1 in
 		find ./target/release/rpmbuild/RPMS/ -name "*.rpm" -exec cp {} /out \;
 		;;
 	deb)
-		cargo deb
-		find ./target/debian/ -name "*.deb" -exec cp {} /out \;
+		debuild -us -uc -i -b
+		find /tmp/src -name "*.deb" -exec cp {} /out \;
 		;;
 esac

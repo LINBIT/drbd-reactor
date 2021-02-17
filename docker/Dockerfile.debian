@@ -2,8 +2,5 @@ FROM debian:buster
 MAINTAINER Roland Kammerer <roland.kammerer@linbit.com>
 
 RUN apt-get update && \
-	apt-get install -y gcc curl dh-systemd && \
-	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y -q --no-modify-path && \
-	. "${HOME}/.cargo/env" && \
-	cargo install cargo-deb && \
+	apt-get install -y gcc curl dh-systemd devscripts cargo rustc && \
 	apt-get clean -y

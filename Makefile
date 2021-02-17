@@ -1,5 +1,21 @@
+PROG := drbdd
+DEBUG ?=
+DESTDIR =
 DEBCONTAINER=drbdd:deb
 RPMCONTAINER=drbdd:rpm
+
+$(info DEBUG is $(DEBUG))
+
+ifdef DEBUG
+	RELEASE :=
+	TARGET := debug
+else
+	RELEASE := --release
+	TARGET := release
+endif
+
+build: ## cargo build binary
+	cargo build $(RELEASE)
 
 .PHONY: help
 help:
@@ -24,3 +40,14 @@ rpm: ## Build a rpm package
 	tmpdir=$$(mktemp -d) && \
 	docker run -it --rm -v $$PWD:/src:ro -v $$tmpdir:/out --entrypoint=/src/docker/entry.sh $(RPMCONTAINER) rpm && \
 	mv $$tmpdir/*.rpm . && echo "rm -rf $$tmpdir"
+
+install:  # install binary and config
+	install -D -m 0750 target/$(TARGET)/$(PROG) $(DESTDIR)/usr/sbin/$(PROG)
+	install -D -m 0640 example/drbdd.toml $(DESTDIR)/etc/drbdd.toml
+	install -D -m 0640 example/drbdd.service $(DESTDIR)/lib/systemd/system/drbdd.service
+
+clean: ## cargo clean
+	cargo clean
+
+test: ## cargo test
+	cargo test

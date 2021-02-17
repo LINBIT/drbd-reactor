@@ -1,0 +1,23 @@
+drbdd (0.1.0~rc.1-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * initial commit
+  * events: check minimum drbdsetup version
+  * PluginUpdate: send current resource state
+  * promoter,doc: mention default for on-stop-failure
+  * Cargo.toml: add readme
+  * Cargo.toml,authors: add Moritz
+  * packaging: add systemd service file
+  * promoter: add res config section
+  * README.md: fix UpdatePluging description
+
+  [ Rene Peinthor ]
+  * Add .gitlab-ci.yml
+
+  [ Moritz "WanzenBug" Wanzenböck ]
+  * Use enums in place of strings when parsing log config
+  * add .gitignore
+  * move CLI arg parsing to main
+  * refactor config file
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Wed, 17 Feb 2021 10:25:16 +0100
