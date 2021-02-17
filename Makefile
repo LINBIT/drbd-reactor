@@ -3,6 +3,7 @@ DEBUG ?=
 DESTDIR =
 DEBCONTAINER=drbdd:deb
 RPMCONTAINER=drbdd:rpm
+REL = $(PROG)-$(VERSION)
 
 $(info DEBUG is $(DEBUG))
 
@@ -51,3 +52,17 @@ clean: ## cargo clean
 
 test: ## cargo test
 	cargo test
+
+debrelease: checkVERSION
+	dh_clean || true
+	ln -s . $(REL) || true
+	tar --owner=0 --group=0 -czvf $(REL).tar.gz \
+		$$(git ls-files | awk '{print "$(REL)/" $$0}')
+	if test -L "$(REL)"; then rm $(REL); fi
+
+ifndef VERSION
+checkVERSION:
+	$(error environment variable VERSION is not set)
+else
+checkVERSION:
+endif

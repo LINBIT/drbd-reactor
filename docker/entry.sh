@@ -4,15 +4,17 @@ SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 cd /
 mkdir -p /tmp/src/drbdd
-cd /tmp/src/drbdd && cp -r /src/* .
+cd /tmp/src/drbdd && cp -r /src . && cd ./src
 
 source "$HOME/.cargo/env"
 case $1 in
 	rpm)
-		USER=builder cargo rpm init
-		(cd .rpm && patch < ../docker/drbdd.spec.patch)
-		cargo rpm build
-		find ./target/release/rpmbuild/RPMS/ -name "*.rpm" -exec cp {} /out \;
+		VERSION="$(awk '/^Version:/ {print $2}' drbdd.spec)"
+		make debrelease VERSION="$VERSION"
+		mkdir -p "$(rpm -E "%_topdir")/SOURCES"
+		mv "./drbdd-${VERSION}.tar.gz" "$(rpm -E "%_topdir")/SOURCES"
+		rpmbuild -bb drbdd.spec
+		find ~/rpmbuild/RPMS/ -name "*.rpm" -exec cp {} /out \;
 		;;
 	deb)
 		debuild -us -uc -i -b
