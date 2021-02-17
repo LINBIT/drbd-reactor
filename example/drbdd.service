@@ -2,7 +2,7 @@
 Description=DRBDD Service
 
 [Service]
-ExecStart=/usr/bin/drbdd
+ExecStart=/usr/sbin/drbdd
 
 [Install]
 WantedBy=multi-user.target
