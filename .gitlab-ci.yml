@@ -19,6 +19,19 @@ image: "rust:latest"
 
 # Use cargo to test the project
 test:cargo:
+  before_script:
+    - cargo install cargo2junit
   script:
     - rustc --version && cargo --version  # Print version info for debugging
-    - cargo test --workspace --verbose
+    - cargo test --locked -- -Z unstable-options --format json | cargo2junit > results.xml
+  artifacts:
+    reports:
+      junit:
+        - results.xml
+
+test:rustfmt:
+  before_script:
+    - rustup component add rustfmt
+  script:
+    - cargo fmt -- --version && cargo fmt -- --print-config current .
+    - cargo fmt -- --check
