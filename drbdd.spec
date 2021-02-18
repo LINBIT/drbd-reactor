@@ -4,11 +4,12 @@ Name:		drbdd
 Version:	0.1.0~rc.1
 Release:	1
 Summary:	Monitors DRBD resources via plugins.
+%global	tarball_version %(echo "%{version}" | sed -e 's/~rc/-rc/' -e 's/~alpha/-alpha/')
 
 Group:		System Environment/Daemons
 License:	ASL 2.0
 URL:		https://www.github.com/LINBIT/drbdd
-Source0:	%{name}-%{version}.tar.gz
+Source0:	https://www.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
 
 BuildRequires:	systemd
 
@@ -18,7 +19,7 @@ acting on state changes.
 Plugins can for example monitor resources or promote DRBD resources.
 
 %prep
-%setup -q
+%setup -q -n %{name}-%{tarball_version}
 
 
 %build

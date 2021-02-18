@@ -9,7 +9,7 @@ cd /tmp/src/drbdd && cp -r /src . && cd ./src
 source "$HOME/.cargo/env"
 case $1 in
 	rpm)
-		VERSION="$(awk '/^Version:/ {print $2}' drbdd.spec)"
+		VERSION="$(awk -F '=' '/^version/ {gsub(/"/, "", $2); gsub(/ /, "", $2); print $2}' Cargo.toml)"
 		make debrelease VERSION="$VERSION"
 		mkdir -p "$(rpm -E "%_topdir")/SOURCES"
 		mv "./drbdd-${VERSION}.tar.gz" "$(rpm -E "%_topdir")/SOURCES"
