@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
-use std::{any, fs, sync, thread};
+use std::{any, io, sync, thread};
 
 use anyhow::{Context, Result};
+use fern;
 use log::error;
-use simplelog;
 use structopt::StructOpt;
 
 use drbdd::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
@@ -139,23 +139,29 @@ impl Core {
 
 /// Initialize all configured loggers and set them up as global log sink
 fn init_loggers(log_cfgs: Vec<config::LogConfig>) -> Result<()> {
-    let mut all_loggers = Vec::new();
+    let mut central_dispatcher = fern::Dispatch::new().format(|out, message, record| {
+        out.finish(format_args!(
+            "{} [{}] {}",
+            record.level(),
+            record.target(),
+            message,
+        ))
+    });
+
     for log_cfg in log_cfgs {
-        let logger: Box<dyn simplelog::SharedLogger> = match log_cfg.file {
-            Some(path) => {
-                let log_file = fs::File::create(&path).with_context(|| {
-                    format!("failed to open configured log file: {}", path.display())
-                })?;
-                simplelog::WriteLogger::new(log_cfg.level, Default::default(), log_file)
-            }
-            None => {
-                simplelog::TermLogger::new(log_cfg.level, Default::default(), Default::default())
-            }
+        let out: fern::Output = match log_cfg.file {
+            Some(path) => fern::log_file(path)?.into(),
+            None => io::stderr().into(),
         };
 
-        all_loggers.push(logger);
+        let dispatch_for_cfg = fern::Dispatch::new().level(log_cfg.level).chain(out);
+
+        central_dispatcher = central_dispatcher.chain(dispatch_for_cfg);
     }
-    simplelog::CombinedLogger::init(all_loggers).context("failed to set up logging")?;
+
+    central_dispatcher
+        .apply()
+        .context("failed to set up logging")?;
 
     Ok(())
 }

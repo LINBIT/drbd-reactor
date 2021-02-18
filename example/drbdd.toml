@@ -1,8 +1,8 @@
 # Log configuration. If not configured, defaults to "info" level on stdout/stderr
 [[log]]
 ## debugger plugin needs debug log level, default is "info"
-# level = "info" # trace, debug, info, warn, error
-## Path to a fi
+# level = "info" # trace, debug, info, warn, error, off
+## Path to a log file
 # file = "/var/log/drbdd.log"
 
 ## Enable the debugger
