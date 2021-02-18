@@ -65,4 +65,6 @@ checkVERSION:
 	$(error environment variable VERSION is not set)
 else
 checkVERSION:
+	lbvers.py check --base=$(BASE) --build=$(BUILD) --build-nr=$(BUILD_NR) --pkg-nr=$(PKG_NR) \
+		--cargo=Cargo.toml --debian-changelog=debian/changelog --rpm-spec=drbdd.spec
 endif
