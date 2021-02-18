@@ -39,5 +39,5 @@ make install DESTDIR=%{buildroot}
 
 
 %changelog
-* Wed Feb 17 2021 Roland Kammerer <roland.kammerer@linbit.com> - 0.1.0~rc.1
+* Wed Feb 17 2021 Roland Kammerer <roland.kammerer@linbit.com> - 0.1.0~rc.1-1
 -  New upstream release
