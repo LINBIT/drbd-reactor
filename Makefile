@@ -55,10 +55,12 @@ test: ## cargo test
 
 debrelease: checkVERSION
 	dh_clean || true
-	ln -s . $(REL) || true
-	tar --owner=0 --group=0 -czvf $(REL).tar.gz \
-		$$(git ls-files | awk '{print "$(REL)/" $$0}')
-	if test -L "$(REL)"; then rm $(REL); fi
+	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf $(REL).tar.gz \
+		$$(git ls-files | grep -v '^\.')
+
+release: checkVERSION
+	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf $(REL).tar.gz \
+		$$(git ls-files | grep -v '^\.' | grep -v '^debian\/')
 
 ifndef VERSION
 checkVERSION:
