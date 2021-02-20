@@ -1,3 +1,21 @@
+drbdd (0.1.0~rc.2-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * packaging,rpm: use real upstream name
+  * Cargo.lock: bring back in sync
+  * build: start using lbvers.py
+  * packaging,rpm: add Release in %changelog
+  * build,rpm: fix docker build
+  * deps,fern: allow 0.5
+  * build: add release target
+
+  [ Moritz "WanzenBug" Wanzenböck ]
+  * Ensure rustfmt formatting + test reports in CI
+  * Remove unused "exitcode" crate
+  * switch to fern for logging
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Sat, 20 Feb 2021 16:16:16 +0100
+
 drbdd (0.1.0~rc.1-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
