@@ -5,7 +5,7 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::Result;
-use log::{info, trace};
+use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::drbd::{EventType, PluginUpdate};
@@ -14,9 +14,11 @@ use crate::plugin;
 pub fn run(cfg: PromoterConfig, rx: super::PluginReceiver) -> Result<()> {
     trace!("promoter: start");
 
+    let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
+    adjust_resources(&names)?;
+
     let type_exists = plugin::typefilter(&EventType::Exists);
     let type_change = plugin::typefilter(&EventType::Change);
-    let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
     let names = plugin::namefilter(&names);
 
     // set default stop actions (i.e., reversed start, and default on-stop-failure (i.e., true)
@@ -147,6 +149,20 @@ pub fn on_failure(action: &str) {
         }
         thread::sleep(Duration::from_secs(2));
     }
+}
+
+fn adjust_resources(to_start: &[String]) -> Result<()> {
+    for res in to_start {
+        let status = Command::new("drbdadm").arg("adjust").arg(res).status()?;
+        if !status.success() {
+            // for now let's keep it a warning, I don't think we should fail hard here.
+            warn!(
+                "promoter: 'drbdadm adjust {}' did not return successfully",
+                res
+            );
+        }
+    }
+    Ok(())
 }
 
 enum State {
