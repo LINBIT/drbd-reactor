@@ -2,15 +2,25 @@ use anyhow::Result;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 
-pub fn run(_cfg: DebuggerConfig, rx: super::PluginReceiver) -> Result<()> {
-    trace!("debugger: start");
+pub struct Debugger {}
 
-    for r in rx {
-        debug!("{:#?}", r);
+impl Debugger {
+    pub fn new(_cfg: DebuggerConfig) -> Result<Self> {
+        Ok(Debugger {})
     }
+}
 
-    trace!("debugger: exit");
-    Ok(())
+impl super::Plugin for Debugger {
+    fn run(&self, rx: super::PluginReceiver) -> Result<()> {
+        trace!("debugger: start");
+
+        for r in rx {
+            debug!("{:#?}", r);
+        }
+
+        trace!("debugger: exit");
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]

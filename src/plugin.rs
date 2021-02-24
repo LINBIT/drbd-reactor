@@ -14,6 +14,10 @@ pub mod promoter;
 pub type PluginSender = mpsc::Sender<Arc<PluginUpdate>>;
 pub type PluginReceiver = mpsc::Receiver<Arc<PluginUpdate>>;
 
+trait Plugin: Send {
+    fn run(&self, rx: PluginReceiver) -> anyhow::Result<()>;
+}
+
 pub fn namefilter(names: &[String]) -> impl Fn(&Arc<PluginUpdate>) -> bool + '_ {
     return move |up: &Arc<PluginUpdate>| {
         for name in names {
@@ -63,23 +67,24 @@ pub struct PluginConfig {
 /// of the channel used to communicate with the plugin.
 pub fn start_from_config(
     cfg: PluginConfig,
-) -> (Vec<thread::JoinHandle<Result<()>>>, Vec<PluginSender>) {
+) -> Result<(Vec<thread::JoinHandle<Result<()>>>, Vec<PluginSender>)> {
     let mut handles = Vec::new();
     let mut senders = Vec::new();
 
+    let mut plugins: Vec<Box<dyn Plugin>> = Vec::new();
     for debug_cfg in cfg.debugger {
-        let (ptx, prx) = mpsc::channel();
-        let handle = thread::spawn(|| debugger::run(debug_cfg, prx));
-        handles.push(handle);
-        senders.push(ptx);
+        plugins.push(Box::new(debugger::Debugger::new(debug_cfg)?));
     }
-
     for promote_cfg in cfg.promoter {
+        plugins.push(Box::new(promoter::Promoter::new(promote_cfg)?));
+    }
+
+    for d in plugins {
         let (ptx, prx) = mpsc::channel();
-        let handle = thread::spawn(|| promoter::run(promote_cfg, prx));
+        let handle = thread::spawn(move || d.run(prx));
         handles.push(handle);
         senders.push(ptx);
     }
 
-    (handles, senders)
+    Ok((handles, senders))
 }

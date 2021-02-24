@@ -188,7 +188,7 @@ fn main() -> Result<()> {
 
     init_loggers(cfg.log)?;
 
-    let (handles, senders) = plugin::start_from_config(cfg.plugins);
+    let (handles, senders) = plugin::start_from_config(cfg.plugins)?;
 
     Core::new()
         .run(senders)

@@ -11,69 +11,84 @@ use serde::{Deserialize, Serialize};
 use crate::drbd::{EventType, PluginUpdate};
 use crate::plugin;
 
-pub fn run(cfg: PromoterConfig, rx: super::PluginReceiver) -> Result<()> {
-    trace!("promoter: start");
+pub struct Promoter {
+    cfg: PromoterConfig,
+}
 
-    let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
-    adjust_resources(&names)?;
+impl Promoter {
+    pub fn new(cfg: PromoterConfig) -> Result<Self> {
+        let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
+        adjust_resources(&names)?;
 
-    let type_exists = plugin::typefilter(&EventType::Exists);
-    let type_change = plugin::typefilter(&EventType::Change);
-    let names = plugin::namefilter(&names);
-
-    // set default stop actions (i.e., reversed start, and default on-stop-failure (i.e., true)
-    let cfg = {
-        let mut cfg = cfg.clone();
-        for res in cfg.resources.values_mut() {
-            if res.stop.is_empty() {
-                res.stop = res.start.clone();
-                res.stop.reverse();
-            }
-            if res.on_stop_failure == "" {
-                res.on_stop_failure = "true".to_string();
-            }
-        }
-        cfg
-    };
-
-    for r in rx
-        .into_iter()
-        .filter(names)
-        .filter(|x| type_exists(x) || type_change(x))
-    {
-        let name = r.get_name();
-        let res = cfg
-            .resources
-            .get(&name)
-            .expect("Can not happen, name filter is built from the cfg");
-
-        match r.as_ref() {
-            PluginUpdate::Resource {
-                ref old, ref new, ..
-            } => {
-                if !old.may_promote && new.may_promote {
-                    info!("promoter: resource '{}' may promote", name);
-                    if start_actions(&res.start).is_err() && stop_actions(&res.stop).is_err() {
-                        on_failure(&res.on_stop_failure); // loops until success
-                    }
-                }
-            }
-            PluginUpdate::Device {
-                ref old, ref new, ..
-            } => {
-                if old.quorum && !new.quorum {
-                    info!("promoter: resource '{}' lost quorum", name);
-                    if stop_actions(&res.stop).is_err() {
-                        on_failure(&res.on_stop_failure); // loops until success
-                    }
-                }
-            }
-            _ => (),
-        }
+        Ok(Self { cfg })
     }
+}
 
-    trace!("promoter: exit");
-    Ok(())
+impl super::Plugin for Promoter {
+    fn run(&self, rx: super::PluginReceiver) -> Result<()> {
+        trace!("promoter: start");
+
+        let names = self.cfg.resources.keys().cloned().collect::<Vec<String>>();
+        adjust_resources(&names)?;
+
+        let type_exists = plugin::typefilter(&EventType::Exists);
+        let type_change = plugin::typefilter(&EventType::Change);
+        let names = plugin::namefilter(&names);
+
+        // set default stop actions (i.e., reversed start, and default on-stop-failure (i.e., true)
+        let cfg = {
+            let mut cfg = self.cfg.clone();
+            for res in cfg.resources.values_mut() {
+                if res.stop.is_empty() {
+                    res.stop = res.start.clone();
+                    res.stop.reverse();
+                }
+                if res.on_stop_failure == "" {
+                    res.on_stop_failure = "true".to_string();
+                }
+            }
+            cfg
+        };
+
+        for r in rx
+            .into_iter()
+            .filter(names)
+            .filter(|x| type_exists(x) || type_change(x))
+        {
+            let name = r.get_name();
+            let res = cfg
+                .resources
+                .get(&name)
+                .expect("Can not happen, name filter is built from the cfg");
+
+            match r.as_ref() {
+                PluginUpdate::Resource {
+                    ref old, ref new, ..
+                } => {
+                    if !old.may_promote && new.may_promote {
+                        info!("promoter: resource '{}' may promote", name);
+                        if start_actions(&res.start).is_err() && stop_actions(&res.stop).is_err() {
+                            on_failure(&res.on_stop_failure); // loops until success
+                        }
+                    }
+                }
+                PluginUpdate::Device {
+                    ref old, ref new, ..
+                } => {
+                    if old.quorum && !new.quorum {
+                        info!("promoter: resource '{}' lost quorum", name);
+                        if stop_actions(&res.stop).is_err() {
+                            on_failure(&res.on_stop_failure); // loops until success
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        trace!("promoter: exit");
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
