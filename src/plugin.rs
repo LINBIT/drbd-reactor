@@ -1,3 +1,5 @@
+use std::env;
+use std::os::unix::net::UnixDatagram;
 use std::process::{Command, ExitStatus};
 use std::sync::{mpsc, Arc};
 use std::thread;
@@ -79,6 +81,8 @@ pub fn start_from_config(
         plugins.push(Box::new(promoter::Promoter::new(promote_cfg)?));
     }
 
+    maybe_systemd_notify_ready()?;
+
     for d in plugins {
         let (ptx, prx) = mpsc::channel();
         let handle = thread::spawn(move || d.run(prx));
@@ -87,4 +91,21 @@ pub fn start_from_config(
     }
 
     Ok((handles, senders))
+}
+
+fn maybe_systemd_notify_ready() -> Result<()> {
+    let socket = match env::var_os("NOTIFY_SOCKET") {
+        Some(socket) => socket,
+        None => return Ok(()),
+    };
+
+    let sock = UnixDatagram::unbound()?;
+    let msg = "READY=1\n";
+    if sock.send_to(msg.as_bytes(), socket)? != msg.len() {
+        Err(anyhow::anyhow!(
+            "Could not completely write 'READY=1' to NOTIFY_SOCKET"
+        ))
+    } else {
+        Ok(())
+    }
 }

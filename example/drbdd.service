@@ -2,6 +2,7 @@
 Description=DRBDD Service
 
 [Service]
+Type=notify
 ExecStart=/usr/sbin/drbdd
 
 [Install]
