@@ -238,10 +238,7 @@ fn parse_kv(item: &str) -> Option<(&str, &str)> {
 }
 
 fn str_to_bool(s: &str) -> bool {
-    if s == "yes" || s == "true" {
-        return true;
-    }
-    false
+    return s == "yes" || s == "true";
 }
 
 #[cfg(test)]
