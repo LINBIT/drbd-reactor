@@ -65,6 +65,19 @@ Communication is done via channels where plugins only consume information.
 The core expose a `PluginUpdate` channel, the plugin decides if it wants to use the diffs from `old` and
 `new`, and/or the complete current state from `resource`.
 
+# Contributions
+
+Contributions are obviously always welcome! Please talk to us first *before* you start working on a new
+plugin. Please check the state of plugins at the beginning of the document, and don't work on plugins that are
+currently under development by somebody else.
+
+## Dependencies
+
+We have to be a bit careful introducing new dependencies as we want to provide `drbdd` via a
+[PPA](https://launchpad.net/~linbit/+archive/ubuntu/linbit-drbd9-stack). So please use only dependencies that
+are packaged as `librust-` package in Ubuntu Focal. We might relax that, but that would need to be a very very
+convincing argument. Again, talk to us early.
+
 # Current implementation considerations
 Currently plugins have to filter their `PluginUpdate` stream by themselves. This keeps the core simple, but
 allowing some kind of filtered subscription could make sense. If we don't do that, and keep the "all plugins
