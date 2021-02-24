@@ -31,7 +31,7 @@ pub fn events2(tx: Sender<EventUpdate>) -> Result<()> {
         .is_none()
     {
         return Err(anyhow::anyhow!(
-            "drbdsetup minimum version ('9.16.0') not fullfilled"
+            "drbdsetup minimum version ('9.16.0') not fulfilled"
         ));
     }
 
