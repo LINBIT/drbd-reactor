@@ -5,7 +5,12 @@ DEBCONTAINER=drbdd:deb
 RPMCONTAINER=drbdd:rpm
 REL = $(PROG)-$(VERSION)
 
+ifneq ($(wildcard vendor/.),)
+OFFLINE = --offline
+endif
+
 $(info DEBUG is $(DEBUG))
+$(info OFFLINE is $(OFFLINE))
 
 ifdef DEBUG
 	RELEASE :=
@@ -16,7 +21,7 @@ else
 endif
 
 build: ## cargo build binary
-	cargo build $(RELEASE)
+	cargo build $(OFFLINE) $(RELEASE)
 
 .PHONY: help
 help:
@@ -54,9 +59,13 @@ test: ## cargo test
 	cargo test
 
 debrelease: checkVERSION
-	dh_clean || true
-	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf $(REL).tar.gz \
-		$$(git ls-files | grep -v '^\.')
+	rm -rf .debrelease && mkdir .debrelease
+	cd .debrelease && git clone $(PWD) . && \
+	mkdir .cargo && cp vendor.toml .cargo/config && \
+	rm -rf vendor && cargo vendor && rm -fr vendor/winapi*gnu*/lib/*.a && \
+	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf ../$(REL).tar.gz \
+		$$(git ls-files | grep -v '^\.') .cargo/config vendor
+	rm -rf .debrelease
 
 release: checkVERSION
 	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf $(REL).tar.gz \
