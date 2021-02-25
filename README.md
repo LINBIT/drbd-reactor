@@ -5,16 +5,18 @@ changes in a DRBD resource.
 
 # Plugins
 
-| Plugin                               | Purpose                        |
-| ------------------------------------ | ------------------------------ |
-| [debugger](./src/plugin/debugger.md) | Demo that prints state changes |
-| [promoter](./src/plugin/promoter.md) | Simple HA for resources        |
-| [umh](./src/plugin/umh.md)           | User mode helper               |
+| Plugin                                   | Purpose                        |
+| ---------------------------------------- | ------------------------------ |
+| [debugger](./src/plugin/debugger.md)     | Demo that prints state changes |
+| [promoter](./src/plugin/promoter.md)     | Simple HA for resources        |
+| [umh](./src/plugin/umh.md)               | User mode helper               |
+| [prometheus](./src/plugin/prometheus.md) | Prometheus endpoint            |
 
 ## Implementation
 - [x] debugger
 - [x] promoter
-- [ ] umh
+- [ ] umh (Under active development)
+- [ ] prometheus (Under active development)
 
 # Configuration
 This daemon is configured via a configuration file. The only command line option allowed is the path to the
