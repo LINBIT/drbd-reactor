@@ -238,12 +238,19 @@ fn parse_kv(item: &str) -> Option<(&str, &str)> {
 }
 
 fn str_to_bool(s: &str) -> bool {
-    return s == "yes" || s == "true";
+    s == "yes" || s == "true"
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn string_to_bool() {
+        assert_eq!(str_to_bool(&"yes"), true);
+        assert_eq!(str_to_bool(&"true"), true);
+        assert_eq!(str_to_bool(&"no"), false);
+    }
 
     #[test]
     fn all_parsed_resource_update() {
