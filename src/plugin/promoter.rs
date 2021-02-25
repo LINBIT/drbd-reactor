@@ -28,11 +28,9 @@ impl super::Plugin for Promoter {
     fn run(&self, rx: super::PluginReceiver) -> Result<()> {
         trace!("promoter: start");
 
-        let names = self.cfg.resources.keys().cloned().collect::<Vec<String>>();
-        adjust_resources(&names)?;
-
         let type_exists = plugin::typefilter(&EventType::Exists);
         let type_change = plugin::typefilter(&EventType::Change);
+        let names = self.cfg.resources.keys().cloned().collect::<Vec<String>>();
         let names = plugin::namefilter(&names);
 
         // set default stop actions (i.e., reversed start, and default on-stop-failure (i.e., true)
