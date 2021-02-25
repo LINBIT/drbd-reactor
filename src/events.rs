@@ -86,7 +86,7 @@ fn process_events2(tx: &Sender<EventUpdate>) -> Result<()> {
 
         match parse_events2_line(&line) {
             Ok(update) => tx.send(update)?,
-            Err(e) => warn!("could not parse line '{}', because {}", line, e),
+            Err(e) => debug!("could not parse line '{}', because {}", line, e),
         }
         buf.clear();
     }
