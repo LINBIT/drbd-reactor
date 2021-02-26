@@ -1,3 +1,23 @@
+drbdd (0.1.0-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * promoter: adjust resources
+  * build,rpm: mark drbdd.toml as config
+  * plugins: split init/run
+  * README: contributions/dependencies
+  * implement sd_notify
+  * events2: downgrade parse problems to debug
+  * README.md: add prometheus plugin
+  * build: make debrelease build offline builds
+  * promoter: adjust only once
+  * rustify str_to_bool
+
+  [ Robert Altnoeder ]
+  * Remove superfluous statements
+  * Fix text error
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 26 Feb 2021 08:36:28 +0100
+
 drbdd (0.1.0~rc.2-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
