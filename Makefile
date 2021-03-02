@@ -4,13 +4,22 @@ DESTDIR =
 DEBCONTAINER=drbdd:deb
 RPMCONTAINER=drbdd:rpm
 REL = $(PROG)-$(VERSION)
+DOCKERREGISTRY := drbd.io
+ARCH ?= amd64
+ifneq ($(strip $(ARCH)),)
+DOCKERREGISTRY := $(DOCKERREGISTRY)/$(ARCH)
+endif
+DOCKERREGPATH = $(DOCKERREGISTRY)/$(PROG)
+DOCKER_TAG ?= latest
+
 
 ifneq ($(wildcard vendor/.),)
 OFFLINE = --offline
 endif
 
-$(info DEBUG is $(DEBUG))
-$(info OFFLINE is $(OFFLINE))
+# don't use info as this prints to stdout which messes up 'dockerpath' target
+$(shell echo DEBUG is $(DEBUG) >&2)
+$(shell echo OFFLINE is $(OFFLINE) >&2)
 
 ifdef DEBUG
 	RELEASE :=
@@ -78,4 +87,16 @@ else
 checkVERSION:
 	lbvers.py check --base=$(BASE) --build=$(BUILD) --build-nr=$(BUILD_NR) --pkg-nr=$(PKG_NR) \
 		--cargo=Cargo.toml --debian-changelog=debian/changelog --rpm-spec=drbdd.spec
+	if test $$(grep "ENV DRBDD_VERSION $(VERSION)" Dockerfile | wc -l) -ne 2; then \
+		echo -e "\n\tDockerfile needs update"; \
+	false; fi;
 endif
+
+.PHONY: dockerimage
+dockerimage:
+	docker build -t $(DOCKERREGPATH):$(DOCKER_TAG) .
+	docker tag $(DOCKERREGPATH):$(DOCKER_TAG) $(DOCKERREGPATH):latest
+
+.PHONY: dockerpath
+dockerpath:
+	@echo $(DOCKERREGPATH):latest $(DOCKERREGPATH):$(DOCKER_TAG)
