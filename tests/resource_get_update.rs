@@ -22,9 +22,9 @@ fn get_resource_update() {
     u.may_promote = false;
     let up = r.get_resource_update(&EventType::Exists, &u).unwrap();
     match up {
-        PluginUpdate::Resource { old, new, .. } => {
-            assert_eq!(old.may_promote, true);
-            assert_eq!(new.may_promote, false);
+        PluginUpdate::ResourceUpdate(_, u) => {
+            assert_eq!(u.old.may_promote, true);
+            assert_eq!(u.new.may_promote, false);
         }
         _ => panic!("not a resorce update"),
     }
@@ -50,12 +50,10 @@ fn get_device_update() {
     u.quorum = true;
     let up = r.get_device_update(&EventType::Exists, &u).unwrap();
     match up {
-        PluginUpdate::Device {
-            volume, old, new, ..
-        } => {
-            assert_eq!(old.quorum, false);
-            assert_eq!(new.quorum, true);
-            assert_eq!(volume, 0);
+        PluginUpdate::DeviceUpdate(_, u) => {
+            assert_eq!(u.old.quorum, false);
+            assert_eq!(u.new.quorum, true);
+            assert_eq!(u.volume, 0);
         }
         _ => panic!("not a device update"),
     }
@@ -81,15 +79,10 @@ fn get_connection_update() {
     u.congested = true;
     let up = r.get_connection_update(&EventType::Exists, &u).unwrap();
     match up {
-        PluginUpdate::Connection {
-            peer_node_id,
-            old,
-            new,
-            ..
-        } => {
-            assert_eq!(old.congested, false);
-            assert_eq!(new.congested, true);
-            assert_eq!(peer_node_id, 1);
+        PluginUpdate::ConnectionUpdate(_, u) => {
+            assert_eq!(u.old.congested, false);
+            assert_eq!(u.new.congested, true);
+            assert_eq!(u.peer_node_id, 1);
         }
         _ => panic!("not a connection update"),
     }
@@ -123,17 +116,11 @@ fn get_peerdevice_update() {
     u.peer_client = true;
     let up = r.get_peerdevice_update(&EventType::Exists, &u).unwrap();
     match up {
-        PluginUpdate::PeerDevice {
-            peer_node_id,
-            volume,
-            old,
-            new,
-            ..
-        } => {
-            assert_eq!(old.peer_client, false);
-            assert_eq!(new.peer_client, true);
-            assert_eq!(peer_node_id, 1);
-            assert_eq!(volume, 1);
+        PluginUpdate::PeerDeviceUpdate(_, u) => {
+            assert_eq!(u.old.peer_client, false);
+            assert_eq!(u.new.peer_client, true);
+            assert_eq!(u.peer_node_id, 1);
+            assert_eq!(u.volume, 1);
         }
         _ => panic!("not a peerdevice update"),
     }

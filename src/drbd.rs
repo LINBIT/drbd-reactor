@@ -282,66 +282,74 @@ pub enum EventUpdate {
 }
 
 #[derive(Debug, Clone)]
+pub struct ResourcePluginUpdate {
+    pub resource_name: String,
+    pub old: ResourceUpdateState,
+    pub new: ResourceUpdateState,
+    pub resource: Resource,
+}
+
+#[derive(Debug, Clone)]
+pub struct DevicePluginUpdate {
+    pub resource_name: String,
+    pub volume: i32,
+    pub old: DeviceUpdateState,
+    pub new: DeviceUpdateState,
+    pub resource: Resource,
+}
+
+#[derive(Debug, Clone)]
+pub struct PeerDevicePluginUpdate {
+    pub resource_name: String,
+    pub volume: i32,
+    pub peer_node_id: i32,
+    pub old: PeerDeviceUpdateState,
+    pub new: PeerDeviceUpdateState,
+    pub resource: Resource,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConnectionPluginUpdate {
+    pub resource_name: String,
+    pub peer_node_id: i32,
+    pub old: ConnectionUpdateState,
+    pub new: ConnectionUpdateState,
+    pub resource: Resource,
+}
+
+#[derive(Debug, Clone)]
 pub enum PluginUpdate {
-    Resource {
-        event: EventType,
-        resource_name: String,
-        old: ResourceUpdateState,
-        new: ResourceUpdateState,
-        resource: Resource,
-    },
-    Device {
-        event: EventType,
-        resource_name: String,
-        volume: i32,
-        old: DeviceUpdateState,
-        new: DeviceUpdateState,
-        resource: Resource,
-    },
-    PeerDevice {
-        event: EventType,
-        resource_name: String,
-        volume: i32,
-        peer_node_id: i32,
-        old: PeerDeviceUpdateState,
-        new: PeerDeviceUpdateState,
-        resource: Resource,
-    },
-    Connection {
-        event: EventType,
-        resource_name: String,
-        peer_node_id: i32,
-        old: ConnectionUpdateState,
-        new: ConnectionUpdateState,
-        resource: Resource,
-    },
+    ResourceUpdate(EventType, ResourcePluginUpdate),
+    DeviceUpdate(EventType, DevicePluginUpdate),
+    PeerDeviceUpdate(EventType, PeerDevicePluginUpdate),
+    ConnectionUpdate(EventType, ConnectionPluginUpdate),
 }
 
 impl PluginUpdate {
     pub fn has_name(&self, name: &str) -> bool {
         match self {
-            Self::Resource { resource_name, .. } => resource_name == name,
-            Self::Device { resource_name, .. } => resource_name == name,
-            Self::PeerDevice { resource_name, .. } => resource_name == name,
-            Self::Connection { resource_name, .. } => resource_name == name,
+            Self::ResourceUpdate(_, u) => u.resource_name == name,
+            Self::DeviceUpdate(_, u) => u.resource_name == name,
+            Self::PeerDeviceUpdate(_, u) => u.resource_name == name,
+            Self::ConnectionUpdate(_, u) => u.resource_name == name,
         }
     }
 
     pub fn has_type(&self, search: &EventType) -> bool {
         match self {
-            Self::Resource { event, .. } => event == search,
-            Self::Device { event, .. } => event == search,
-            Self::PeerDevice { event, .. } => event == search,
-            Self::Connection { event, .. } => event == search,
+            Self::ResourceUpdate(event, _) => event == search,
+            Self::DeviceUpdate(event, _) => event == search,
+            Self::PeerDeviceUpdate(event, _) => event == search,
+            Self::ConnectionUpdate(event, _) => event == search,
         }
     }
 
     pub fn get_name(&self) -> String {
         match self {
-            Self::Resource { resource_name, .. } => resource_name.to_string(),
-            Self::Device { resource_name, .. } => resource_name.to_string(),
-            Self::PeerDevice { resource_name, .. } => resource_name.to_string(),
-            Self::Connection { resource_name, .. } => resource_name.to_string(),
+            Self::ResourceUpdate(_, u) => u.resource_name.to_string(),
+            Self::DeviceUpdate(_, u) => u.resource_name.to_string(),
+            Self::PeerDeviceUpdate(_, u) => u.resource_name.to_string(),
+            Self::ConnectionUpdate(_, u) => u.resource_name.to_string(),
         }
     }
 }
@@ -412,14 +420,16 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::Device {
-                    event: et.clone(),
-                    resource_name: self.name.clone(),
-                    volume: device.volume,
-                    old,
-                    new,
-                    resource: self.clone(),
-                })
+                Some(PluginUpdate::DeviceUpdate(
+                    et.clone(),
+                    DevicePluginUpdate {
+                        resource_name: self.name.clone(),
+                        volume: device.volume,
+                        old,
+                        new,
+                        resource: self.clone(),
+                    },
+                ))
             }
 
             None => {
@@ -428,16 +438,18 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::Device {
-                    event: et.clone(),
-                    resource_name: self.name.clone(),
-                    volume: device.volume,
-                    old: DeviceUpdateState {
-                        ..Default::default()
+                Some(PluginUpdate::DeviceUpdate(
+                    et.clone(),
+                    DevicePluginUpdate {
+                        resource_name: self.name.clone(),
+                        volume: device.volume,
+                        old: DeviceUpdateState {
+                            ..Default::default()
+                        },
+                        new,
+                        resource: self.clone(),
                     },
-                    new,
-                    resource: self.clone(),
-                })
+                ))
             }
         }
     }
@@ -495,14 +507,16 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::Connection {
-                    event: et.clone(),
-                    resource_name: self.name.clone(),
-                    peer_node_id: conn.peer_node_id,
-                    old,
-                    new,
-                    resource: self.clone(),
-                })
+                Some(PluginUpdate::ConnectionUpdate(
+                    et.clone(),
+                    ConnectionPluginUpdate {
+                        resource_name: self.name.clone(),
+                        peer_node_id: conn.peer_node_id,
+                        old,
+                        new,
+                        resource: self.clone(),
+                    },
+                ))
             }
             None => {
                 self.update_or_delete_connection(et, conn);
@@ -510,16 +524,18 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::Connection {
-                    event: et.clone(),
-                    resource_name: self.name.clone(),
-                    peer_node_id: conn.peer_node_id,
-                    old: ConnectionUpdateState {
-                        ..Default::default()
+                Some(PluginUpdate::ConnectionUpdate(
+                    et.clone(),
+                    ConnectionPluginUpdate {
+                        resource_name: self.name.clone(),
+                        peer_node_id: conn.peer_node_id,
+                        old: ConnectionUpdateState {
+                            ..Default::default()
+                        },
+                        new,
+                        resource: self.clone(),
                     },
-                    new,
-                    resource: self.clone(),
-                })
+                ))
             }
         }
     }
@@ -635,15 +651,17 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::PeerDevice {
-                    event: et.clone(),
-                    resource_name: self.name.clone(),
-                    volume: peerdevice.volume,
-                    peer_node_id: peerdevice.peer_node_id,
-                    old,
-                    new,
-                    resource: self.clone(),
-                })
+                Some(PluginUpdate::PeerDeviceUpdate(
+                    et.clone(),
+                    PeerDevicePluginUpdate {
+                        resource_name: self.name.clone(),
+                        volume: peerdevice.volume,
+                        peer_node_id: peerdevice.peer_node_id,
+                        old,
+                        new,
+                        resource: self.clone(),
+                    },
+                ))
             }
             None => {
                 self.update_or_delete_peerdevice(et, peerdevice);
@@ -651,17 +669,19 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::PeerDevice {
-                    event: et.clone(),
-                    resource_name: self.name.clone(),
-                    volume: peerdevice.volume,
-                    peer_node_id: peerdevice.peer_node_id,
-                    old: PeerDeviceUpdateState {
-                        ..Default::default()
+                Some(PluginUpdate::PeerDeviceUpdate(
+                    et.clone(),
+                    PeerDevicePluginUpdate {
+                        resource_name: self.name.clone(),
+                        volume: peerdevice.volume,
+                        peer_node_id: peerdevice.peer_node_id,
+                        old: PeerDeviceUpdateState {
+                            ..Default::default()
+                        },
+                        new,
+                        resource: self.clone(),
                     },
-                    new,
-                    resource: self.clone(),
-                })
+                ))
             }
         }
     }
@@ -690,13 +710,15 @@ impl Resource {
             return None;
         }
 
-        Some(PluginUpdate::Resource {
-            event: et.clone(),
-            resource_name: self.name.clone(),
-            old,
-            new,
-            resource: self.clone(),
-        })
+        Some(PluginUpdate::ResourceUpdate(
+            et.clone(),
+            ResourcePluginUpdate {
+                resource_name: self.name.clone(),
+                old,
+                new,
+                resource: self.clone(),
+            },
+        ))
     }
 }
 
