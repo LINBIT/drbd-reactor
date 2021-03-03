@@ -97,7 +97,7 @@ impl Core {
 
         for r in e2rx {
             match r {
-                EventUpdate::ResourceUpdate(et, r) => {
+                EventUpdate::Resource(et, r) => {
                     let res = self.get_or_create_resource(&r.name);
 
                     if let Some(i) = res.get_resource_update(&et, &r) {
@@ -108,21 +108,21 @@ impl Core {
                         self.resources.remove(&r.name);
                     }
                 }
-                EventUpdate::DeviceUpdate(et, d) => {
+                EventUpdate::Device(et, d) => {
                     let res = self.get_or_create_resource(&d.name);
 
                     if let Some(i) = res.get_device_update(&et, &d) {
                         send_to_event_plugins(i)?;
                     }
                 }
-                EventUpdate::PeerDeviceUpdate(et, pd) => {
+                EventUpdate::PeerDevice(et, pd) => {
                     let res = self.get_or_create_resource(&pd.name);
 
                     if let Some(i) = res.get_peerdevice_update(&et, &pd) {
                         send_to_event_plugins(i)?;
                     }
                 }
-                EventUpdate::ConnectionUpdate(et, c) => {
+                EventUpdate::Connection(et, c) => {
                     let res = self.get_or_create_resource(&c.name);
 
                     if let Some(i) = res.get_connection_update(&et, &c) {

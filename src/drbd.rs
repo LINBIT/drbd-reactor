@@ -274,10 +274,10 @@ pub struct ConnectionUpdateState {
 
 #[derive(Debug, PartialEq)]
 pub enum EventUpdate {
-    ResourceUpdate(EventType, Resource),
-    DeviceUpdate(EventType, Device),
-    PeerDeviceUpdate(EventType, PeerDevice),
-    ConnectionUpdate(EventType, Connection),
+    Resource(EventType, Resource),
+    Device(EventType, Device),
+    PeerDevice(EventType, PeerDevice),
+    Connection(EventType, Connection),
     Stop,
 }
 
@@ -319,37 +319,37 @@ pub struct ConnectionPluginUpdate {
 
 #[derive(Debug, Clone)]
 pub enum PluginUpdate {
-    ResourceUpdate(EventType, ResourcePluginUpdate),
-    DeviceUpdate(EventType, DevicePluginUpdate),
-    PeerDeviceUpdate(EventType, PeerDevicePluginUpdate),
-    ConnectionUpdate(EventType, ConnectionPluginUpdate),
+    Resource(EventType, ResourcePluginUpdate),
+    Device(EventType, DevicePluginUpdate),
+    PeerDevice(EventType, PeerDevicePluginUpdate),
+    Connection(EventType, ConnectionPluginUpdate),
 }
 
 impl PluginUpdate {
     pub fn has_name(&self, name: &str) -> bool {
         match self {
-            Self::ResourceUpdate(_, u) => u.resource_name == name,
-            Self::DeviceUpdate(_, u) => u.resource_name == name,
-            Self::PeerDeviceUpdate(_, u) => u.resource_name == name,
-            Self::ConnectionUpdate(_, u) => u.resource_name == name,
+            Self::Resource(_, u) => u.resource_name == name,
+            Self::Device(_, u) => u.resource_name == name,
+            Self::PeerDevice(_, u) => u.resource_name == name,
+            Self::Connection(_, u) => u.resource_name == name,
         }
     }
 
     pub fn has_type(&self, search: &EventType) -> bool {
         match self {
-            Self::ResourceUpdate(event, _) => event == search,
-            Self::DeviceUpdate(event, _) => event == search,
-            Self::PeerDeviceUpdate(event, _) => event == search,
-            Self::ConnectionUpdate(event, _) => event == search,
+            Self::Resource(event, _) => event == search,
+            Self::Device(event, _) => event == search,
+            Self::PeerDevice(event, _) => event == search,
+            Self::Connection(event, _) => event == search,
         }
     }
 
     pub fn get_name(&self) -> String {
         match self {
-            Self::ResourceUpdate(_, u) => u.resource_name.to_string(),
-            Self::DeviceUpdate(_, u) => u.resource_name.to_string(),
-            Self::PeerDeviceUpdate(_, u) => u.resource_name.to_string(),
-            Self::ConnectionUpdate(_, u) => u.resource_name.to_string(),
+            Self::Resource(_, u) => u.resource_name.to_string(),
+            Self::Device(_, u) => u.resource_name.to_string(),
+            Self::PeerDevice(_, u) => u.resource_name.to_string(),
+            Self::Connection(_, u) => u.resource_name.to_string(),
         }
     }
 }
@@ -420,7 +420,7 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::DeviceUpdate(
+                Some(PluginUpdate::Device(
                     et.clone(),
                     DevicePluginUpdate {
                         resource_name: self.name.clone(),
@@ -438,7 +438,7 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::DeviceUpdate(
+                Some(PluginUpdate::Device(
                     et.clone(),
                     DevicePluginUpdate {
                         resource_name: self.name.clone(),
@@ -507,7 +507,7 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::ConnectionUpdate(
+                Some(PluginUpdate::Connection(
                     et.clone(),
                     ConnectionPluginUpdate {
                         resource_name: self.name.clone(),
@@ -524,7 +524,7 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::ConnectionUpdate(
+                Some(PluginUpdate::Connection(
                     et.clone(),
                     ConnectionPluginUpdate {
                         resource_name: self.name.clone(),
@@ -651,7 +651,7 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::PeerDeviceUpdate(
+                Some(PluginUpdate::PeerDevice(
                     et.clone(),
                     PeerDevicePluginUpdate {
                         resource_name: self.name.clone(),
@@ -669,7 +669,7 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::PeerDeviceUpdate(
+                Some(PluginUpdate::PeerDevice(
                     et.clone(),
                     PeerDevicePluginUpdate {
                         resource_name: self.name.clone(),
@@ -710,7 +710,7 @@ impl Resource {
             return None;
         }
 
-        Some(PluginUpdate::ResourceUpdate(
+        Some(PluginUpdate::Resource(
             et.clone(),
             ResourcePluginUpdate {
                 resource_name: self.name.clone(),

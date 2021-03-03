@@ -132,7 +132,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 }
             };
         }
-        return Ok(EventUpdate::ResourceUpdate(et, resource));
+        return Ok(EventUpdate::Resource(et, resource));
     } else if what == "device" {
         let mut device = Device {
             ..Default::default()
@@ -162,7 +162,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 }
             };
         }
-        return Ok(EventUpdate::DeviceUpdate(et, device));
+        return Ok(EventUpdate::Device(et, device));
     } else if what == "connection" {
         let mut conn = Connection {
             ..Default::default()
@@ -185,7 +185,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 }
             };
         }
-        return Ok(EventUpdate::ConnectionUpdate(et, conn));
+        return Ok(EventUpdate::Connection(et, conn));
     } else if what == "peer-device" {
         let mut peerdevice = PeerDevice {
             has_sync_details: false,
@@ -220,7 +220,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 }
             };
         }
-        return Ok(EventUpdate::PeerDeviceUpdate(et, peerdevice));
+        return Ok(EventUpdate::PeerDevice(et, peerdevice));
     }
 
     Err(anyhow::anyhow!(
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn all_parsed_resource_update() {
         let up = parse_events2_line("exists resource name:foo role:Primary suspended:yes write-ordering:foo may_promote:yes promotion_score:23").unwrap();
-        let expected = EventUpdate::ResourceUpdate(
+        let expected = EventUpdate::Resource(
             EventType::Exists,
             Resource {
                 name: "foo".to_string(),
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn all_parsed_device_update() {
         let up = parse_events2_line("change device name:foo volume:1 minor:1 disk:Attaching client:yes quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:yes").unwrap();
-        let expected = EventUpdate::DeviceUpdate(
+        let expected = EventUpdate::Device(
             EventType::Change,
             Device {
                 name: "foo".to_string(),
@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn all_parsed_connection_update() {
         let up = parse_events2_line("exists connection name:foo peer-node-id:1 conn-name:bar connection:Connected role:Primary congested:yes ap-in-flight:1 rs-in-flight:1").unwrap();
-        let expected = EventUpdate::ConnectionUpdate(
+        let expected = EventUpdate::Connection(
             EventType::Exists,
             Connection {
                 name: "foo".to_string(),
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn all_parsed_peerdevice_update() {
         let up = parse_events2_line("exists peer-device name:foo peer-node-id:1 conn-name:bar volume:1 replication:Established peer-disk:UpToDate peer-client:yes resync-suspended:yes received:1 sent:1 out-of-sync:1 pending:1 unacked:1").unwrap();
-        let expected = EventUpdate::PeerDeviceUpdate(
+        let expected = EventUpdate::PeerDevice(
             EventType::Exists,
             PeerDevice {
                 name: "foo".to_string(),

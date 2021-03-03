@@ -22,7 +22,7 @@ fn get_resource_update() {
     u.may_promote = false;
     let up = r.get_resource_update(&EventType::Exists, &u).unwrap();
     match up {
-        PluginUpdate::ResourceUpdate(_, u) => {
+        PluginUpdate::Resource(_, u) => {
             assert_eq!(u.old.may_promote, true);
             assert_eq!(u.new.may_promote, false);
         }
@@ -50,7 +50,7 @@ fn get_device_update() {
     u.quorum = true;
     let up = r.get_device_update(&EventType::Exists, &u).unwrap();
     match up {
-        PluginUpdate::DeviceUpdate(_, u) => {
+        PluginUpdate::Device(_, u) => {
             assert_eq!(u.old.quorum, false);
             assert_eq!(u.new.quorum, true);
             assert_eq!(u.volume, 0);
@@ -79,7 +79,7 @@ fn get_connection_update() {
     u.congested = true;
     let up = r.get_connection_update(&EventType::Exists, &u).unwrap();
     match up {
-        PluginUpdate::ConnectionUpdate(_, u) => {
+        PluginUpdate::Connection(_, u) => {
             assert_eq!(u.old.congested, false);
             assert_eq!(u.new.congested, true);
             assert_eq!(u.peer_node_id, 1);
@@ -116,7 +116,7 @@ fn get_peerdevice_update() {
     u.peer_client = true;
     let up = r.get_peerdevice_update(&EventType::Exists, &u).unwrap();
     match up {
-        PluginUpdate::PeerDeviceUpdate(_, u) => {
+        PluginUpdate::PeerDevice(_, u) => {
             assert_eq!(u.old.peer_client, false);
             assert_eq!(u.new.peer_client, true);
             assert_eq!(u.peer_node_id, 1);
