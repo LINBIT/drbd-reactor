@@ -2,18 +2,22 @@ use serde::Serialize;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
-#[derive(Default, Debug, Serialize, Clone, PartialEq)]
-pub struct Resource {
-    pub name: String,
-    pub role: Role,
-    pub suspended: bool,
-    #[serde(rename = "write-ordering")]
-    pub write_ordering: String,
-    pub may_promote: bool,
-    pub promotion_score: i32,
-    pub devices: Vec<Device>,
-    pub connections: Vec<Connection>,
-}
+common_matchable![Vec<Connection>, Vec<Device>];
+make_matchable![
+    #[derive(Default, Debug, Serialize, Clone, PartialEq)]
+    pub struct Resource {
+        pub name: String,
+        pub role: Role,
+        pub suspended: bool,
+        #[serde(rename = "write-ordering")]
+        pub write_ordering: String,
+        pub may_promote: bool,
+        pub promotion_score: i32,
+        pub devices: Vec<Device>,
+        pub connections: Vec<Connection>,
+    },
+    ResourcePattern
+];
 
 #[derive(Default, Debug, Serialize, Clone, PartialEq)]
 pub struct Device {
@@ -86,12 +90,15 @@ pub struct Connection {
     pub peerdevices: Vec<PeerDevice>,
 }
 
-#[derive(Serialize, Debug, PartialEq, Clone)]
-pub enum Role {
-    Unknown,
-    Primary,
-    Secondary,
-}
+make_matchable![
+    #[derive(Serialize, Debug, PartialEq, Clone)]
+    pub enum Role {
+        Unknown,
+        Primary,
+        Secondary,
+    }
+];
+
 // this could be extern enum_derive, but simple enough
 impl FromStr for Role {
     type Err = Error;
@@ -111,19 +118,22 @@ impl Default for Role {
     }
 }
 
-#[derive(Serialize, Debug, Clone, PartialEq)]
-pub enum DiskState {
-    Diskless,
-    Attaching,
-    Detaching,
-    Failed,
-    Negotiating,
-    Inconsistent,
-    Outdated,
-    DUnknown,
-    Consistent,
-    UpToDate,
-}
+make_matchable![
+    #[derive(Serialize, Debug, Clone, PartialEq)]
+    pub enum DiskState {
+        Diskless,
+        Attaching,
+        Detaching,
+        Failed,
+        Negotiating,
+        Inconsistent,
+        Outdated,
+        DUnknown,
+        Consistent,
+        UpToDate,
+    }
+];
+
 impl FromStr for DiskState {
     type Err = Error;
 
@@ -149,19 +159,22 @@ impl Default for DiskState {
     }
 }
 
-#[derive(Serialize, Debug, Clone, PartialEq)]
-pub enum ConnectionState {
-    StandAlone,
-    Disconnecting,
-    Unconnected,
-    Timeout,
-    BrokenPipe,
-    NetworkFailure,
-    ProtocolError,
-    TearDown,
-    Connecting,
-    Connected,
-}
+make_matchable![
+    #[derive(Serialize, Debug, Clone, PartialEq)]
+    pub enum ConnectionState {
+        StandAlone,
+        Disconnecting,
+        Unconnected,
+        Timeout,
+        BrokenPipe,
+        NetworkFailure,
+        ProtocolError,
+        TearDown,
+        Connecting,
+        Connected,
+    }
+];
+
 impl FromStr for ConnectionState {
     type Err = Error;
 
@@ -190,24 +203,27 @@ impl Default for ConnectionState {
     }
 }
 
-#[derive(Serialize, Debug, Clone, PartialEq)]
-pub enum ReplicationState {
-    Off,
-    Established,
-    StartingSyncS,
-    StartingSyncT,
-    WFBitMapS,
-    WFBitMapT,
-    WFSyncUUID,
-    SyncSource,
-    SyncTarget,
-    VerifyS,
-    VerifyT,
-    PausedSyncS,
-    PausedSyncT,
-    Ahead,
-    Behind,
-}
+make_matchable![
+    #[derive(Serialize, Debug, Clone, PartialEq)]
+    pub enum ReplicationState {
+        Off,
+        Established,
+        StartingSyncS,
+        StartingSyncT,
+        WFBitMapS,
+        WFBitMapT,
+        WFSyncUUID,
+        SyncSource,
+        SyncTarget,
+        VerifyS,
+        VerifyT,
+        PausedSyncS,
+        PausedSyncT,
+        Ahead,
+        Behind,
+    }
+];
+
 impl FromStr for ReplicationState {
     type Err = Error;
 
@@ -241,36 +257,48 @@ impl Default for ReplicationState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResourceUpdateState {
-    pub role: Role,
-    pub may_promote: bool,
-    pub promotion_score: i32,
-}
+make_matchable![
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct ResourceUpdateState {
+        pub role: Role,
+        pub may_promote: bool,
+        pub promotion_score: i32,
+    },
+    ResourceUpdateStatePattern
+];
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct DeviceUpdateState {
-    pub disk_state: DiskState,
-    pub client: bool,
-    pub quorum: bool,
-    pub size: u64,
-}
+make_matchable![
+    #[derive(Debug, Clone, Default, PartialEq)]
+    pub struct DeviceUpdateState {
+        pub disk_state: DiskState,
+        pub client: bool,
+        pub quorum: bool,
+        pub size: u64,
+    },
+    DeviceUpdateStatePattern
+];
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct PeerDeviceUpdateState {
-    pub replication_state: ReplicationState,
-    pub peer_disk_state: DiskState,
-    pub peer_client: bool,
-    pub resync_suspended: bool,
-}
+make_matchable![
+    #[derive(Debug, Clone, Default, PartialEq)]
+    pub struct PeerDeviceUpdateState {
+        pub replication_state: ReplicationState,
+        pub peer_disk_state: DiskState,
+        pub peer_client: bool,
+        pub resync_suspended: bool,
+    },
+    PeerDeviceUpdateStatePattern
+];
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ConnectionUpdateState {
-    pub conn_name: String,
-    pub connection: ConnectionState,
-    pub peer_role: Role,
-    pub congested: bool,
-}
+make_matchable![
+    #[derive(Debug, Clone, Default, PartialEq)]
+    pub struct ConnectionUpdateState {
+        pub conn_name: String,
+        pub connection: ConnectionState,
+        pub peer_role: Role,
+        pub congested: bool,
+    },
+    ConnectionUpdateStatePattern
+];
 
 #[derive(Debug, PartialEq)]
 pub enum EventUpdate {
@@ -281,45 +309,57 @@ pub enum EventUpdate {
     Stop,
 }
 
-#[derive(Debug, Clone)]
-pub struct ResourcePluginUpdate {
-    pub event_type: EventType,
-    pub resource_name: String,
-    pub old: ResourceUpdateState,
-    pub new: ResourceUpdateState,
-    pub resource: Resource,
-}
+make_matchable![
+    #[derive(Debug, Clone)]
+    pub struct ResourcePluginUpdate {
+        pub event_type: EventType,
+        pub resource_name: String,
+        pub old: ResourceUpdateState,
+        pub new: ResourceUpdateState,
+        pub resource: Resource,
+    },
+    ResourcePluginUpdatePattern
+];
 
-#[derive(Debug, Clone)]
-pub struct DevicePluginUpdate {
-    pub event_type: EventType,
-    pub resource_name: String,
-    pub volume: i32,
-    pub old: DeviceUpdateState,
-    pub new: DeviceUpdateState,
-    pub resource: Resource,
-}
+make_matchable![
+    #[derive(Debug, Clone)]
+    pub struct DevicePluginUpdate {
+        pub event_type: EventType,
+        pub resource_name: String,
+        pub volume: i32,
+        pub old: DeviceUpdateState,
+        pub new: DeviceUpdateState,
+        pub resource: Resource,
+    },
+    DevicePluginUpdatePattern
+];
 
-#[derive(Debug, Clone)]
-pub struct PeerDevicePluginUpdate {
-    pub event_type: EventType,
-    pub resource_name: String,
-    pub volume: i32,
-    pub peer_node_id: i32,
-    pub old: PeerDeviceUpdateState,
-    pub new: PeerDeviceUpdateState,
-    pub resource: Resource,
-}
+make_matchable![
+    #[derive(Debug, Clone)]
+    pub struct PeerDevicePluginUpdate {
+        pub event_type: EventType,
+        pub resource_name: String,
+        pub volume: i32,
+        pub peer_node_id: i32,
+        pub old: PeerDeviceUpdateState,
+        pub new: PeerDeviceUpdateState,
+        pub resource: Resource,
+    },
+    PeerDevicePluginUpdatePattern
+];
 
-#[derive(Debug, Clone)]
-pub struct ConnectionPluginUpdate {
-    pub event_type: EventType,
-    pub resource_name: String,
-    pub peer_node_id: i32,
-    pub old: ConnectionUpdateState,
-    pub new: ConnectionUpdateState,
-    pub resource: Resource,
-}
+make_matchable![
+    #[derive(Debug, Clone)]
+    pub struct ConnectionPluginUpdate {
+        pub event_type: EventType,
+        pub resource_name: String,
+        pub peer_node_id: i32,
+        pub old: ConnectionUpdateState,
+        pub new: ConnectionUpdateState,
+        pub resource: Resource,
+    },
+    ConnectionPluginUpdatePattern
+];
 
 #[derive(Debug, Clone)]
 pub enum PluginUpdate {
@@ -712,13 +752,15 @@ impl Resource {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum EventType {
-    Exists,
-    Create,
-    Destroy,
-    Change,
-}
+make_matchable![
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum EventType {
+        Exists,
+        Create,
+        Destroy,
+        Change,
+    }
+];
 
 impl FromStr for EventType {
     type Err = Error;
