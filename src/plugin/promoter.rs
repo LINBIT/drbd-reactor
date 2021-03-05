@@ -60,7 +60,7 @@ impl super::Plugin for Promoter {
                 .expect("Can not happen, name filter is built from the cfg");
 
             match r.as_ref() {
-                PluginUpdate::Resource(_, u) => {
+                PluginUpdate::Resource(u) => {
                     if !u.old.may_promote && u.new.may_promote {
                         info!("promoter: resource '{}' may promote", name);
                         if start_actions(&res.start).is_err() && stop_actions(&res.stop).is_err() {
@@ -68,7 +68,7 @@ impl super::Plugin for Promoter {
                         }
                     }
                 }
-                PluginUpdate::Device(_, u) => {
+                PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
                         info!("promoter: resource '{}' lost quorum", name);
                         if stop_actions(&res.stop).is_err() {

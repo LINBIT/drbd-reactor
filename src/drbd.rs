@@ -283,6 +283,7 @@ pub enum EventUpdate {
 
 #[derive(Debug, Clone)]
 pub struct ResourcePluginUpdate {
+    pub event_type: EventType,
     pub resource_name: String,
     pub old: ResourceUpdateState,
     pub new: ResourceUpdateState,
@@ -291,6 +292,7 @@ pub struct ResourcePluginUpdate {
 
 #[derive(Debug, Clone)]
 pub struct DevicePluginUpdate {
+    pub event_type: EventType,
     pub resource_name: String,
     pub volume: i32,
     pub old: DeviceUpdateState,
@@ -300,6 +302,7 @@ pub struct DevicePluginUpdate {
 
 #[derive(Debug, Clone)]
 pub struct PeerDevicePluginUpdate {
+    pub event_type: EventType,
     pub resource_name: String,
     pub volume: i32,
     pub peer_node_id: i32,
@@ -310,6 +313,7 @@ pub struct PeerDevicePluginUpdate {
 
 #[derive(Debug, Clone)]
 pub struct ConnectionPluginUpdate {
+    pub event_type: EventType,
     pub resource_name: String,
     pub peer_node_id: i32,
     pub old: ConnectionUpdateState,
@@ -319,37 +323,37 @@ pub struct ConnectionPluginUpdate {
 
 #[derive(Debug, Clone)]
 pub enum PluginUpdate {
-    Resource(EventType, ResourcePluginUpdate),
-    Device(EventType, DevicePluginUpdate),
-    PeerDevice(EventType, PeerDevicePluginUpdate),
-    Connection(EventType, ConnectionPluginUpdate),
+    Resource(ResourcePluginUpdate),
+    Device(DevicePluginUpdate),
+    PeerDevice(PeerDevicePluginUpdate),
+    Connection(ConnectionPluginUpdate),
 }
 
 impl PluginUpdate {
     pub fn has_name(&self, name: &str) -> bool {
         match self {
-            Self::Resource(_, u) => u.resource_name == name,
-            Self::Device(_, u) => u.resource_name == name,
-            Self::PeerDevice(_, u) => u.resource_name == name,
-            Self::Connection(_, u) => u.resource_name == name,
+            Self::Resource(u) => u.resource_name == name,
+            Self::Device(u) => u.resource_name == name,
+            Self::PeerDevice(u) => u.resource_name == name,
+            Self::Connection(u) => u.resource_name == name,
         }
     }
 
     pub fn has_type(&self, search: &EventType) -> bool {
         match self {
-            Self::Resource(event, _) => event == search,
-            Self::Device(event, _) => event == search,
-            Self::PeerDevice(event, _) => event == search,
-            Self::Connection(event, _) => event == search,
+            Self::Resource(u) => u.event_type == *search,
+            Self::Device(u) => u.event_type == *search,
+            Self::PeerDevice(u) => u.event_type == *search,
+            Self::Connection(u) => u.event_type == *search,
         }
     }
 
     pub fn get_name(&self) -> String {
         match self {
-            Self::Resource(_, u) => u.resource_name.to_string(),
-            Self::Device(_, u) => u.resource_name.to_string(),
-            Self::PeerDevice(_, u) => u.resource_name.to_string(),
-            Self::Connection(_, u) => u.resource_name.to_string(),
+            Self::Resource(u) => u.resource_name.to_string(),
+            Self::Device(u) => u.resource_name.to_string(),
+            Self::PeerDevice(u) => u.resource_name.to_string(),
+            Self::Connection(u) => u.resource_name.to_string(),
         }
     }
 }
@@ -420,16 +424,14 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::Device(
-                    et.clone(),
-                    DevicePluginUpdate {
-                        resource_name: self.name.clone(),
-                        volume: device.volume,
-                        old,
-                        new,
-                        resource: self.clone(),
-                    },
-                ))
+                Some(PluginUpdate::Device(DevicePluginUpdate {
+                    event_type: et.clone(),
+                    resource_name: self.name.clone(),
+                    volume: device.volume,
+                    old,
+                    new,
+                    resource: self.clone(),
+                }))
             }
 
             None => {
@@ -438,18 +440,16 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::Device(
-                    et.clone(),
-                    DevicePluginUpdate {
-                        resource_name: self.name.clone(),
-                        volume: device.volume,
-                        old: DeviceUpdateState {
-                            ..Default::default()
-                        },
-                        new,
-                        resource: self.clone(),
+                Some(PluginUpdate::Device(DevicePluginUpdate {
+                    event_type: et.clone(),
+                    resource_name: self.name.clone(),
+                    volume: device.volume,
+                    old: DeviceUpdateState {
+                        ..Default::default()
                     },
-                ))
+                    new,
+                    resource: self.clone(),
+                }))
             }
         }
     }
@@ -507,16 +507,14 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::Connection(
-                    et.clone(),
-                    ConnectionPluginUpdate {
-                        resource_name: self.name.clone(),
-                        peer_node_id: conn.peer_node_id,
-                        old,
-                        new,
-                        resource: self.clone(),
-                    },
-                ))
+                Some(PluginUpdate::Connection(ConnectionPluginUpdate {
+                    event_type: et.clone(),
+                    resource_name: self.name.clone(),
+                    peer_node_id: conn.peer_node_id,
+                    old,
+                    new,
+                    resource: self.clone(),
+                }))
             }
             None => {
                 self.update_or_delete_connection(et, conn);
@@ -524,18 +522,16 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::Connection(
-                    et.clone(),
-                    ConnectionPluginUpdate {
-                        resource_name: self.name.clone(),
-                        peer_node_id: conn.peer_node_id,
-                        old: ConnectionUpdateState {
-                            ..Default::default()
-                        },
-                        new,
-                        resource: self.clone(),
+                Some(PluginUpdate::Connection(ConnectionPluginUpdate {
+                    event_type: et.clone(),
+                    resource_name: self.name.clone(),
+                    peer_node_id: conn.peer_node_id,
+                    old: ConnectionUpdateState {
+                        ..Default::default()
                     },
-                ))
+                    new,
+                    resource: self.clone(),
+                }))
             }
         }
     }
@@ -651,17 +647,15 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::PeerDevice(
-                    et.clone(),
-                    PeerDevicePluginUpdate {
-                        resource_name: self.name.clone(),
-                        volume: peerdevice.volume,
-                        peer_node_id: peerdevice.peer_node_id,
-                        old,
-                        new,
-                        resource: self.clone(),
-                    },
-                ))
+                Some(PluginUpdate::PeerDevice(PeerDevicePluginUpdate {
+                    event_type: et.clone(),
+                    resource_name: self.name.clone(),
+                    volume: peerdevice.volume,
+                    peer_node_id: peerdevice.peer_node_id,
+                    old,
+                    new,
+                    resource: self.clone(),
+                }))
             }
             None => {
                 self.update_or_delete_peerdevice(et, peerdevice);
@@ -669,19 +663,17 @@ impl Resource {
                     return None;
                 }
 
-                Some(PluginUpdate::PeerDevice(
-                    et.clone(),
-                    PeerDevicePluginUpdate {
-                        resource_name: self.name.clone(),
-                        volume: peerdevice.volume,
-                        peer_node_id: peerdevice.peer_node_id,
-                        old: PeerDeviceUpdateState {
-                            ..Default::default()
-                        },
-                        new,
-                        resource: self.clone(),
+                Some(PluginUpdate::PeerDevice(PeerDevicePluginUpdate {
+                    event_type: et.clone(),
+                    resource_name: self.name.clone(),
+                    volume: peerdevice.volume,
+                    peer_node_id: peerdevice.peer_node_id,
+                    old: PeerDeviceUpdateState {
+                        ..Default::default()
                     },
-                ))
+                    new,
+                    resource: self.clone(),
+                }))
             }
         }
     }
@@ -710,15 +702,13 @@ impl Resource {
             return None;
         }
 
-        Some(PluginUpdate::Resource(
-            et.clone(),
-            ResourcePluginUpdate {
-                resource_name: self.name.clone(),
-                old,
-                new,
-                resource: self.clone(),
-            },
-        ))
+        Some(PluginUpdate::Resource(ResourcePluginUpdate {
+            event_type: et.clone(),
+            resource_name: self.name.clone(),
+            old,
+            new,
+            resource: self.clone(),
+        }))
     }
 }
 
