@@ -1,6 +1,6 @@
 use crate::drbd::{
-    Connection, ConnectionState, Device, DiskState, EventType, EventUpdate, PeerDevice,
-    ReplicationState, Resource, Role,
+    BackingDevice, Connection, ConnectionState, Device, DiskState, EventType, EventUpdate,
+    PeerDevice, ReplicationState, Resource, Role,
 };
 use anyhow::Result;
 use log::{debug, warn};
@@ -144,6 +144,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("minor", v) => device.minor = v.parse::<_>()?,
                 ("disk", v) => device.disk_state = DiskState::from_str(v.into())?,
                 ("client", v) => device.client = str_to_bool(v),
+                ("backing_dev", v) => device.backing_dev = BackingDevice::from_str(v.into())?,
                 ("quorum", v) => device.quorum = str_to_bool(v),
                 ("size", v) => device.size = v.parse::<_>()?,
                 ("read", v) => device.read = v.parse::<_>()?,
@@ -273,7 +274,34 @@ mod tests {
 
     #[test]
     fn all_parsed_device_update() {
-        let up = parse_events2_line("change device name:foo volume:1 minor:1 disk:Attaching client:yes quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:yes").unwrap();
+        let up = parse_events2_line("change device name:foo volume:1 minor:1 disk:Attaching backing_dev:/dev/sda1 client:no quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:yes").unwrap();
+        let expected = EventUpdate::Device(
+            EventType::Change,
+            Device {
+                name: "foo".to_string(),
+                volume: 1,
+                minor: 1,
+                disk_state: DiskState::Attaching,
+                client: false,
+                backing_dev: BackingDevice {
+                    0: Some("/dev/sda1".to_string()),
+                },
+                quorum: true,
+                size: 1,
+                read: 1,
+                written: 1,
+                al_writes: 1,
+                bm_writes: 1,
+                upper_pending: 1,
+                lower_pending: 1,
+                al_suspended: true,
+                blocked: true,
+            },
+        );
+        assert_eq!(up, expected);
+
+        // backing_dev as none
+        let up = parse_events2_line("change device name:foo volume:1 minor:1 disk:Attaching backing_dev:none client:yes quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:yes").unwrap();
         let expected = EventUpdate::Device(
             EventType::Change,
             Device {
@@ -282,6 +310,7 @@ mod tests {
                 minor: 1,
                 disk_state: DiskState::Attaching,
                 client: true,
+                backing_dev: BackingDevice { 0: None },
                 quorum: true,
                 size: 1,
                 read: 1,

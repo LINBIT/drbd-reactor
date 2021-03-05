@@ -12,6 +12,7 @@ use crate::drbd::{EventType, PluginUpdate};
 
 pub mod debugger;
 pub mod promoter;
+pub mod umh;
 
 pub type PluginSender = mpsc::Sender<Arc<PluginUpdate>>;
 pub type PluginReceiver = mpsc::Receiver<Arc<PluginUpdate>>;
@@ -63,6 +64,8 @@ pub struct PluginConfig {
     promoter: Vec<promoter::PromoterConfig>,
     #[serde(default)]
     debugger: Vec<debugger::DebuggerConfig>,
+    #[serde(default)]
+    umh: Vec<umh::UMHConfig>,
 }
 
 /// Start every enable plugin in its own thread and return a thread handle and the send end
@@ -79,6 +82,9 @@ pub fn start_from_config(
     }
     for promote_cfg in cfg.promoter {
         plugins.push(Box::new(promoter::Promoter::new(promote_cfg)?));
+    }
+    for umh_cfg in cfg.umh {
+        plugins.push(Box::new(umh::UMH::new(umh_cfg)?));
     }
 
     maybe_systemd_notify_ready()?;

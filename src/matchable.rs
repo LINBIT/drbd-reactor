@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 /// A trait for matching structs from "partial" filters.
 ///
 /// This is meant as a very basic generic filter for a bunch of different structs or enums.
@@ -10,16 +12,45 @@ pub trait PartialMatchable {
     fn matches(&self, matcher: &Self::Pattern) -> bool;
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub enum BasicPatternOperator {
+    Equals,
+    NotEquals,
+}
+
+impl Default for BasicPatternOperator {
+    fn default() -> Self {
+        BasicPatternOperator::Equals
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[serde(untagged)]
+pub enum BasicPattern<T> {
+    WithOperator {
+        value: T,
+        #[serde(default)]
+        operator: BasicPatternOperator,
+    },
+    Default(T),
+}
+
 #[macro_export]
 macro_rules! common_matchable {
     ($($ty:ty),*) => {
         $(
             impl $crate::matchable::PartialMatchable for $ty {
-                type Pattern = ::core::option::Option<$ty>;
+                type Pattern = ::core::option::Option<$crate::matchable::BasicPattern<$ty>>;
                 fn matches(&self, pattern: &Self::Pattern) -> bool {
-                    match pattern {
-                        Some(s) => self == s,
-                        None => true,
+                    let (value, operator) = match pattern {
+                        Some($crate::matchable::BasicPattern::Default(v)) => (v, &$crate::matchable::BasicPatternOperator::Equals),
+                        Some($crate::matchable::BasicPattern::WithOperator{ value: v, operator: o}) => (v, o),
+                        None => return true,
+                    };
+
+                    match operator {
+                        $crate::matchable::BasicPatternOperator::Equals => self == value,
+                        $crate::matchable::BasicPatternOperator::NotEquals => self != value,
                     }
                 }
             }
@@ -39,10 +70,12 @@ common_matchable![String, bool, i32, u64];
 ///```rust
 /// use drbdd::make_matchable;
 /// use drbdd::matchable::PartialMatchable;
+/// use drbdd::matchable::BasicPattern;
+/// use drbdd::matchable::BasicPatternOperator;
 ///
 /// make_matchable!(struct Foo { item: String }, FooPattern);
 ///
-/// let foo_pattern = Some(FooPattern { item: Some("a".to_string()) });
+/// let foo_pattern = Some(FooPattern { item: Some(BasicPattern::Default("a".to_string())) });
 /// let a = Foo { item: "a".to_string() };
 /// let b = Foo { item: "b".to_string() };
 /// assert!(a.matches(&None));
@@ -50,12 +83,16 @@ common_matchable![String, bool, i32, u64];
 /// assert!(!b.matches(&foo_pattern));
 ///
 /// make_matchable!(enum Bar { A, B });
-/// let bar_pattern = Some(Bar::A);
+/// let bar_pattern = Some(BasicPattern::Default(Bar::A));
+/// let negative_pattern = Some(BasicPattern::WithOperator {value: Bar::A, operator: BasicPatternOperator::NotEquals});
 /// let a = Bar::A;
 /// let b = Bar::B;
 /// assert!(a.matches(&None));
 /// assert!(a.matches(&bar_pattern));
 /// assert!(!b.matches(&bar_pattern));
+/// assert!(!a.matches(&negative_pattern));
+/// assert!(b.matches(&negative_pattern));
+///
 ///```
 #[macro_export]
 macro_rules! make_matchable {
@@ -117,14 +154,19 @@ macro_rules! make_matchable {
         }
 
         impl $crate::matchable::PartialMatchable for $name {
-            type Pattern = ::core::option::Option<$name>;
+            type Pattern = ::core::option::Option<$crate::matchable::BasicPattern<$name>>;
             fn matches(&self, pattern: &Self::Pattern) -> bool {
-                match (self, pattern) {
+                let (value, operator) = match pattern {
+                        Some($crate::matchable::BasicPattern::Default(v)) => (v, &$crate::matchable::BasicPatternOperator::Equals),
+                        Some($crate::matchable::BasicPattern::WithOperator{ value: v, operator: o}) => (v, o),
+                        None => return true,
+                };
+
+                match (self, value) {
                 $(
-                    ($name::$variant, ::core::option::Option::Some($name::$variant)) => true,
+                    ($name::$variant, $name::$variant) => &$crate::matchable::BasicPatternOperator::Equals == operator,
                 )*
-                    (_, ::core::option::Option::None) => true,
-                    _ => false,
+                    _ => &$crate::matchable::BasicPatternOperator::NotEquals == operator,
                 }
             }
         }

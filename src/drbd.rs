@@ -1,15 +1,17 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt;
 use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
 common_matchable![Vec<Connection>, Vec<Device>];
 make_matchable![
-    #[derive(Default, Debug, Serialize, Clone, PartialEq)]
+    #[derive(Default, Debug, Serialize, Clone, PartialEq, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct Resource {
         pub name: String,
         pub role: Role,
         pub suspended: bool,
-        #[serde(rename = "write-ordering")]
         pub write_ordering: String,
         pub may_promote: bool,
         pub promotion_score: i32,
@@ -19,79 +21,85 @@ make_matchable![
     ResourcePattern
 ];
 
-#[derive(Default, Debug, Serialize, Clone, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct BackingDevice(pub Option<String>);
+
+impl FromStr for BackingDevice {
+    type Err = Error;
+
+    fn from_str(input: &str) -> Result<Self, Error> {
+        match input {
+            "none" => Ok(Self(None)),
+            _ => Ok(Self(Some(input.to_string()))),
+        }
+    }
+}
+impl fmt::Display for BackingDevice {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.0 {
+            Some(bd) => write!(f, "{}", bd),
+            None => write!(f, "none"),
+        }
+    }
+}
+
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "kebab-case")]
 pub struct Device {
     pub name: String,
     pub volume: i32,
     pub minor: i32,
-    #[serde(rename = "disk-state")]
     pub disk_state: DiskState,
+    pub backing_dev: BackingDevice,
     pub client: bool,
     pub quorum: bool,
     pub size: u64,
     pub read: u64,
     pub written: u64,
-    #[serde(rename = "al-writes")]
     pub al_writes: u64,
-    #[serde(rename = "bm-writes")]
     pub bm_writes: u64,
-    #[serde(rename = "upper-pending")]
     pub upper_pending: u64,
-    #[serde(rename = "lower-pending")]
     pub lower_pending: u64,
-    #[serde(rename = "al-suspended")]
     pub al_suspended: bool,
     pub blocked: bool,
 }
 
-#[derive(Default, Debug, Serialize, Clone, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "kebab-case")]
 pub struct PeerDevice {
     pub name: String,
     pub volume: i32,
-    #[serde(rename = "peer-node-id")]
     pub peer_node_id: i32,
-    #[serde(rename = "replication-state")]
     pub replication_state: ReplicationState,
-    #[serde(rename = "conn-name")]
     pub conn_name: String,
-    #[serde(rename = "peer-disk-state")]
     pub peer_disk_state: DiskState,
-    #[serde(rename = "peer-client")]
     pub peer_client: bool,
-    #[serde(rename = "resync-suspendend")]
     pub resync_suspended: bool,
     pub received: u64,
     pub sent: u64,
-    #[serde(rename = "out-of-sync")]
     pub out_of_sync: u64,
     pub pending: u64,
     pub unacked: u64,
-    #[serde(rename = "has-sync-details")]
     pub has_sync_details: bool,
-    #[serde(rename = "has-online-verify-details")]
     pub has_online_verify_details: bool,
 }
 
-#[derive(Default, Debug, Serialize, Clone, PartialEq)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "kebab-case")]
 pub struct Connection {
     pub name: String,
-    #[serde(rename = "peer-node-id")]
     pub peer_node_id: i32,
-    #[serde(rename = "conn-name")]
     pub conn_name: String,
     pub connection: ConnectionState,
-    #[serde(rename = "peer-role")]
     pub peer_role: Role,
     pub congested: bool,
-    #[serde(rename = "ap-in-flight")]
     pub ap_in_flight: u64,
-    #[serde(rename = "rs-in-flight")]
     pub rs_in_flight: u64,
     pub peerdevices: Vec<PeerDevice>,
 }
 
 make_matchable![
-    #[derive(Serialize, Debug, PartialEq, Clone)]
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
     pub enum Role {
         Unknown,
         Primary,
@@ -119,7 +127,7 @@ impl Default for Role {
 }
 
 make_matchable![
-    #[derive(Serialize, Debug, Clone, PartialEq)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
     pub enum DiskState {
         Diskless,
         Attaching,
@@ -160,7 +168,7 @@ impl Default for DiskState {
 }
 
 make_matchable![
-    #[derive(Serialize, Debug, Clone, PartialEq)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
     pub enum ConnectionState {
         StandAlone,
         Disconnecting,
@@ -203,8 +211,25 @@ impl Default for ConnectionState {
     }
 }
 
+impl fmt::Display for ConnectionState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::StandAlone => write!(f, "StandAlone"),
+            Self::Disconnecting => write!(f, "Disconnected"),
+            Self::Unconnected => write!(f, "Unconnected"),
+            Self::Timeout => write!(f, "Timeout"),
+            Self::BrokenPipe => write!(f, "BrokenPipe"),
+            Self::NetworkFailure => write!(f, "NetworkFailure"),
+            Self::ProtocolError => write!(f, "ProtocolError"),
+            Self::TearDown => write!(f, "TearDown"),
+            Self::Connecting => write!(f, "Connecting"),
+            Self::Connected => write!(f, "Connected"),
+        }
+    }
+}
+
 make_matchable![
-    #[derive(Serialize, Debug, Clone, PartialEq)]
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
     pub enum ReplicationState {
         Off,
         Established,
@@ -258,7 +283,8 @@ impl Default for ReplicationState {
 }
 
 make_matchable![
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct ResourceUpdateState {
         pub role: Role,
         pub may_promote: bool,
@@ -268,7 +294,8 @@ make_matchable![
 ];
 
 make_matchable![
-    #[derive(Debug, Clone, Default, PartialEq)]
+    #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct DeviceUpdateState {
         pub disk_state: DiskState,
         pub client: bool,
@@ -279,7 +306,8 @@ make_matchable![
 ];
 
 make_matchable![
-    #[derive(Debug, Clone, Default, PartialEq)]
+    #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct PeerDeviceUpdateState {
         pub replication_state: ReplicationState,
         pub peer_disk_state: DiskState,
@@ -290,10 +318,11 @@ make_matchable![
 ];
 
 make_matchable![
-    #[derive(Debug, Clone, Default, PartialEq)]
+    #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct ConnectionUpdateState {
         pub conn_name: String,
-        pub connection: ConnectionState,
+        pub connection_state: ConnectionState,
         pub peer_role: Role,
         pub congested: bool,
     },
@@ -310,7 +339,8 @@ pub enum EventUpdate {
 }
 
 make_matchable![
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct ResourcePluginUpdate {
         pub event_type: EventType,
         pub resource_name: String,
@@ -321,8 +351,19 @@ make_matchable![
     ResourcePluginUpdatePattern
 ];
 
+impl ResourcePluginUpdate {
+    pub fn get_env(&self) -> HashMap<String, String> {
+        let mut env = HashMap::new();
+
+        env.insert("DRBD_RES_NAME".to_string(), self.resource_name.clone());
+
+        env
+    }
+}
+
 make_matchable![
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct DevicePluginUpdate {
         pub event_type: EventType,
         pub resource_name: String,
@@ -334,8 +375,40 @@ make_matchable![
     DevicePluginUpdatePattern
 ];
 
+impl DevicePluginUpdate {
+    pub fn get_env(&self) -> HashMap<String, String> {
+        let mut env = HashMap::new();
+
+        env.insert("DRBD_RES_NAME".to_string(), self.resource_name.clone());
+
+        let find = Device {
+            volume: self.volume,
+            ..Default::default()
+        };
+        if let Some(device) = self.resource.get_device(&find) {
+            env.insert("DRBD_MINOR".to_string(), device.minor.to_string());
+            env.insert(
+                format!("DRBD_MINOR_{}", self.volume),
+                device.minor.to_string(),
+            );
+            env.insert(
+                "DRBD_BACKING_DEV".to_string(),
+                device.backing_dev.to_string(),
+            );
+            env.insert(
+                format!("DRBD_BACKING_DEV_{}", self.volume),
+                device.backing_dev.to_string(),
+            );
+        }
+        env.insert("DRBD_VOLUME".to_string(), self.volume.to_string());
+
+        env
+    }
+}
+
 make_matchable![
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct PeerDevicePluginUpdate {
         pub event_type: EventType,
         pub resource_name: String,
@@ -348,8 +421,43 @@ make_matchable![
     PeerDevicePluginUpdatePattern
 ];
 
+impl PeerDevicePluginUpdate {
+    pub fn get_env(&self) -> HashMap<String, String> {
+        let mut env = HashMap::new();
+
+        env.insert("DRBD_RES_NAME".to_string(), self.resource_name.clone());
+
+        let find = Device {
+            volume: self.volume,
+            ..Default::default()
+        };
+        if let Some(device) = self.resource.get_device(&find) {
+            env.insert("DRBD_MINOR".to_string(), device.minor.to_string());
+            env.insert(
+                format!("DRBD_MINOR_{}", self.volume),
+                device.minor.to_string(),
+            );
+            env.insert(
+                "DRBD_BACKING_DEV".to_string(),
+                device.backing_dev.to_string(),
+            );
+            env.insert(
+                format!("DRBD_BACKING_DEV_{}", self.volume),
+                device.backing_dev.to_string(),
+            );
+        }
+        env.insert(
+            "DRBD_PEER_NODE_ID".to_string(),
+            self.peer_node_id.to_string(),
+        );
+
+        env
+    }
+}
+
 make_matchable![
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
     pub struct ConnectionPluginUpdate {
         pub event_type: EventType,
         pub resource_name: String,
@@ -360,6 +468,24 @@ make_matchable![
     },
     ConnectionPluginUpdatePattern
 ];
+
+impl ConnectionPluginUpdate {
+    pub fn get_env(&self) -> HashMap<String, String> {
+        let mut env = HashMap::new();
+
+        env.insert("DRBD_RES_NAME".to_string(), self.resource_name.clone());
+        env.insert(
+            "DRBD_PEER_NODE_ID".to_string(),
+            self.peer_node_id.to_string(),
+        );
+        env.insert(
+            "DRBD_CSTATE".to_string(),
+            self.new.connection_state.to_string(),
+        );
+
+        env
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum PluginUpdate {
@@ -529,7 +655,7 @@ impl Resource {
         let new = ConnectionUpdateState {
             congested: conn.congested,
             conn_name: conn.conn_name.clone(),
-            connection: conn.connection.clone(),
+            connection_state: conn.connection.clone(),
             peer_role: conn.peer_role.clone(),
         };
 
@@ -538,7 +664,7 @@ impl Resource {
                 let old = ConnectionUpdateState {
                     congested: existing.congested,
                     conn_name: existing.conn_name.clone(),
-                    connection: existing.connection.clone(),
+                    connection_state: existing.connection.clone(),
                     peer_role: existing.peer_role.clone(),
                 };
 
@@ -753,7 +879,7 @@ impl Resource {
 }
 
 make_matchable![
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     pub enum EventType {
         Exists,
         Create,

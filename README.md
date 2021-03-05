@@ -15,7 +15,8 @@ changes in a DRBD resource.
 ## Implementation
 - [x] debugger
 - [x] promoter
-- [ ] umh (Under active development)
+- [x] umh (user defined filters)
+- [ ] umh (replacement for kernel called helpers: Under active development)
 - [ ] prometheus (Under active development)
 
 # Configuration
