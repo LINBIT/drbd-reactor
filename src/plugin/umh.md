@@ -29,6 +29,14 @@ new.role = "Primary"
 It is important to note that fields not specified do not restrict the filter. Think of them as "don't care".
 Make sure to read and understand the implied [caveats](./umh.md#caveats).
 
+IMPORTANT: backing device information needs
+
+- drbd-utils `>= 9.17.0`
+- kernel module `>= 9.1.1` if using `9.1.z` or `>= 9.0.28` if using `9.0.z`
+
+Otherwise it will be set to "none".
+
+
 # Common fields
 Every rule type (e.g., resource, device,...) has a set of common fields
 

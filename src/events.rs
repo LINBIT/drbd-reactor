@@ -23,16 +23,31 @@ pub fn events2(tx: Sender<EventUpdate>) -> Result<()> {
             String::from_utf8(version.stderr).unwrap_or("<Could not convert stderr>".to_string())
         ));
     }
+
+    // check drbdsetup events2 version
     let pattern = Regex::new(r"^DRBDADM_VERSION_CODE=0x([[:xdigit:]]+)$")?;
-    if String::from_utf8(version.stdout)?
-        .lines()
-        .filter_map(|line| pattern.captures(line))
-        .find(|v| u32::from_str_radix(&v[1], 16).map_or_else(|_err| false, |v| v >= 0x091000))
-        .is_none()
-    {
+    let (major, minor, patch) = split_version(pattern, version.stdout.clone())?;
+    if let Err(e) = min_version((major, minor, patch), (9, 16, 0)) {
         return Err(anyhow::anyhow!(
-            "drbdsetup minimum version ('9.16.0') not fulfilled"
+            "drbdsetup minimum version ('9.16.0') not fulfilled: {}",
+            e
         ));
+    }
+    let mut has_backing_dev = min_version((major, minor, patch), (9, 17, 0)).is_ok();
+
+    if has_backing_dev {
+        // minimal kernel version for backing_dev
+        let pattern = Regex::new(r"^DRBD_KERNEL_VERSION_CODE=0x([[:xdigit:]]+)$")?;
+        let (major, minor, patch) = split_version(pattern, version.stdout)?;
+        let drbd90 = min_version((major, minor, patch), (9, 0, 28));
+        let drbd911plus = min_version((major, minor, patch), (9, 1, 1));
+
+        has_backing_dev =
+            drbd911plus.is_ok() || (drbd90.is_ok() && !(major == 9 && minor == 1 && patch == 0));
+    }
+
+    if !has_backing_dev {
+        warn!("backing device information will be missing!");
     }
 
     // TODO(): add some duration, like if we failed 5 times in the last minute or so
@@ -394,4 +409,61 @@ mod tests {
         // path not implemented
         assert!(parse_events2_line("create path name:foo").is_err());
     }
+}
+
+fn split_version(pattern: regex::Regex, stdout: Vec<u8>) -> Result<(u8, u8, u8)> {
+    let version = String::from_utf8(stdout)?;
+    let version = version
+        .lines()
+        .filter_map(|line| pattern.captures(line))
+        .next()
+        .ok_or(anyhow::anyhow!(
+            "Could not determine version from pattern '{}'",
+            pattern
+        ))?;
+
+    let version = u32::from_str_radix(&version[1], 16)?;
+
+    let major = ((version >> 16) & 0xff) as u8;
+    let minor = ((version >> 8) & 0xff) as u8;
+    let patch = (version & 0xff) as u8;
+
+    Ok((major, minor, patch))
+}
+
+fn min_version(have: (u8, u8, u8), want: (u8, u8, u8)) -> Result<()> {
+    if have.0 > want.0 {
+        return Ok(());
+    }
+    if have.0 < want.0 {
+        return Err(anyhow::anyhow!(
+            "Major version too small {} vs. {}",
+            have.0,
+            want.0
+        ));
+    }
+
+    if have.1 > want.1 {
+        return Ok(());
+    }
+    if have.1 < want.1 {
+        return Err(anyhow::anyhow!(
+            "Minor version too small {} vs. {}",
+            have.1,
+            want.1
+        ));
+    }
+
+    if have.2 > want.2 {
+        return Ok(());
+    }
+    if have.2 < want.2 {
+        return Err(anyhow::anyhow!(
+            "Patch version too small {} vs. {}",
+            have.2,
+            want.2
+        ));
+    }
+
+    Ok(())
 }
