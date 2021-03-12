@@ -14,26 +14,20 @@ use crate::drbd::{
 use crate::matchable::{BasicPattern, PartialMatchable};
 
 pub struct UMH {
-    cfg: UMHConfig,
+    resource_rules: Vec<(CommonRule, Option<ResourcePluginUpdatePattern>)>,
+    device_rules: Vec<(CommonRule, Option<DevicePluginUpdatePattern>)>,
+    peer_device_rules: Vec<(CommonRule, Option<PeerDevicePluginUpdatePattern>)>,
+    connection_rules: Vec<(CommonRule, Option<ConnectionPluginUpdatePattern>)>,
 }
 
 impl UMH {
     pub fn new(cfg: UMHConfig) -> Result<Self> {
-        let mut cfg = cfg;
-        for r in &mut cfg.resource {
-            r.to_pattern();
-        }
-        for d in &mut cfg.device {
-            d.to_pattern();
-        }
-        for pd in &mut cfg.peerdevice {
-            pd.to_pattern();
-        }
-        for c in &mut cfg.connection {
-            c.to_pattern();
-        }
-
-        Ok(Self { cfg })
+        Ok(Self {
+            resource_rules: cfg.resource.into_iter().map(Into::into).collect(),
+            device_rules: cfg.device.into_iter().map(Into::into).collect(),
+            peer_device_rules: cfg.peerdevice.into_iter().map(Into::into).collect(),
+            connection_rules: cfg.connection.into_iter().map(Into::into).collect(),
+        })
     }
 }
 
@@ -42,56 +36,16 @@ impl super::Plugin for UMH {
         trace!("umh: start");
 
         for r in rx.into_iter() {
-            match r.as_ref() {
-                // TODO(): this is quire repetitve, think about how to refactor.
-                PluginUpdate::Resource(u) => {
-                    for r in &self.cfg.resource {
-                        if u.matches(&r.pattern) {
-                            info!("umh: match for rule '{}'", r.common.name);
-                            spawn_command(
-                                r.common.command.clone(),
-                                u.get_env(),
-                                r.common.env.clone(),
-                            );
-                        }
-                    }
-                }
-                PluginUpdate::Device(u) => {
-                    for d in &self.cfg.device {
-                        if u.matches(&d.pattern) {
-                            info!("umh: match for rule '{}'", d.common.name);
-                            spawn_command(
-                                d.common.command.clone(),
-                                u.get_env(),
-                                d.common.env.clone(),
-                            );
-                        }
-                    }
-                }
-                PluginUpdate::PeerDevice(u) => {
-                    for pd in &self.cfg.peerdevice {
-                        if u.matches(&pd.pattern) {
-                            info!("umh: match for rule '{}'", pd.common.name);
-                            spawn_command(
-                                pd.common.command.clone(),
-                                u.get_env(),
-                                pd.common.env.clone(),
-                            );
-                        }
-                    }
-                }
-                PluginUpdate::Connection(u) => {
-                    for c in &self.cfg.connection {
-                        if u.matches(&c.pattern) {
-                            info!("umh: match for rule '{}'", c.common.name);
-                            spawn_command(
-                                c.common.command.clone(),
-                                u.get_env(),
-                                c.common.env.clone(),
-                            );
-                        }
-                    }
-                }
+            let handlers = match r.as_ref() {
+                PluginUpdate::Resource(r) => get_handlers_by_pattern(r, &self.resource_rules),
+                PluginUpdate::Device(d) => get_handlers_by_pattern(d, &self.device_rules),
+                PluginUpdate::PeerDevice(p) => get_handlers_by_pattern(p, &self.peer_device_rules),
+                PluginUpdate::Connection(c) => get_handlers_by_pattern(c, &self.connection_rules),
+            };
+
+            for handler in handlers {
+                info!("umh: match for rule: {}", handler.name);
+                spawn_command(&handler.command, &r.get_env(), &handler.env)
             }
         }
 
@@ -100,24 +54,48 @@ impl super::Plugin for UMH {
     }
 }
 
+/// Given a matchable item and a list of rules, return every rule that applies
+fn get_handlers_by_pattern<'a, T>(
+    item: &'a T,
+    rules: &'a [(CommonRule, T::Pattern)],
+) -> Box<dyn Iterator<Item = &'a CommonRule> + 'a>
+where
+    T: PartialMatchable,
+{
+    let iter = rules
+        .into_iter()
+        .filter(move |(_, p)| item.matches(p))
+        .map(|(c, _)| c);
+
+    Box::new(iter)
+}
+
 fn spawn_command(
-    cmd: String,
-    filter_env: HashMap<String, String>,
-    user_env: HashMap<String, String>,
+    cmd: &str,
+    filter_env: &HashMap<String, String>,
+    user_env: &HashMap<String, String>,
 ) {
     debug!("umh: starting handler '{}'", cmd);
 
     let common_env = common_env();
+
+    let mut child = match Command::new("sh")
+        .arg("-c")
+        .arg(cmd)
+        .env_clear()
+        .envs(filter_env)
+        .envs(user_env)
+        .envs(common_env)
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("Could not execute handler: {}", e);
+            return;
+        }
+    };
     thread::spawn(move || {
-        match Command::new("sh")
-            .arg("-c")
-            .arg(cmd)
-            .env_clear()
-            .envs(&filter_env)
-            .envs(&user_env)
-            .envs(&common_env)
-            .status()
-        {
+        match child.wait() {
             Ok(status) => {
                 if !status.success() {
                     warn!("handler did not not exit successfully")
@@ -129,17 +107,14 @@ fn spawn_command(
     });
 }
 
-fn common_env() -> HashMap<String, String> {
-    let mut env = HashMap::new();
-
-    env.insert("HOME".to_string(), "/".to_string());
-    env.insert("TERM".to_string(), "linux".to_string());
-    env.insert(
-        "PATH".to_string(),
-        "/sbin:/usr/sbin:/bin:/usr/bin".to_string(),
-    );
-
-    env
+fn common_env() -> impl Iterator<Item = (&'static str, &'static str)> {
+    [
+        ("HOME", "/"),
+        ("TERM", "Linux"),
+        ("PATH", "/sbin:/usr/sbin:/bin:/usr/bin"),
+    ]
+    .iter()
+    .map(ToOwned::to_owned)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -171,22 +146,21 @@ struct DeviceRule {
     volume: Option<BasicPattern<i32>>,
     old: Option<DeviceUpdateStatePattern>,
     new: Option<DeviceUpdateStatePattern>,
-
-    // needs to be filled
-    pattern: Option<DevicePluginUpdatePattern>,
 }
 
-impl DeviceRule {
-    fn to_pattern(&mut self) {
-        let pattern = DevicePluginUpdatePattern {
-            event_type: self.event_type.clone(),
-            resource_name: self.resource_name.clone(),
-            volume: self.volume.clone(),
-            old: self.old.clone(),
-            new: self.new.clone(),
-            resource: None, // intentionally filtered
-        };
-        self.pattern = Some(pattern);
+impl Into<(CommonRule, Option<DevicePluginUpdatePattern>)> for DeviceRule {
+    fn into(self) -> (CommonRule, Option<DevicePluginUpdatePattern>) {
+        (
+            self.common,
+            Some(DevicePluginUpdatePattern {
+                event_type: self.event_type,
+                resource_name: self.resource_name,
+                volume: self.volume,
+                old: self.old,
+                new: self.new,
+                resource: None,
+            }),
+        )
     }
 }
 
@@ -196,25 +170,24 @@ pub struct ResourceRule {
     #[serde(flatten)]
     common: CommonRule,
 
-    pub event_type: Option<BasicPattern<EventType>>,
-    pub resource_name: Option<BasicPattern<String>>,
-    pub old: Option<ResourceUpdateStatePattern>,
-    pub new: Option<ResourceUpdateStatePattern>,
-
-    // needs to be filled
-    pattern: Option<ResourcePluginUpdatePattern>,
+    event_type: Option<BasicPattern<EventType>>,
+    resource_name: Option<BasicPattern<String>>,
+    old: Option<ResourceUpdateStatePattern>,
+    new: Option<ResourceUpdateStatePattern>,
 }
 
-impl ResourceRule {
-    fn to_pattern(&mut self) {
-        let pattern = ResourcePluginUpdatePattern {
-            event_type: self.event_type.clone(),
-            resource_name: self.resource_name.clone(),
-            old: self.old.clone(),
-            new: self.new.clone(),
-            resource: None, // intentionally filtered
-        };
-        self.pattern = Some(pattern);
+impl Into<(CommonRule, Option<ResourcePluginUpdatePattern>)> for ResourceRule {
+    fn into(self) -> (CommonRule, Option<ResourcePluginUpdatePattern>) {
+        (
+            self.common,
+            Some(ResourcePluginUpdatePattern {
+                event_type: self.event_type,
+                resource_name: self.resource_name,
+                old: self.old,
+                new: self.new,
+                resource: None,
+            }),
+        )
     }
 }
 
@@ -224,29 +197,28 @@ pub struct PeerDeviceRule {
     #[serde(flatten)]
     common: CommonRule,
 
-    pub event_type: Option<BasicPattern<EventType>>,
-    pub resource_name: Option<BasicPattern<String>>,
-    pub volume: Option<BasicPattern<i32>>,
-    pub peer_node_id: Option<BasicPattern<i32>>,
-    pub old: Option<PeerDeviceUpdateStatePattern>,
-    pub new: Option<PeerDeviceUpdateStatePattern>,
-
-    // needs to be filled
-    pattern: Option<PeerDevicePluginUpdatePattern>,
+    event_type: Option<BasicPattern<EventType>>,
+    resource_name: Option<BasicPattern<String>>,
+    volume: Option<BasicPattern<i32>>,
+    peer_node_id: Option<BasicPattern<i32>>,
+    old: Option<PeerDeviceUpdateStatePattern>,
+    new: Option<PeerDeviceUpdateStatePattern>,
 }
 
-impl PeerDeviceRule {
-    fn to_pattern(&mut self) {
-        let pattern = PeerDevicePluginUpdatePattern {
-            event_type: self.event_type.clone(),
-            resource_name: self.resource_name.clone(),
-            volume: self.volume,
-            peer_node_id: self.peer_node_id,
-            old: self.old.clone(),
-            new: self.new.clone(),
-            resource: None, // intentionally filtered
-        };
-        self.pattern = Some(pattern);
+impl Into<(CommonRule, Option<PeerDevicePluginUpdatePattern>)> for PeerDeviceRule {
+    fn into(self) -> (CommonRule, Option<PeerDevicePluginUpdatePattern>) {
+        (
+            self.common,
+            Some(PeerDevicePluginUpdatePattern {
+                event_type: self.event_type,
+                resource_name: self.resource_name,
+                volume: self.volume,
+                peer_node_id: self.peer_node_id,
+                old: self.old,
+                new: self.new,
+                resource: None,
+            }),
+        )
     }
 }
 
@@ -256,26 +228,25 @@ pub struct ConnectionRule {
     #[serde(flatten)]
     common: CommonRule,
 
-    pub event_type: Option<BasicPattern<EventType>>,
-    pub resource_name: Option<BasicPattern<String>>,
-    pub peer_node_id: Option<BasicPattern<i32>>,
-    pub old: Option<ConnectionUpdateStatePattern>,
-    pub new: Option<ConnectionUpdateStatePattern>,
-
-    // needs to be filled
-    pattern: Option<ConnectionPluginUpdatePattern>,
+    event_type: Option<BasicPattern<EventType>>,
+    resource_name: Option<BasicPattern<String>>,
+    peer_node_id: Option<BasicPattern<i32>>,
+    old: Option<ConnectionUpdateStatePattern>,
+    new: Option<ConnectionUpdateStatePattern>,
 }
 
-impl ConnectionRule {
-    fn to_pattern(&mut self) {
-        let pattern = ConnectionPluginUpdatePattern {
-            event_type: self.event_type.clone(),
-            resource_name: self.resource_name.clone(),
-            peer_node_id: self.peer_node_id,
-            old: self.old.clone(),
-            new: self.new.clone(),
-            resource: None, // intentionally filtered
-        };
-        self.pattern = Some(pattern);
+impl Into<(CommonRule, Option<ConnectionPluginUpdatePattern>)> for ConnectionRule {
+    fn into(self) -> (CommonRule, Option<ConnectionPluginUpdatePattern>) {
+        (
+            self.common,
+            Some(ConnectionPluginUpdatePattern {
+                event_type: self.event_type,
+                resource_name: self.resource_name,
+                peer_node_id: self.peer_node_id,
+                old: self.old,
+                new: self.new,
+                resource: None,
+            }),
+        )
     }
 }

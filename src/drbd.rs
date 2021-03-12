@@ -522,6 +522,15 @@ impl PluginUpdate {
             Self::Connection(u) => u.resource_name.to_string(),
         }
     }
+
+    pub fn get_env(&self) -> HashMap<String, String> {
+        match self {
+            Self::Resource(u) => u.get_env(),
+            Self::Device(u) => u.get_env(),
+            Self::PeerDevice(u) => u.get_env(),
+            Self::Connection(u) => u.get_env(),
+        }
+    }
 }
 
 impl Resource {
