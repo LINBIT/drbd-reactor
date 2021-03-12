@@ -20,3 +20,13 @@
 ## shell one-liner executed in a loop if a stop action fails
 ## if unset, this defaults to "true"
 # on-stop-failure =  "echo b > /proc/sysrq-trigger"
+
+# Configure a user mode helper filter
+# [[umh]]
+## Filter type
+# [[umh.resource]]
+# command = "drbdd-role-change.sh"
+# event-type = "Change"
+## everything not Primary
+# old.role = { operator = "NotEquals", value = "Primary" }
+# new.role = "Primary"
