@@ -68,9 +68,11 @@ Besides the [common fields](umh.md#common-fields), one can match the following f
 
 A match on such a rule calls the specified `command` and sets the following environment variables:
 
-| Variable        | Description               |
-| --------------- | ------------------------- |
-| `DRBD_RES_NAME` | Name of the DRBD resource |
+| Variable                     | Description                                   |
+| ---------------------------- | --------------------------------------------- |
+| `DRBD_RES_NAME`              | Name of the DRBD resource                     |
+| `DRBD_{OLD,NEW}_ROLE`        | [Role](umh.md#resource-roles) of the resource |
+| `DRBD_{OLD,NEW}_MAY_PROMOTE` | If the resource may be promoted               |
 
 
 ## Device rules
@@ -85,14 +87,17 @@ Besides the [common fields](umh.md#common-fields), one can match the following f
 
 A match on such a rule calls the specified `command` and sets the following environment variables:
 
-| Variable                   | Description                                               |
-| -------------------------- | --------------------------------------------------------- |
-| `DRBD_RES_NAME`            | Name of the DRBD resource                                 |
-| `DRBD_MINOR`               | Minor number of the device                                |
-| `DRBD_MINOR_$volume`       | Minor number of the device by `volume`                    |
-| `DRBD_VOLUME`              | `volume` (number) of the device                           |
-| `DRBD_BACKING_DEV`         | Block device path to backing device or "none"             |
-| `DRBD_BACKING_DEV_$volume` | Block device path to backing device or "none" by `volume` |
+| Variable                    | Description                                               |
+| --------------------------- | --------------------------------------------------------- |
+| `DRBD_RES_NAME`             | Name of the DRBD resource                                 |
+| `DRBD_MINOR`                | Minor number of the device                                |
+| `DRBD_MINOR_$volume`        | Minor number of the device by `volume`                    |
+| `DRBD_VOLUME`               | `volume` (number) of the device                           |
+| `DRBD_BACKING_DEV`          | Block device path to backing device or "none"             |
+| `DRBD_BACKING_DEV_$volume`  | Block device path to backing device or "none" by `volume` |
+| `DRBD_{OLD,NEW}_DISK_STATE` | [DiskState](umh.md#disk-states) of the device             |
+| `DRBD_{OLD,NEW}_CLIENT`     | Device was/is a DRBD client                               |
+| `DRBD_{OLD,NEW}_QUORUM`     | Device had/has DRBD qourum                                |
 
 ## Peer device rules
 Besides the [common fields](umh.md#common-fields), one can match the following fields in a `peerdevice` rule:
@@ -108,15 +113,19 @@ Besides the [common fields](umh.md#common-fields), one can match the following f
 
 A match on such a rule calls the specified `command` and sets the following environment variables:
 
-| Variable                   | Description                                               |
-| -------------------------- | --------------------------------------------------------- |
-| `DRBD_RES_NAME`            | Name of the DRBD resource                                 |
-| `DRBD_MINOR`               | Minor number of the device                                |
-| `DRBD_MINOR_$volume`       | Minor number of the device by `volume`                    |
-| `DRBD_VOLUME`              | `volume` (number) of the device                           |
-| `DRBD_BACKING_DEV`         | Block device path to backing device or "none"             |
-| `DRBD_BACKING_DEV_$volume` | Block device path to backing device or "none" by `volume` |
-| `DRBD_PEER_NODE_ID`        | Node ID of the peer                                       |
+| Variable                                | Description                                               |
+| --------------------------------------- | --------------------------------------------------------- |
+| `DRBD_RES_NAME`                         | Name of the DRBD resource                                 |
+| `DRBD_MINOR`                            | Minor number of the device                                |
+| `DRBD_MINOR_$volume`                    | Minor number of the device by `volume`                    |
+| `DRBD_VOLUME`                           | `volume` (number) of the device                           |
+| `DRBD_BACKING_DEV`                      | Block device path to backing device or "none"             |
+| `DRBD_BACKING_DEV_$volume`              | Block device path to backing device or "none" by `volume` |
+| `DRBD_PEER_NODE_ID`                     | Node ID of the peer                                       |
+| `DRBD_{OLD,NEW}_PEER_DISK_STATE`        | [DiskState](umh.md#disk-states) of the peer-device        |
+| `DRBD_{OLD,NEW}_PEER_CLIENT`            | Peer-device was/is a DRBD client                          |
+| `DRBD_{OLD,NEW}_PEER_RESYNC_SUSPENDED`  | Resync was/is suspended                                   |
+| `DRBD_{OLD,NEW}_PEER_REPLICATION_STATE` | [ReplicationState](umh.md#replication-states)             |
 
 A note on `DRBD_BACKING_DEV*`: DRBD does not know the backing device path of its peer, so the device set in
 these variables is the *local* backing device path! Usually the backing device names on all peers are the same
@@ -137,11 +146,15 @@ Besides the [common fields](umh.md#common-fields), one can match the following f
 
 A match on such a rule calls the specified `command` and sets the following environment variables:
 
-| Variable                   | Description                                    |
-| -------------------------- | ---------------------------------------------- |
-| `DRBD_RES_NAME`            | Name of the DRBD resource                      |
-| `DRBD_PEER_NODE_ID`        | Node ID of the peer                            |
-| `DRBD_CSTATE`              | [Connection state](./umh.md#connection-states) |
+| Variable                    | Description                                    |
+| --------------------------- | ---------------------------------------------- |
+| `DRBD_RES_NAME`             | Name of the DRBD resource                      |
+| `DRBD_PEER_NODE_ID`         | Node ID of the peer                            |
+| `DRBD_CSTATE`               | [Connection state](./umh.md#connection-states) |
+| `DRBD_{OLD,NEW}_CONN_NAME`  | Conneciton name                                |
+| `DRBD_{OLD,NEW}_CONN_STATE` | [Connection state](./umh.md#connection-states) |
+| `DRBD_{OLD,NEW}_PEER_ROLE`  | Peer role                                      |
+| `DRBD_{OLD,NEW}_CONGESTED`  | Connection was/is congested                    |
 
 # Operators
 Currently filters that are set are compared for equality with the value received in a state update. One handy

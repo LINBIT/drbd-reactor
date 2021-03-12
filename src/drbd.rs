@@ -120,6 +120,15 @@ impl FromStr for Role {
         }
     }
 }
+impl fmt::Display for Role {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Unknown => write!(f, "Unknown"),
+            Self::Primary => write!(f, "Primary"),
+            Self::Secondary => write!(f, "Secondary"),
+        }
+    }
+}
 impl Default for Role {
     fn default() -> Self {
         Self::Unknown
@@ -158,6 +167,22 @@ impl FromStr for DiskState {
             "Consistent" => Ok(Self::Consistent),
             "UpToDate" => Ok(Self::UpToDate),
             _ => Err(Error::new(ErrorKind::InvalidData, "unknow disk state")),
+        }
+    }
+}
+impl fmt::Display for DiskState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Diskless => write!(f, "Diskless"),
+            Self::Attaching => write!(f, "Attaching"),
+            Self::Detaching => write!(f, "Detaching"),
+            Self::Failed => write!(f, "Failed"),
+            Self::Negotiating => write!(f, "Negotiating"),
+            Self::Inconsistent => write!(f, "Inconsistent"),
+            Self::Outdated => write!(f, "Outdated"),
+            Self::DUnknown => write!(f, "DUnknown"),
+            Self::Consistent => write!(f, "Consistent"),
+            Self::UpToDate => write!(f, "UpToDate"),
         }
     }
 }
@@ -205,17 +230,11 @@ impl FromStr for ConnectionState {
         }
     }
 }
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self::StandAlone
-    }
-}
-
 impl fmt::Display for ConnectionState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::StandAlone => write!(f, "StandAlone"),
-            Self::Disconnecting => write!(f, "Disconnected"),
+            Self::Disconnecting => write!(f, "Disconnecting"),
             Self::Unconnected => write!(f, "Unconnected"),
             Self::Timeout => write!(f, "Timeout"),
             Self::BrokenPipe => write!(f, "BrokenPipe"),
@@ -225,6 +244,11 @@ impl fmt::Display for ConnectionState {
             Self::Connecting => write!(f, "Connecting"),
             Self::Connected => write!(f, "Connected"),
         }
+    }
+}
+impl Default for ConnectionState {
+    fn default() -> Self {
+        Self::StandAlone
     }
 }
 
@@ -273,6 +297,27 @@ impl FromStr for ReplicationState {
                 ErrorKind::InvalidData,
                 "unknow replication state",
             )),
+        }
+    }
+}
+impl fmt::Display for ReplicationState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Off => write!(f, "Off"),
+            Self::Established => write!(f, "Established"),
+            Self::StartingSyncS => write!(f, "StartingSyncS"),
+            Self::StartingSyncT => write!(f, "StartingSyncT"),
+            Self::WFBitMapS => write!(f, "WFBitMapS"),
+            Self::WFBitMapT => write!(f, "WFBitMapT"),
+            Self::WFSyncUUID => write!(f, "WFSyncUUID"),
+            Self::SyncSource => write!(f, "SyncSource"),
+            Self::SyncTarget => write!(f, "SyncTarget"),
+            Self::VerifyS => write!(f, "VerifyS"),
+            Self::VerifyT => write!(f, "VerifyT"),
+            Self::PausedSyncS => write!(f, "PausedSyncS"),
+            Self::PausedSyncT => write!(f, "PausedSyncT"),
+            Self::Ahead => write!(f, "Ahead"),
+            Self::Behind => write!(f, "Behind"),
         }
     }
 }
@@ -356,6 +401,16 @@ impl ResourcePluginUpdate {
         let mut env = HashMap::new();
 
         env.insert("DRBD_RES_NAME".to_string(), self.resource_name.clone());
+        env.insert("DRBD_OLD_ROLE".to_string(), self.old.role.to_string());
+        env.insert("DRBD_NEW_ROLE".to_string(), self.new.role.to_string());
+        env.insert(
+            "DRBD_OLD_MAY_PROMOTE".to_string(),
+            self.old.may_promote.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_MAY_PROMOTE".to_string(),
+            self.new.may_promote.to_string(),
+        );
 
         env
     }
@@ -401,6 +456,19 @@ impl DevicePluginUpdate {
             );
         }
         env.insert("DRBD_VOLUME".to_string(), self.volume.to_string());
+
+        env.insert(
+            "DRBD_OLD_DISK_STATE".to_string(),
+            self.old.disk_state.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_DISK_STATE".to_string(),
+            self.new.disk_state.to_string(),
+        );
+        env.insert("DRBD_OLD_CLIENT".to_string(), self.old.client.to_string());
+        env.insert("DRBD_NEW_CLIENT".to_string(), self.new.client.to_string());
+        env.insert("DRBD_OLD_QUORUM".to_string(), self.old.quorum.to_string());
+        env.insert("DRBD_NEW_QUORUM".to_string(), self.new.quorum.to_string());
 
         env
     }
@@ -451,6 +519,42 @@ impl PeerDevicePluginUpdate {
             self.peer_node_id.to_string(),
         );
 
+        env.insert(
+            "DRBD_OLD_REPLICATION_STATE".to_string(),
+            self.old.replication_state.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_REPLICATION_STATE".to_string(),
+            self.new.replication_state.to_string(),
+        );
+
+        env.insert(
+            "DRBD_OLD_PEER_DISK_STATE".to_string(),
+            self.old.peer_disk_state.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_PEER_DISK_STATE".to_string(),
+            self.new.peer_disk_state.to_string(),
+        );
+
+        env.insert(
+            "DRBD_OLD_PEER_CLIENT".to_string(),
+            self.old.peer_client.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_PEER_DISK_STATE".to_string(),
+            self.new.peer_client.to_string(),
+        );
+
+        env.insert(
+            "DRBD_OLD_PEER_RESYNC_SUSPENDED".to_string(),
+            self.old.resync_suspended.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_PEER_RESYNC_SUSPENDED".to_string(),
+            self.new.resync_suspended.to_string(),
+        );
+
         env
     }
 }
@@ -481,6 +585,33 @@ impl ConnectionPluginUpdate {
         env.insert(
             "DRBD_CSTATE".to_string(),
             self.new.connection_state.to_string(),
+        );
+
+        env.insert(
+            "DRBD_OLD_CONN_NAME".to_string(),
+            self.old.conn_name.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_CONN_NAME".to_string(),
+            self.new.conn_name.to_string(),
+        );
+
+        env.insert(
+            "DRBD_OLD_CONN_STATE".to_string(),
+            self.old.connection_state.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_CONN_STATE".to_string(),
+            self.new.connection_state.to_string(),
+        );
+
+        env.insert(
+            "DRBD_OLD_PEER_ROLE".to_string(),
+            self.old.peer_role.to_string(),
+        );
+        env.insert(
+            "DRBD_NEW_PEER_ROLE".to_string(),
+            self.new.peer_role.to_string(),
         );
 
         env
