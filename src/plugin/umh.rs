@@ -104,7 +104,7 @@ fn spawn_command(
             let out = std::str::from_utf8(&output.stdout).unwrap_or("<Could not convert stdout>");
             let err = std::str::from_utf8(&output.stderr).unwrap_or("<Could not convert stderr>");
             if !out.is_empty() || !err.is_empty() {
-                debug!("umh: handler stdout: '{}'; stderr: {}", out, err);
+                debug!("umh: handler stdout: '{}'; stderr: '{}'", out, err);
             }
         }
         Err(e) => warn!("umh: could not execute handler: {}", e),
