@@ -1,0 +1,62 @@
+.Dd $Mdocdate$
+.Dt DRBDD 1
+.Os
+.Sh NAME
+.Nm drbdd
+.Nd monitors DRBD resources via plugins
+.Sh SYNOPSIS
+.Nm
+.Op Fl c Ar config
+.Sh DESCRIPTION
+.Nm
+is a daemon with multiple plugins that have different purposes. Section
+.Sx PLUGINS
+provides a brief overview about the available plugins. A detailed description,
+configuration options, and examples are provided per plugin, please refer to
+the
+.Sx SEE ALSO
+section.
+.Bl -tag -width Ds
+.It Fl c Ar config
+Path to the config file. By default
+.Pa /etc/drbdd.toml
+.El
+.Sh PLUGINS
+.Ss promoter
+The promoter plugin monitors events on resources an executes systemd units.
+This plugin can be used for simple high-availability.
+.Ss umh
+The user mode helper is a plugin that allows users to specify filters matched
+on DRBD state changes (e.g., from
+.Sy Secondary
+to
+.Sy Primary
+). If a filter rule matches, a user defined script gets
+executed and various useful environment variables get set.
+.Ss debugger
+This is a simple plugin that prints change events to stderr. This is mainly
+useful as a simple showcase for users or plugin writers. It also helps
+developers to detect bugs in drbdd's core.
+.Em Important:
+Messages are printed on debug level, so make sure to set an apropriate log
+level.
+.Sh FILES
+this
+.Sh FILES
+.Bl -tag -compact
+.It Pa /etc/drbdd.toml
+Default configuration file.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr drbdd.toml 5
+.\" .Xr drbdd.promoter 5
+.\" .Xr drbdd.umh 5
+.Sh AUTHORS
+The
+.Nm
+program was written by the following authors:
+.An -split
+.An Roland Kammerer Aq Mt rck@linbit.com
+.An Moritz Wanzenböck Aq Mt moritz.wanzenboeck@linbit.com

@@ -31,11 +31,13 @@ make install DESTDIR=%{buildroot}
 
 
 %files
-%doc
 # %{_unitdir}/drbdd.service
 /lib/systemd/system/drbdd.service
 /usr/sbin/drbdd
+%{_mandir}/man1/drbdd.1*
+%{_mandir}/man5/drbdd.toml.5*
 %config(noreplace) /etc/drbdd.toml
+%doc README.md
 
 
 %changelog

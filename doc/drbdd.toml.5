@@ -1,0 +1,43 @@
+.Dd $Mdocdate$
+.Dt DRBDD.TOML 5
+.Os
+.Sh NAME
+.Nm drbdd.toml
+.Nd DRBDD daemon configuration file
+.Sh DESCRIPTION
+.Nm
+is the configuration file for the DRBDD daemon,
+.Xr drbdd 1 .
+The file has to be valid
+.Lk https://toml.io "toml" .
+.Pp
+The configuration file consists of sections for logging and the actual plugin
+configuration. While this is rarely used and should be used with caution, it
+is possible to have multiple instances of a plugin as well as multiple loggers
+.Sh EXAMPLES
+.Bd -literal -offset indent
+[[log]]
+level = "debug"
+
+# Configure a promoter
+[[promoter]]
+[promoter.resources.foo]
+start = ["foo.mount", "foo.service"]
+on-stop-failure =  "echo b > /proc/sysrq-trigger"
+
+# Configure a user mode helper filter
+[[umh]]
+[[umh.resource]]
+command = "drbdd-role-change.sh"
+event-type = "Change"
+old.role = { operator = "NotEquals", value = "Primary" }
+new.role = "Primary"
+.Ed
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr drbdd 1
+program was written by the following authors:
+.An -split
+.An Roland Kammerer Aq Mt rck@linbit.com
+.An Moritz Wanzenböck Aq Mt moritz.wanzenboeck@linbit.com

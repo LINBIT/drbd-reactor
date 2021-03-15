@@ -4,6 +4,8 @@ DESTDIR =
 DEBCONTAINER=drbdd:deb
 RPMCONTAINER=drbdd:rpm
 REL = $(PROG)-$(VERSION)
+MANPAGES = doc/drbdd.1 doc/drbdd.toml.5
+
 DOCKERREGISTRY := drbd.io
 ARCH ?= amd64
 ifneq ($(strip $(ARCH)),)
@@ -60,6 +62,10 @@ install:  # install binary and config
 	install -D -m 0750 target/$(TARGET)/$(PROG) $(DESTDIR)/usr/sbin/$(PROG)
 	install -D -m 0640 example/drbdd.toml $(DESTDIR)/etc/drbdd.toml
 	install -D -m 0640 example/drbdd.service $(DESTDIR)/lib/systemd/system/drbdd.service
+	for f in $(MANPAGES); do \
+		sect=$$(echo $$f | sed -e 's/.*\.\([0-9]\)$$/\1/'); \
+		install -D -m 0640 $$f $(DESTDIR)/usr/share/man/man$${sect}/$$(basename $$f); \
+	done
 
 clean: ## cargo clean
 	cargo clean
@@ -73,18 +79,19 @@ debrelease: checkVERSION
 	mkdir .cargo && cp vendor.toml .cargo/config && \
 	rm -rf vendor && cargo vendor && rm -fr vendor/winapi*gnu*/lib/*.a && \
 	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf ../$(REL).tar.gz \
-		$$(git ls-files | grep -v '^\.') .cargo/config vendor
+		$$(git ls-files | grep -v '^\.') $(MANPAGES) .cargo/config vendor
 	rm -rf .debrelease
 
 release: checkVERSION
 	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf $(REL).tar.gz \
-		$$(git ls-files | grep -v '^\.' | grep -v '^debian\/')
+		$$(git ls-files | grep -v '^\.' | grep -v '^debian\/') $(MANPAGES)
 
 ifndef VERSION
 checkVERSION:
 	$(error environment variable VERSION is not set)
 else
 checkVERSION:
+	test -z "$$(git ls-files -m)"
 	lbvers.py check --base=$(BASE) --build=$(BUILD) --build-nr=$(BUILD_NR) --pkg-nr=$(PKG_NR) \
 		--cargo=Cargo.toml --debian-changelog=debian/changelog --rpm-spec=drbdd.spec
 	if test $$(grep "ENV DRBDD_VERSION $(VERSION)" Dockerfile | wc -l) -ne 2; then \
