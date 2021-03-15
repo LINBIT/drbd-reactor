@@ -2,7 +2,7 @@ use anyhow::Result;
 use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::thread;
 
 use crate::drbd::{
@@ -79,31 +79,35 @@ fn spawn_command(
 
     let common_env = common_env();
 
-    let mut child = match Command::new("sh")
+    let child = match Command::new("sh")
         .arg("-c")
         .arg(cmd)
         .env_clear()
         .envs(filter_env)
         .envs(user_env)
         .envs(common_env)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
     {
         Ok(c) => c,
         Err(e) => {
-            warn!("Could not execute handler: {}", e);
+            warn!("umh: could not execute handler: {}", e);
             return;
         }
     };
-    thread::spawn(move || {
-        match child.wait() {
-            Ok(status) => {
-                if !status.success() {
-                    warn!("handler did not not exit successfully")
-                }
-                // report exit status back via drbdsetup and cockie
+    thread::spawn(move || match child.wait_with_output() {
+        Ok(output) => {
+            if !output.status.success() {
+                warn!("umh: handler did not not exit successfully")
             }
-            Err(e) => warn!("Could not execute handler: {}", e),
+            let out = std::str::from_utf8(&output.stdout).unwrap_or("<Could not convert stdout>");
+            let err = std::str::from_utf8(&output.stderr).unwrap_or("<Could not convert stderr>");
+            if !out.is_empty() || !err.is_empty() {
+                debug!("umh: handler stdout: '{}'; stderr: {}", out, err);
+            }
         }
+        Err(e) => warn!("umh: could not execute handler: {}", e),
     });
 }
 
