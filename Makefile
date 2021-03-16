@@ -4,7 +4,7 @@ DESTDIR =
 DEBCONTAINER=drbdd:deb
 RPMCONTAINER=drbdd:rpm
 REL = $(PROG)-$(VERSION)
-MANPAGES = doc/drbdd.1 doc/drbdd.toml.5
+MANPAGES = doc/drbdd.1 doc/drbdd.toml.5 doc/drbdd.umh.5 doc/drbdd.promoter.5 doc/drbdd.debugger.5
 
 DOCKERREGISTRY := drbd.io
 ARCH ?= amd64
@@ -79,12 +79,12 @@ debrelease: checkVERSION
 	mkdir .cargo && cp vendor.toml .cargo/config && \
 	rm -rf vendor && cargo vendor && rm -fr vendor/winapi*gnu*/lib/*.a && \
 	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf ../$(REL).tar.gz \
-		$$(git ls-files | grep -v '^\.') $(MANPAGES) .cargo/config vendor
+		$$(git ls-files | grep -v '^\.') .cargo/config vendor
 	rm -rf .debrelease
 
 release: checkVERSION
 	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf $(REL).tar.gz \
-		$$(git ls-files | grep -v '^\.' | grep -v '^debian\/') $(MANPAGES)
+		$$(git ls-files | grep -v '^\.' | grep -v '^debian\/')
 
 ifndef VERSION
 checkVERSION:

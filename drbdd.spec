@@ -36,6 +36,9 @@ make install DESTDIR=%{buildroot}
 /usr/sbin/drbdd
 %{_mandir}/man1/drbdd.1*
 %{_mandir}/man5/drbdd.toml.5*
+%{_mandir}/man5/drbdd.umh.5*
+%{_mandir}/man5/drbdd.promoter.5*
+%{_mandir}/man5/drbdd.debugger.5*
 %config(noreplace) /etc/drbdd.toml
 %doc README.md
 

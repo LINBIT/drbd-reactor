@@ -1,0 +1,34 @@
+.Dd $Mdocdate$
+.Dt DRBDD.DEBUGGER 5
+.Os
+.Sh NAME
+.Nm drbdd.debugger
+.Nd drbdd debugger plugin
+.Sh DESCRIPTION
+.Nm
+is the debugger plugin for
+.Xr drbdd 1 .
+.Pp
+This is a simple plugin that prints change events to stderr. This is mainly
+useful as a simple showcase for users or plugin writers. It also helps
+developers to detect bugs in drbdd's core.
+.Pp
+Messages are printed on
+.Em debug level ,
+so make sure to set an apropriate log level.
+.Sh EXAMPLES
+.Bd -literal -offset indent
+[[log]]
+level = "debug"
+
+## Enable the debugger
+[[debugger]]
+.Ed
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr drbdd 1
+program was written by the following authors:
+.An -split
+.An Roland Kammerer Aq Mt rck@linbit.com
+.An Moritz Wanzenböck Aq Mt moritz.wanzenboeck@linbit.com

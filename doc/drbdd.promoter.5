@@ -1,0 +1,63 @@
+.Dd $Mdocdate$
+.Dt DRBDD.PROMOTER 5
+.Os
+.Sh NAME
+.Nm drbdd.promoter
+.Nd drbdd promoter plugin
+.Sh DESCRIPTION
+.Nm
+is the promoter plugin for
+.Xr drbdd 1 .
+.Pp
+The promoter plugin monitors events on resources an executes systemd units.
+This plugin can be used for simple high-availability.
+.Pp
+If a resource changes its state to
+.Dq may promote ,
+the plugin (i.e., all plugins on all nodes in the cluster) start the defined
+.Xr systemd.unit 5 .
+If this is a mount unit, and DRBD
+.Sy auto-promote
+is enabled (the default), one of the plugins will succeed and promote the DRBD
+resource to DRBD Primary. All the others will fail.
+.Pp
+If a resource looses DRBD quorum, it stops all the systemd units in reverse
+order.
+.Pp
+The plugin's configuration can contain an action that is executed if a stop
+action fails (e.g., triggering a reboot). Start/stop actions are interpreted
+as systemd units and handled as such. Other service mangers/scripts are
+supported by starting the action with an absolute path.
+.Pp
+In order for DRBD to use quorum as needed by this plugin, make sure the
+resource file of the DRBD resource contains the following option (this is the
+default for LINSTOR, but your resources needs to qualify for quorum).
+.Bd -literal -offset indent
+options {
+   quorum majority;
+   on-no-quorum io-error;
+}
+.Ed
+.Sh EXAMPLES
+This configures a promoter for resource
+.Dq foo .
+If the resource might be promoted the
+.Dq foo.mount
+and
+.Dq foo.service
+units get started. On stop failes a sysrq gets triggered.
+.Bd -literal -offset indent
+[promoter.resources.foo]
+start = ["foo.mount", "foo.service"]
+## if unset/empty, services from 'start' will be stopped in reverse order
+# stop = []
+on-stop-failure =  "echo b > /proc/sysrq-trigger"
+.Ed
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr drbdd 1
+program was written by the following authors:
+.An -split
+.An Roland Kammerer Aq Mt rck@linbit.com
+.An Moritz Wanzenböck Aq Mt moritz.wanzenboeck@linbit.com

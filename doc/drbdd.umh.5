@@ -1,0 +1,424 @@
+.Dd $Mdocdate$
+.Dt DRBDD.UMH 5
+.Os
+.Sh NAME
+.Nm drbdd.umh
+.Nd drbdd user mode helper plugin
+.Sh DESCRIPTION
+.Nm
+is the user mode helper plugin for
+.Xr drbdd 1 .
+.Pp
+The user mode helper is a plugin that allows users to specify filters matched
+on DRBD state changes. If a filter rule matches, a user defined script gets
+executed. Information is passed to scripts via environment variables. For
+every event all rules are evaluated, so if multiple rules match, multiple
+actions are executed (concurrently).
+.Pp
+There are 4 different types a rule can be defined for:
+.Bl -bullet -compact
+.It
+.Sx RESOURCE RULES
+.It
+.Sx DEVICE RULES
+.It
+.Sx PEER DEVICE RULES
+.It
+.Sx CONNECTION RULES
+.El
+.Pp
+It is important to note that fields not specified do not restrict the filter. Think of them as
+.Dq don't care .
+Make sure to read and understand the implied
+.Sx CAVEATS
+section.
+.Sh COMMON FIELDS
+Every rule type (e.g., resource, device,...) has a set of common fields
+.TS
+allbox tab(:);
+r r r r.
+Common fields:Description:Type:Mandatory
+name:Name of the rule written to logs:String:no
+command:Command/script to execute via sh -c:String:yes
+env:User defined env variables:Map:no
+.TE
+.Pp
+Every type also has a common set of filters that can be used for matching.
+.TS
+allbox tab(:);
+r r r.
+Common filters:Description:Type
+resource-name:Name of the DRBD resource:String
+event-type:Type of the event:EventType
+.TE
+.Sh STATE CHANGES
+Every field shown in this section marked as state change can be set
+on the
+.Sy old
+and/or
+.Sy new
+section of a rule. This can be used to filter state changes (e.g., from
+.Sy Secondary
+to
+.Sy Primary
+).
+.Ss RESOURCE RULES
+.TS
+allbox tab(:);
+r r r r.
+Fields:Description:Type:State change
+role:Role of the resource:Role:yes
+may-promote:If the resource may be promoted:Boolean:yes
+.TE
+.Pp
+A match on such a rule calls the specified
+.Sy command
+and sets the following environment variables:
+.Bl -tag -width DRBD_{OLD,NEW}_MAYPROMOTE -compact
+.It Ev DRBD_RES_NAME
+Name of the DRBD resource
+.It Ev DRBD_{OLD,NEW}_ROLE
+Role of the resource
+.It Ev DRBD_{OLD,NEW}_MAYPROMOTE
+Resource may be promoted to Primary
+.El
+.Ss DEVICE RULES
+.TS
+allbox tab(:);
+r r r r.
+Fields:Description:Type:State change
+volume:Volume number:Integer:no
+disk-state:Disk state of the device:DiskState:yes
+client:Device is a DRBD client:Boolean:yes
+quorum:Device has DRBD quorum:Boolean:yes
+.TE
+.Pp
+A match on such a rule calls the specified
+.Sy command
+and sets the following environment variables:
+.Bl -tag -width DRBD_{OLD,NEW}_DISK_STATE -compact
+.It Ev DRBD_RES_NAME
+Name of the DRBD resource
+.It Ev DRBD_MINOR
+Minor number of the device
+.It Ev DRBD_MINOR_$volume
+Minor number of the device by
+.Sy volume
+.It Ev DRBD_VOLUME
+volume (number) of the device
+.It Ev DRBD_BACKING_DEV
+Block device path to backing device or
+.Dq none
+.It Ev DRBD_BACKING_DEV_$volume
+Block device path to backing device or
+.Dq none
+by
+.Sy volume
+.It Ev DRBD_{OLD,NEW}_DISK_STATE
+DiskState of the device
+.It Ev DRBD_{OLD,NEW}_CLIENT
+Device was/is a DRBD client
+.It Ev DRBD_{OLD,NEW}_QUORUM
+Device had/has DRBD qourum
+.El
+.Ss PEER DEVICE RULES
+.TS
+allbox tab(:);
+r r r r.
+Fields:Description:Type:State change
+volume:Volume number:Integer:no
+peer-node-id:Node ID of the Peer:Integer:no
+peer-disk-state:Disk state of the peer-device:DiskState:yes
+peer-client:Peer-device is a DRBD client:Boolean:yes
+resync-suspended:DRBD resync is suspended:Boolean:yes
+replication-state:Replication state:ReplicationState:yes
+.TE
+.Pp
+A match on such a rule calls the specified
+.Sy command
+and sets the following environment variables:
+.Bl -tag -width DRBD_{OLD,NEW}_PEER_REPLICATION_STATE -compact
+.It Ev DRBD_{OLD,NEW}_DISK_STATE
+DiskState of the device
+.It Ev DRBD_RES_NAME
+Name of the DRBD resource
+.It Ev DRBD_MINOR
+Minor number of the device
+.It Ev DRBD_MINOR_$volume
+Minor number of the device by
+.Sy volume
+.It Ev DRBD_VOLUME
+.Sy volume
+(number) of the device
+.It Ev DRBD_BACKING_DEV
+Block device path to backing device or
+.Dq none
+.It Ev DRBD_BACKING_DEV_$volume
+Block device path to backing device or
+.Dq none
+by
+.Sy volume
+.It Ev DRBD_PEER_NODE_ID
+Node ID of the peer
+.It Ev DRBD_{OLD,NEW}_PEER_DISK_STATE
+DiskState of the peer-device
+.It Ev DRBD_{OLD,NEW}_PEER_CLIENT
+Peer-device was/is a DRBD client
+.It Ev DRBD_{OLD,NEW}_PEER_RESYNC_SUSPENDED
+Resync was/is suspended
+.It Ev DRBD_{OLD,NEW}_PEER_REPLICATION_STATE
+ReplicationState
+.El
+.Pp
+A note on
+.Sy DRBD_BACKING_DEV*
+: DRBD does not know the backing device path of its peer, so the device set in
+these variables is the
+.Em local
+backing device path! Usually the backing device names on all peers are the same
+for diskful nodes, but it is not strictly required. This was not invented by
+.Xr drbdd 1 ,
+this is how these variables always have been set when DRBD kernel called
+user mode helpers from kernel space. So this might be unexpected, but that is
+what it always was.
+.Ss CONNECTION RULES
+.TS
+allbox tab(:);
+r r r r.
+Fields:Description:Type:State change
+peer-node-id:Node ID of the Peer:Integer:no
+conn-name:Name of the connection:String:yes
+connection-state:Connection state:ConnectionState:yes
+peer-role:Peer role:Role:yes
+congested:Connection is congested:Boolean:yes
+.TE
+.Pp
+A match on such a rule calls the specified
+.Sy command
+and sets the following environment variables:
+.Bl -tag -width DRBD_{OLD,NEW}_CONGESTED -compact
+.It Ev DRBD_RES_NAME
+Name of the DRBD resource
+.It Ev DRBD_PEER_NODE_ID
+Node ID of the peer
+.It Ev DRBD_CSTATE
+Connection state
+.It Ev DRBD_{OLD,NEW}_CONN_NAME
+Conneciton name
+.It Ev DRBD_{OLD,NEW}_CONN_STATE
+Connection state
+.It Ev DRBD_{OLD,NEW}_PEER_ROLE
+Peer role
+.It Ev DRBD_{OLD,NEW}_CONGESTED
+Connection was/is congested
+.El
+.Sh ENVIRONMENT
+Before a
+.Sy command
+is executed its environment gets deleted. Then the common environment
+variables in this section are set, followed by the filter type specific
+environment variables, and the user defined ones.
+.Bl -tag -width HOME
+.It Ev HOME
+.Dq /
+.It Ev TERM
+.Dq Linux
+.It Ev PATH
+.Dq /sbin:/usr/sbin:/bin:/usr/bin
+.El
+.Sh OPERATORS
+Currently filters that are set are compared for equality with the value
+received in a state update. One handy operator is "not equal", meaning
+everthing except the given value. We have to play within the boundaries of
+toml, and we did not want to sacrifice type safety we get for free from the
+parser by inventing our own
+.Dq filter language .
+.Pp
+The default comparison operator is
+.Sy Equals
+.Dl old.role = "Primary"  # compares for equality
+.Pp
+If another operator should be used, one has to specify the
+.Sy value
+.Em and
+the
+.Sy operator
+.Bd -literal -offset indent
+old.role = { operator = "NotEquals", value = "Primary" }
+# which is toml equivalent to these two lines:
+old.role.operator = "NotEquals"
+old.role.value = "Primary"
+.Ed
+.Pp
+It is not possible to mix and match these two notations:
+.Bd -literal -offset indent
+old.role.operator = "NotEquals"
+old.role = "Primary"  # fails. it requires a .value in this case
+.Ed
+.Pp
+The allowed operators are:
+.Bl -bullet -compact
+.It
+.Sy Equals
+(the default)
+.It
+.Sy NotEquals
+.El
+.Sh TYPES
+.Ss EVENT TYPES
+.Bl -bullet -compact
+.It
+Exists
+.It
+Create
+.It
+Destroy
+.It
+Change
+.El
+.Ss RESOURCE ROLES
+.Bl -bullet -compact
+.It
+Unknown
+.It
+Primary
+.It
+Secondary
+.El
+.Ss DISK STATES
+.Bl -bullet -compact
+.It
+Diskless
+.It
+Attaching
+.It
+Detaching
+.It
+Failed
+.It
+Negotiating
+.It
+Inconsistent
+.It
+Outdated
+.It
+DUnknown
+.It
+Consistent
+.It
+UpToDate
+.El
+.Ss REPLICATION STATES
+.Bl -bullet -compact
+.It
+Off
+.It
+Established
+.It
+StartingSyncS
+.It
+StartingSyncT
+.It
+WFBitMapS
+.It
+WFBitMapT
+.It
+WFSyncUUID
+.It
+SyncSource
+.It
+SyncTarget
+.It
+VerifyS
+.It
+VerifyT
+.It
+PausedSyncS
+.It
+PausedSyncT
+.It
+Ahead
+.It
+Behind
+.El
+.Ss CONNECTION STATES
+.Bl -bullet -compact
+.It
+StandAlone
+.It
+Disconnecting
+.It
+Unconnected
+.It
+Timeout
+.It
+BrokenPipe
+.It
+NetworkFailure
+.It
+ProtocolError
+.It
+TearDown
+.It
+Connecting
+.It
+Connected
+.El
+.Sh EXAMPLES
+Configure a user mode helper filter of type
+.Sy resource .
+.Bd -literal -offset indent
+[[umh]]
+[[umh.resource]]
+command = "slack.sh $DRBD_RES_NAME on $(uname -n) from $DRBD_OLD_ROLE to $DRBD_NEW_ROLE"
+event-type = "Change"
+old.role = { operator = "NotEquals", value = "Primary" }
+new.role = "Primary"
+.Ed
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr drbdd 1
+program was written by the following authors:
+.An -split
+.An Roland Kammerer Aq Mt rck@linbit.com
+.An Moritz Wanzenböck Aq Mt moritz.wanzenboeck@linbit.com
+.Sh CAVEATS
+As it was mentioned before, fields that are not set are not taken into
+consideration when matching the filter.  Let's look at how one might write a
+filter:
+.Bd -literal -offset indent
+[[umh.resource]]
+command = "/usr/local/bin/primary.sh"
+resource-name = "foo"
+new.role = "Primary"
+.Ed
+.Pp
+What this means is that this filter does *not* care about the state of the old
+role. So if the resource changes for whatever reason, not related to it's
+role, an update is sent and the current state is matched against the rule. In
+this case it would trigger as the the role "changes" from the old state
+.Dq don't care
+(i.e., already Primary) to current/new state Primary.
+.Pp
+Most rules are written to match specific state changes anyways, so a natural
+fit would be:
+.Bd -literal -offset indent
+[[umh.resource]]
+command = "/usr/local/bin/primary.sh"
+resource-name = "foo"
+old.role = "Secondary"
+new.role = "Primary"
+.Ed
+.Pp
+Another possibility for more complex fields than a resource's role, capturing everthing besides a given target
+value look like this. See section
+.Sx OPERATORS
+for details:
+.Bd -literal -offset indent
+[[umh.resource]]
+command = "/usr/local/bin/primary.sh"
+resource-name = "foo"
+old.role = { operator = "NotEquals", value = "Primary" }
+new.role = "Primary"
+.Ed
