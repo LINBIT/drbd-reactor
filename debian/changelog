@@ -1,3 +1,26 @@
+drbdd (0.2.0~rc.1-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * COPYING: Apache-2.0
+  * containers: initial build
+  * introduce *PluginUpdate structs
+  * Plugin/EventUpdate: rm "Update" from variants
+  * PluginUpdate: mv event_type to structs
+  * umh: implement user defined helpers
+  * umh: check for backing_dev
+  * umh: expose more env variables
+  * umh: add example to config
+  * build: add man pages
+  * umh: add handler stdout/stderr
+  * umh: add quotes around stderr
+  * doc: add plugin man pages
+
+  [ Moritz "WanzenBug" Wanzenböck ]
+  * make PluginUpdate structs matchable
+  * refactor umh handler invocation
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 16 Mar 2021 09:23:08 +0100
+
 drbdd (0.1.0-1) experimental; urgency=medium
 
   [ Roland Kammerer ]

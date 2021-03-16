@@ -1,7 +1,7 @@
 %define debug_package %{nil}
 
 Name:		drbdd
-Version:	0.1.0
+Version:	0.2.0~rc.1
 Release:	1
 Summary:	Monitors DRBD resources via plugins.
 %global	tarball_version %(echo "%{version}" | sed -e 's/~rc/-rc/' -e 's/~alpha/-alpha/')
@@ -44,6 +44,9 @@ make install DESTDIR=%{buildroot}
 
 
 %changelog
+* Tue Mar 16 2021 Roland Kammerer <roland.kammerer@linbit.com> - 0.2.0~rc.1-1
+-  New upstream release
+
 * Fri Feb 26 2021 Roland Kammerer <roland.kammerer@libit.com> - 0.1.0-1
 -  New upstream release
 
