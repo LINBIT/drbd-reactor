@@ -96,6 +96,18 @@ pub struct Connection {
     pub ap_in_flight: u64,
     pub rs_in_flight: u64,
     pub peerdevices: Vec<PeerDevice>,
+    pub paths: Vec<Path>,
+}
+
+#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct Path {
+    pub name: String,
+    pub peer_node_id: i32,
+    pub conn_name: String,
+    pub local: String,
+    pub peer: String,
+    pub established: bool,
 }
 
 make_matchable![
@@ -380,6 +392,7 @@ pub enum EventUpdate {
     Device(EventType, Device),
     PeerDevice(EventType, PeerDevice),
     Connection(EventType, Connection),
+    Path(EventType, Path),
     Stop,
 }
 
@@ -436,11 +449,7 @@ impl DevicePluginUpdate {
 
         env.insert("DRBD_RES_NAME".to_string(), self.resource_name.clone());
 
-        let find = Device {
-            volume: self.volume,
-            ..Default::default()
-        };
-        if let Some(device) = self.resource.get_device(&find) {
+        if let Some(device) = self.resource.get_device(self.volume) {
             env.insert("DRBD_MINOR".to_string(), device.minor.to_string());
             env.insert(
                 format!("DRBD_MINOR_{}", self.volume),
@@ -495,11 +504,7 @@ impl PeerDevicePluginUpdate {
 
         env.insert("DRBD_RES_NAME".to_string(), self.resource_name.clone());
 
-        let find = Device {
-            volume: self.volume,
-            ..Default::default()
-        };
-        if let Some(device) = self.resource.get_device(&find) {
+        if let Some(device) = self.resource.get_device(self.volume) {
             env.insert("DRBD_MINOR".to_string(), device.minor.to_string());
             env.insert(
                 format!("DRBD_MINOR_{}", self.volume),
@@ -681,16 +686,16 @@ impl Resource {
         self.promotion_score = r.promotion_score;
     }
 
-    fn get_device(&self, device: &Device) -> Option<&Device> {
-        self.devices.iter().find(|c| c.volume == device.volume)
+    fn get_device(&self, volume_id: i32) -> Option<&Device> {
+        self.devices.iter().find(|c| c.volume == volume_id)
     }
 
-    fn get_device_mut(&mut self, device: &Device) -> Option<&mut Device> {
-        self.devices.iter_mut().find(|c| c.volume == device.volume)
+    fn get_device_mut(&mut self, volume_id: i32) -> Option<&mut Device> {
+        self.devices.iter_mut().find(|c| c.volume == volume_id)
     }
 
     pub fn update_device(&mut self, device: &Device) {
-        match self.get_device_mut(device) {
+        match self.get_device_mut(device.volume) {
             Some(existing) => *existing = device.clone(),
             None => self.devices.push(device.clone()),
         }
@@ -700,7 +705,7 @@ impl Resource {
         self.devices.retain(|x| x.volume != volume_id)
     }
 
-    pub fn update_or_delete_device(&mut self, et: &EventType, device: &Device) {
+    fn update_or_delete_device(&mut self, et: &EventType, device: &Device) {
         if *et == EventType::Destroy {
             self.delete_device(device.volume);
         } else {
@@ -716,7 +721,7 @@ impl Resource {
             size: device.size,
         };
 
-        match self.get_device(device) {
+        match self.get_device(device.volume) {
             Some(existing) => {
                 let old = DeviceUpdateState {
                     disk_state: existing.disk_state.clone(),
@@ -760,26 +765,26 @@ impl Resource {
         }
     }
 
-    pub fn get_connection(&self, conn: &Connection) -> Option<&Connection> {
+    pub fn get_connection(&self, peer_node_id: i32) -> Option<&Connection> {
         self.connections
             .iter()
-            .find(|c| c.peer_node_id == conn.peer_node_id)
+            .find(|c| c.peer_node_id == peer_node_id)
     }
 
-    pub fn get_connection_mut(&mut self, conn: &Connection) -> Option<&mut Connection> {
+    pub fn get_connection_mut(&mut self, peer_node_id: i32) -> Option<&mut Connection> {
         self.connections
             .iter_mut()
-            .find(|c| c.peer_node_id == conn.peer_node_id)
+            .find(|c| c.peer_node_id == peer_node_id)
     }
 
     pub fn update_connection(&mut self, conn: &Connection) {
-        match self.get_connection_mut(&conn) {
+        match self.get_connection_mut(conn.peer_node_id) {
             Some(existing) => *existing = conn.clone(),
             None => self.connections.push(conn.clone()),
         }
     }
 
-    pub fn update_or_delete_connection(&mut self, et: &EventType, conn: &Connection) {
+    fn update_or_delete_connection(&mut self, et: &EventType, conn: &Connection) {
         if *et == EventType::Destroy {
             self.delete_connection(conn.peer_node_id);
         } else {
@@ -799,7 +804,7 @@ impl Resource {
             peer_role: conn.peer_role.clone(),
         };
 
-        match self.get_connection(conn) {
+        match self.get_connection(conn.peer_node_id) {
             Some(existing) => {
                 let old = ConnectionUpdateState {
                     congested: existing.congested,
@@ -846,43 +851,29 @@ impl Resource {
         self.connections.retain(|x| x.peer_node_id != peer_node_id)
     }
 
-    pub fn get_connection_peerdevice(&self, peerdevice: &PeerDevice) -> Option<&Connection> {
-        self.connections
-            .iter()
-            .find(|c| c.peer_node_id == peerdevice.peer_node_id)
-    }
-
-    pub fn get_connection_peerdevice_mut(
-        &mut self,
-        peerdevice: &PeerDevice,
-    ) -> Option<&mut Connection> {
-        self.connections
-            .iter_mut()
-            .find(|c| c.peer_node_id == peerdevice.peer_node_id)
-    }
-
-    pub fn get_peerdevice(&self, peerdevice: &PeerDevice) -> Option<&PeerDevice> {
-        match self.get_connection_peerdevice(peerdevice) {
-            Some(conn) => conn
-                .peerdevices
-                .iter()
-                .find(|c| c.volume == peerdevice.volume),
+    pub fn get_peerdevice(&self, peer_node_id: i32, peer_volume_id: i32) -> Option<&PeerDevice> {
+        match self.get_connection(peer_node_id) {
+            Some(conn) => conn.peerdevices.iter().find(|c| c.volume == peer_volume_id),
             None => None,
         }
     }
 
-    pub fn get_peerdevice_mut(&mut self, peerdevice: &PeerDevice) -> Option<&mut PeerDevice> {
-        match self.get_connection_peerdevice_mut(peerdevice) {
+    pub fn get_peerdevice_mut(
+        &mut self,
+        peer_node_id: i32,
+        peer_volume_id: i32,
+    ) -> Option<&mut PeerDevice> {
+        match self.get_connection_mut(peer_node_id) {
             Some(conn) => conn
                 .peerdevices
                 .iter_mut()
-                .find(|c| c.volume == peerdevice.volume),
+                .find(|c| c.volume == peer_volume_id),
             None => None,
         }
     }
 
     pub fn update_peerdevice(&mut self, peerdevice: &PeerDevice) {
-        match self.get_connection_peerdevice_mut(&peerdevice) {
+        match self.get_connection_mut(peerdevice.peer_node_id) {
             None => {
                 let mut conn = Connection {
                     peer_node_id: peerdevice.peer_node_id,
@@ -906,11 +897,7 @@ impl Resource {
     }
 
     pub fn delete_peerdevice(&mut self, peer_node_id: i32, peerdevice_volume_id: i32) {
-        match self
-            .connections
-            .iter_mut()
-            .find(|c| c.peer_node_id == peer_node_id)
-        {
+        match self.get_connection_mut(peer_node_id) {
             Some(conn) => {
                 conn.peerdevices
                     .retain(|x| x.volume != peerdevice_volume_id);
@@ -919,7 +906,7 @@ impl Resource {
         }
     }
 
-    pub fn update_or_delete_peerdevice(&mut self, et: &EventType, peerdevice: &PeerDevice) {
+    fn update_or_delete_peerdevice(&mut self, et: &EventType, peerdevice: &PeerDevice) {
         if *et == EventType::Destroy {
             self.delete_peerdevice(peerdevice.peer_node_id, peerdevice.volume);
         } else {
@@ -939,7 +926,7 @@ impl Resource {
             resync_suspended: peerdevice.resync_suspended,
         };
 
-        match self.get_peerdevice(peerdevice) {
+        match self.get_peerdevice(peerdevice.peer_node_id, peerdevice.volume) {
             Some(existing) => {
                 let old = PeerDeviceUpdateState {
                     peer_client: existing.peer_client,
@@ -982,6 +969,54 @@ impl Resource {
                 }))
             }
         }
+    }
+
+    pub fn update_path(&mut self, path: &Path) {
+        match self.get_connection_mut(path.peer_node_id) {
+            None => {
+                let mut conn = Connection {
+                    peer_node_id: path.peer_node_id,
+                    ..Default::default()
+                };
+
+                conn.paths.push(path.clone());
+                self.connections.push(conn)
+            }
+            Some(conn) => {
+                match conn
+                    .paths
+                    .iter_mut()
+                    .find(|p| p.local == path.local && p.peer == path.peer)
+                {
+                    Some(pa) => *pa = path.clone(),
+                    None => conn.paths.push(path.clone()),
+                }
+            }
+        }
+    }
+
+    pub fn delete_path(&mut self, peer_node_id: i32, local: &str, peer: &str) {
+        match self.get_connection_mut(peer_node_id) {
+            Some(conn) => {
+                conn.paths.retain(|x| {
+                    !(x.peer_node_id == peer_node_id && x.local == local && x.peer == peer)
+                });
+            }
+            None => (),
+        }
+    }
+
+    fn update_or_delete_path(&mut self, et: &EventType, path: &Path) {
+        if *et == EventType::Destroy {
+            self.delete_path(path.peer_node_id, &path.local, &path.peer);
+        } else {
+            self.update_path(path);
+        }
+    }
+
+    pub fn get_path_update(&mut self, et: &EventType, path: &Path) -> Option<PluginUpdate> {
+        self.update_or_delete_path(et, path);
+        None
     }
 
     pub fn get_resource_update(

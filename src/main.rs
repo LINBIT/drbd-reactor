@@ -129,6 +129,13 @@ impl Core {
                         send_to_event_plugins(i)?;
                     }
                 }
+                EventUpdate::Path(et, p) => {
+                    let res = self.get_or_create_resource(&p.name);
+
+                    if let Some(i) = res.get_path_update(&et, &p) {
+                        send_to_event_plugins(i)?;
+                    }
+                }
                 EventUpdate::Stop => break,
             }
         }

@@ -1,5 +1,5 @@
 use crate::drbd::{
-    BackingDevice, Connection, ConnectionState, Device, DiskState, EventType, EventUpdate,
+    BackingDevice, Connection, ConnectionState, Device, DiskState, EventType, EventUpdate, Path,
     PeerDevice, ReplicationState, Resource, Role,
 };
 use anyhow::Result;
@@ -237,6 +237,27 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
             };
         }
         return Ok(EventUpdate::PeerDevice(et, peerdevice));
+    } else if what == "path" {
+        let mut path = Path {
+            ..Default::default()
+        };
+        for (k, v) in kvs {
+            match (k, v) {
+                ("name", v) => path.name = v.into(),
+                ("peer-node-id", v) => path.peer_node_id = v.parse::<_>()?,
+                ("conn-name", v) => path.conn_name = v.into(),
+                ("local", v) => path.local = v.into(),
+                ("peer", v) => path.peer = v.into(),
+                ("established", v) => path.established = str_to_bool(v),
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "events: process_events2: path: unknown keyword '{}'",
+                        k
+                    ))
+                }
+            }
+        }
+        return Ok(EventUpdate::Path(et, path));
     }
 
     Err(anyhow::anyhow!(
@@ -356,6 +377,7 @@ mod tests {
                 ap_in_flight: 1,
                 rs_in_flight: 1,
                 peerdevices: vec![],
+                paths: vec![],
             },
         );
         assert_eq!(up, expected);
@@ -388,6 +410,23 @@ mod tests {
     }
 
     #[test]
+    fn all_parsed_path_update() {
+        let up = parse_events2_line("change path name:foo peer-node-id:3 conn-name:bar local:ipv4:1.2.3.4:7020 peer:ipv4:1.2.3.5:7020 established:yes").unwrap();
+        let expected = EventUpdate::Path(
+            EventType::Change,
+            Path {
+                name: "foo".to_string(),
+                peer_node_id: 3,
+                conn_name: "bar".to_string(),
+                local: "ipv4:1.2.3.4:7020".to_string(),
+                peer: "ipv4:1.2.3.5:7020".to_string(),
+                established: true,
+            },
+        );
+        assert_eq!(up, expected);
+    }
+
+    #[test]
     fn wrong_keys() {
         assert!(parse_events2_line("exists resource name:foo xxx:23").is_err());
         assert!(parse_events2_line("exists peer-device name:foo xxx:23").is_err());
@@ -406,8 +445,6 @@ mod tests {
     #[test]
     fn wrong_what() {
         assert!(parse_events2_line("exists xxx name:foo").is_err());
-        // path not implemented
-        assert!(parse_events2_line("create path name:foo").is_err());
     }
 }
 

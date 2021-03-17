@@ -1,4 +1,4 @@
-use drbdd::drbd::{Connection, Device, EventType, PeerDevice, PluginUpdate, Resource, Role};
+use drbdd::drbd::{Connection, Device, EventType, Path, PeerDevice, PluginUpdate, Resource, Role};
 
 #[test]
 fn get_resource_update() {
@@ -131,4 +131,27 @@ fn get_peerdevice_update() {
 
     // destroy still needs to be an update
     assert!(r.get_peerdevice_update(&EventType::Destroy, &u).is_some());
+}
+
+#[test]
+fn get_path_update() {
+    let mut r = Resource::with_name("foo");
+    let c = Connection {
+        peer_node_id: 1,
+        ..Default::default()
+    };
+
+    r.connections.push(c);
+
+    let p = Path {
+        peer_node_id: 1,
+        ..Default::default()
+    };
+
+    assert!(r.get_path_update(&EventType::Change, &p).is_none());
+    // but updates resource state
+    assert_eq!(r.connections[0].paths[0].peer_node_id, 1);
+
+    assert!(r.get_path_update(&EventType::Destroy, &p).is_none());
+    assert!(r.connections[0].paths.is_empty());
 }
