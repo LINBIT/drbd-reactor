@@ -68,18 +68,35 @@ impl Core {
     ///
     /// This will start listening for DRBD events, keeping track of any changes, updating the
     /// state of the world and forwarding this information to all plugins via the given senders.
-    fn run(&mut self, event_plugin_txs: Vec<plugin::PluginSender>) -> Result<()> {
-        if event_plugin_txs.is_empty() {
+    fn run(
+        &mut self,
+        change_plugin_txs: Vec<plugin::PluginSender>,
+        event_plugin_txs: Vec<plugin::PluginSender>,
+    ) -> Result<()> {
+        if change_plugin_txs.is_empty() && event_plugin_txs.is_empty() {
             return Err(anyhow::anyhow!("You need to enable at least one plugin"));
         }
 
-        let send_to_event_plugins = |up: PluginUpdate| -> Result<()> {
-            let up = sync::Arc::new(up);
-            for tx in &event_plugin_txs {
-                tx.send(up.clone())?;
-            }
-            Ok(())
-        };
+        let send_to_plugins =
+            |up: PluginUpdate, plugin_txs: &Vec<plugin::PluginSender>| -> Result<()> {
+                let up = sync::Arc::new(up);
+                for tx in plugin_txs {
+                    tx.send(up.clone())?;
+                }
+                Ok(())
+            };
+
+        let send_updates =
+            |up: Option<PluginUpdate>, res: &Resource, et: &EventType| -> Result<()> {
+                if let Some(up) = up {
+                    send_to_plugins(up, &change_plugin_txs)?;
+                }
+                send_to_plugins(
+                    PluginUpdate::ResourceOnly(et.clone(), res.clone()),
+                    &event_plugin_txs,
+                )?;
+                Ok(())
+            };
 
         let (e2tx, e2rx) = sync::mpsc::channel();
         let done = e2tx.clone();
@@ -99,10 +116,8 @@ impl Core {
             match r {
                 EventUpdate::Resource(et, r) => {
                     let res = self.get_or_create_resource(&r.name);
-
-                    if let Some(i) = res.get_resource_update(&et, &r) {
-                        send_to_event_plugins(i)?;
-                    }
+                    let up = res.get_resource_update(&et, &r);
+                    send_updates(up, &res, &et)?;
 
                     if et == EventType::Destroy {
                         self.resources.remove(&r.name);
@@ -110,31 +125,23 @@ impl Core {
                 }
                 EventUpdate::Device(et, d) => {
                     let res = self.get_or_create_resource(&d.name);
-
-                    if let Some(i) = res.get_device_update(&et, &d) {
-                        send_to_event_plugins(i)?;
-                    }
+                    let up = res.get_device_update(&et, &d);
+                    send_updates(up, &res, &EventType::Change)?;
                 }
                 EventUpdate::PeerDevice(et, pd) => {
                     let res = self.get_or_create_resource(&pd.name);
-
-                    if let Some(i) = res.get_peerdevice_update(&et, &pd) {
-                        send_to_event_plugins(i)?;
-                    }
+                    let up = res.get_peerdevice_update(&et, &pd);
+                    send_updates(up, &res, &EventType::Change)?;
                 }
                 EventUpdate::Connection(et, c) => {
                     let res = self.get_or_create_resource(&c.name);
-
-                    if let Some(i) = res.get_connection_update(&et, &c) {
-                        send_to_event_plugins(i)?;
-                    }
+                    let up = res.get_connection_update(&et, &c);
+                    send_updates(up, &res, &EventType::Change)?;
                 }
                 EventUpdate::Path(et, p) => {
                     let res = self.get_or_create_resource(&p.name);
-
-                    if let Some(i) = res.get_path_update(&et, &p) {
-                        send_to_event_plugins(i)?;
-                    }
+                    let up = res.get_path_update(&et, &p);
+                    send_updates(up, &res, &EventType::Change)?;
                 }
                 EventUpdate::Stop => break,
             }
@@ -195,10 +202,10 @@ fn main() -> Result<()> {
 
     init_loggers(cfg.log)?;
 
-    let (handles, senders) = plugin::start_from_config(cfg.plugins)?;
+    let (handles, change_senders, event_senders) = plugin::start_from_config(cfg.plugins)?;
 
     Core::new()
-        .run(senders)
+        .run(change_senders, event_senders)
         .context("core did not exit successfully")?;
 
     for handle in handles {

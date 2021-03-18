@@ -629,6 +629,7 @@ pub enum PluginUpdate {
     Device(DevicePluginUpdate),
     PeerDevice(PeerDevicePluginUpdate),
     Connection(ConnectionPluginUpdate),
+    ResourceOnly(EventType, Resource),
 }
 
 impl PluginUpdate {
@@ -638,6 +639,7 @@ impl PluginUpdate {
             Self::Device(u) => u.resource_name == name,
             Self::PeerDevice(u) => u.resource_name == name,
             Self::Connection(u) => u.resource_name == name,
+            Self::ResourceOnly(_, r) => r.name == name,
         }
     }
 
@@ -647,6 +649,7 @@ impl PluginUpdate {
             Self::Device(u) => u.event_type == *search,
             Self::PeerDevice(u) => u.event_type == *search,
             Self::Connection(u) => u.event_type == *search,
+            Self::ResourceOnly(t, _) => *t == *search,
         }
     }
 
@@ -656,6 +659,7 @@ impl PluginUpdate {
             Self::Device(u) => u.resource_name.to_string(),
             Self::PeerDevice(u) => u.resource_name.to_string(),
             Self::Connection(u) => u.resource_name.to_string(),
+            Self::ResourceOnly(_, r) => r.name.to_string(),
         }
     }
 
@@ -665,6 +669,7 @@ impl PluginUpdate {
             Self::Device(u) => u.get_env(),
             Self::PeerDevice(u) => u.get_env(),
             Self::Connection(u) => u.get_env(),
+            Self::ResourceOnly(_, _) => HashMap::new(),
         }
     }
 }

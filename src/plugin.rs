@@ -72,31 +72,47 @@ pub struct PluginConfig {
 /// of the channel used to communicate with the plugin.
 pub fn start_from_config(
     cfg: PluginConfig,
-) -> Result<(Vec<thread::JoinHandle<Result<()>>>, Vec<PluginSender>)> {
-    let mut handles = Vec::new();
-    let mut senders = Vec::new();
-
-    let mut plugins: Vec<Box<dyn Plugin>> = Vec::new();
+) -> Result<(
+    Vec<thread::JoinHandle<Result<()>>>,
+    Vec<PluginSender>,
+    Vec<PluginSender>,
+)> {
+    let mut change_plugins: Vec<Box<dyn Plugin>> = Vec::new();
     for debug_cfg in cfg.debugger {
-        plugins.push(Box::new(debugger::Debugger::new(debug_cfg)?));
+        change_plugins.push(Box::new(debugger::Debugger::new(debug_cfg)?));
     }
     for promote_cfg in cfg.promoter {
-        plugins.push(Box::new(promoter::Promoter::new(promote_cfg)?));
+        change_plugins.push(Box::new(promoter::Promoter::new(promote_cfg)?));
     }
     for umh_cfg in cfg.umh {
-        plugins.push(Box::new(umh::UMH::new(umh_cfg)?));
+        change_plugins.push(Box::new(umh::UMH::new(umh_cfg)?));
     }
+
+    // currently none
+    let event_plugins: Vec<Box<dyn Plugin>> = Vec::new();
 
     maybe_systemd_notify_ready()?;
 
-    for d in plugins {
+    let mut handles = Vec::new();
+
+    let mut change_senders = Vec::new();
+    for d in change_plugins {
         let (ptx, prx) = mpsc::channel();
         let handle = thread::spawn(move || d.run(prx));
         handles.push(handle);
-        senders.push(ptx);
+        change_senders.push(ptx);
     }
 
-    Ok((handles, senders))
+    // currently none
+    let event_senders = Vec::new();
+    for d in event_plugins {
+        let (ptx, prx) = mpsc::channel();
+        let handle = thread::spawn(move || d.run(prx));
+        handles.push(handle);
+        change_senders.push(ptx);
+    }
+
+    Ok((handles, change_senders, event_senders))
 }
 
 fn maybe_systemd_notify_ready() -> Result<()> {

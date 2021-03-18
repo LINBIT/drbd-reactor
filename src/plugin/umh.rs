@@ -41,6 +41,7 @@ impl super::Plugin for UMH {
                 PluginUpdate::Device(d) => get_handlers_by_pattern(d, &self.device_rules),
                 PluginUpdate::PeerDevice(p) => get_handlers_by_pattern(p, &self.peer_device_rules),
                 PluginUpdate::Connection(c) => get_handlers_by_pattern(c, &self.connection_rules),
+                _ => continue,
             };
 
             for handler in handlers {
