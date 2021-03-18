@@ -74,12 +74,12 @@ may-promote:If the resource may be promoted:Boolean:yes
 A match on such a rule calls the specified
 .Sy command
 and sets the following environment variables:
-.Bl -tag -width DRBD_{OLD,NEW}_MAYPROMOTE -compact
+.Bl -tag -width DRBD_{OLD,NEW}_MAY_PROMOTE -compact
 .It Ev DRBD_RES_NAME
 Name of the DRBD resource
 .It Ev DRBD_{OLD,NEW}_ROLE
 Role of the resource
-.It Ev DRBD_{OLD,NEW}_MAYPROMOTE
+.It Ev DRBD_{OLD,NEW}_MAY_PROMOTE
 Resource may be promoted to Primary
 .El
 .Ss DEVICE RULES
