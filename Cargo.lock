@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "drbdd"
-version = "0.2.0-rc.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "ctrlc",

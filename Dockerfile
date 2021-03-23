@@ -1,6 +1,6 @@
 FROM registry.access.redhat.com/ubi7/ubi as builder
 
-ENV DRBDD_VERSION 0.2.0-rc.1
+ENV DRBDD_VERSION 0.2.0
 
 ENV DRBDD_TGZNAME drbdd
 ENV DRBDD_TGZ ${DRBDD_TGZNAME}-${DRBDD_VERSION}.tar.gz
@@ -25,7 +25,7 @@ RUN cd /tmp && tar xvf ${DRBDD_TGZ} && cd ${DRBDD_TGZNAME}-${DRBDD_VERSION} && \
 FROM quay.io/linbit/drbd-utils
 MAINTAINER Roland Kammerer <roland.kammerer@linbit.com>
 
-ENV DRBDD_VERSION 0.2.0-rc.1
+ENV DRBDD_VERSION 0.2.0
 
 ARG release=1
 LABEL	name="drbdd" \

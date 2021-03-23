@@ -1,6 +1,6 @@
 [package]
 name = "drbdd"
-version = "0.2.0-rc.1"
+version = "0.2.0"
 authors = ["Roland Kammerer <roland.kammerer@linbit.com>", "Moritz Wanzenböck <moritz.wanzenboeck@linbit.com>"]
 edition = "2018"
 description = "Monitors DRBD resources via plugins."
