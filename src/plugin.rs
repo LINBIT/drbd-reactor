@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::drbd::{EventType, PluginUpdate};
 
 pub mod debugger;
+pub mod prometheus;
 pub mod promoter;
 pub mod umh;
 
@@ -66,6 +67,8 @@ pub struct PluginConfig {
     debugger: Vec<debugger::DebuggerConfig>,
     #[serde(default)]
     umh: Vec<umh::UMHConfig>,
+    #[serde(default)]
+    prometheus: Vec<prometheus::PrometheusConfig>,
 }
 
 /// Start every enable plugin in its own thread and return a thread handle and the send end
@@ -88,8 +91,10 @@ pub fn start_from_config(
         change_plugins.push(Box::new(umh::UMH::new(umh_cfg)?));
     }
 
-    // currently none
-    let event_plugins: Vec<Box<dyn Plugin>> = Vec::new();
+    let mut event_plugins: Vec<Box<dyn Plugin>> = Vec::new();
+    for prometheus_cfg in cfg.prometheus {
+        event_plugins.push(Box::new(prometheus::Prometheus::new(prometheus_cfg)?));
+    }
 
     maybe_systemd_notify_ready()?;
 
@@ -103,13 +108,12 @@ pub fn start_from_config(
         change_senders.push(ptx);
     }
 
-    // currently none
-    let event_senders = Vec::new();
+    let mut event_senders = Vec::new();
     for d in event_plugins {
         let (ptx, prx) = mpsc::channel();
         let handle = thread::spawn(move || d.run(prx));
         handles.push(handle);
-        change_senders.push(ptx);
+        event_senders.push(ptx);
     }
 
     Ok((handles, change_senders, event_senders))

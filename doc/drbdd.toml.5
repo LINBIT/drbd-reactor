@@ -9,7 +9,8 @@
 is the configuration file for the DRBDD daemon,
 .Xr drbdd 1 .
 The file has to be valid
-.Lk https://toml.io "toml" .
+.Lk https://toml.io "toml"
+file.
 .Pp
 The configuration file consists of sections for logging and the actual plugin
 configuration. While this is rarely used and should be used with caution, it
@@ -32,6 +33,10 @@ command = "drbdd-role-change.sh"
 event-type = "Change"
 old.role = { operator = "NotEquals", value = "Primary" }
 new.role = "Primary"
+
+# Configure a prometheus exporter
+[[prometheus]]
+enums = true
 .Ed
 .Sh AUTHORS
 .An -nosplit

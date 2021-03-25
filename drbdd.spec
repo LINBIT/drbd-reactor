@@ -39,6 +39,7 @@ make install DESTDIR=%{buildroot}
 %{_mandir}/man5/drbdd.umh.5*
 %{_mandir}/man5/drbdd.promoter.5*
 %{_mandir}/man5/drbdd.debugger.5*
+%{_mandir}/man5/drbdd.prometheus.5*
 %config(noreplace) /etc/drbdd.toml
 %doc README.md
 

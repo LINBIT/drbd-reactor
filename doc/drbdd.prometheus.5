@@ -1,0 +1,100 @@
+.Dd $Mdocdate$
+.Dt DRBDD.PROMETHEUS 5
+.Os
+.Sh NAME
+.Nm drbdd.prometheus
+.Nd drbdd prometheus plugin
+.Sh DESCRIPTION
+.Nm
+is the prometheus plugin for
+.Xr drbdd 1 .
+.Pp
+This plugin provides a prometheus compatible http endpoint serving DRBD
+metrics.
+.Sh METRICS
+.Bl -bullet -compact
+.It
+.Sx drbd_connection_apinflight_bytes gauge:
+Number of application requests in flight (not completed)
+.It
+.Sx drbd_connection_congested gauge:
+Boolean whether the TCP send buffer of the data connection is more than 80% filled
+.It
+.Sx drbd_connection_rsinflight_bytes gauge:
+Number of resync requests in flight
+.It
+.Sx drbd_connection_state gauge:
+DRBD connection state
+.It
+.Sx drbd_device_alsuspended gauge:
+Boolean whether the Activity-Log is suspended
+.It
+.Sx drbd_device_alwrites_total counter:
+Number of updates of the activity log area of the meta data
+.It
+.Sx drbd_device_bmwrites_total counter:
+Number of updates of the bitmap area of the meta data
+.It
+.Sx drbd_device_client gauge:
+Boolean whether this device is a client (i.e., intentional diskless)
+.It
+.Sx drbd_device_lowerpending gauge:
+Number of open requests to the local I/O sub-system issued by DRBD
+.It
+.Sx drbd_device_quorum gauge:
+Boolean if this device has DRBD quorum
+.It
+.Sx drbd_device_read_bytes_total counter:
+Net data read from local hard disk
+.It
+.Sx drbd_device_size_bytes gauge:
+Device size in bytes
+.It
+.Sx drbd_device_state gauge:
+DRBD device state
+.It
+.Sx drbd_device_unintentionaldiskless gauge:
+Boolean whether the devices is unintentional diskless
+.It
+.Sx drbd_device_upperpending gauge:
+Number of block I/O requests forwarded to DRBD, but not yet answered by DRBD.
+.It
+.Sx drbd_device_written_bytes_total counter:
+Net data written on local disk
+.It
+.Sx drbd_peerdevice_outofsync_bytes gauge:
+Number of bytes currently out of sync with this peer, according to the bitmap that DRBD has for it
+.It
+.Sx drbd_resource_maypromote gauge:
+Boolean whether the resource may be promoted to Primary
+.It
+.Sx drbd_resource_promotionscore gauge:
+The promotion score (higher is better) for the resource
+.It
+.Sx drbd_resource_resources gauge:
+Number of resources
+.It
+.Sx drbd_resource_role gauge:
+DRBD role of the resource
+.It
+.Sx drbd_resource_suspended gauge:
+Boolean whether the resource is suspended
+.El
+.Sh EXAMPLES
+Configure an exporter also generating enums on the standard port.
+.Bd -literal -offset indent
+[[log]]
+level = "debug"
+
+# Enable a prometheus exporter
+[[prometheus]]
+enums = true
+.Ed
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr drbdd 1
+program was written by the following authors:
+.An -split
+.An Roland Kammerer Aq Mt rck@linbit.com
+.An Moritz Wanzenböck Aq Mt moritz.wanzenboeck@linbit.com

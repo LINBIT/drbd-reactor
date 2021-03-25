@@ -35,6 +35,11 @@ to
 ). If a filter rule matches, a user defined script gets
 executed and various useful environment variables get set. See
 .Xr drbdd.umh 5
+.Ss prometheus
+This plugin serves a
+.Lk https://prometheus.io "prometheus"
+compatible endpoint for DRBD resources exposing various DRBD metrics. See
+.Xr drbdd.prometheus 5
 .Ss debugger
 This is a simple plugin that prints change events to stderr. This is mainly
 useful as a simple showcase for users or plugin writers. It also helps
@@ -56,6 +61,7 @@ Default configuration file.
 .Xr drbdd.toml 5
 .Xr drbdd.promoter 5
 .Xr drbdd.umh 5
+.Xr drbdd.prometheus 5
 .Xr drbdd.debugger 5
 .Sh AUTHORS
 The

@@ -4,7 +4,7 @@ DESTDIR =
 DEBCONTAINER=drbdd:deb
 RPMCONTAINER=drbdd:rpm
 REL = $(PROG)-$(VERSION)
-MANPAGES = doc/drbdd.1 doc/drbdd.toml.5 doc/drbdd.umh.5 doc/drbdd.promoter.5 doc/drbdd.debugger.5
+MANPAGES = doc/drbdd.1 doc/drbdd.toml.5 doc/drbdd.umh.5 doc/drbdd.promoter.5 doc/drbdd.debugger.5 doc/drbdd.prometheus.5
 
 DOCKERREGISTRY := drbd.io
 ARCH ?= amd64

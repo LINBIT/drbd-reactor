@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{Error, ErrorKind};
+use std::slice::Iter;
 use std::str::FromStr;
 
 common_matchable![Vec<Connection>, Vec<Device>];
@@ -116,8 +117,16 @@ make_matchable![
         Unknown,
         Primary,
         Secondary,
+        // if you extend this enum, also extend iterator()
     }
 ];
+
+impl Role {
+    pub fn iterator() -> Iter<'static, Role> {
+        static ROLES: [Role; 3] = [Role::Unknown, Role::Primary, Role::Secondary];
+        ROLES.iter()
+    }
+}
 
 // this could be extern enum_derive, but simple enough
 impl FromStr for Role {
@@ -160,8 +169,27 @@ make_matchable![
         DUnknown,
         Consistent,
         UpToDate,
+        // if you extend this enum, also extend iterator()
     }
 ];
+
+impl DiskState {
+    pub fn iterator() -> Iter<'static, DiskState> {
+        static DISKSTATES: [DiskState; 10] = [
+            DiskState::Diskless,
+            DiskState::Attaching,
+            DiskState::Detaching,
+            DiskState::Failed,
+            DiskState::Negotiating,
+            DiskState::Inconsistent,
+            DiskState::Outdated,
+            DiskState::DUnknown,
+            DiskState::Consistent,
+            DiskState::UpToDate,
+        ];
+        DISKSTATES.iter()
+    }
+}
 
 impl FromStr for DiskState {
     type Err = Error;
@@ -217,8 +245,27 @@ make_matchable![
         TearDown,
         Connecting,
         Connected,
+        // if you extend this enum, also extend iterator()
     }
 ];
+
+impl ConnectionState {
+    pub fn iterator() -> Iter<'static, ConnectionState> {
+        static CONNECTIONSTATES: [ConnectionState; 10] = [
+            ConnectionState::StandAlone,
+            ConnectionState::Disconnecting,
+            ConnectionState::Unconnected,
+            ConnectionState::Timeout,
+            ConnectionState::BrokenPipe,
+            ConnectionState::NetworkFailure,
+            ConnectionState::ProtocolError,
+            ConnectionState::TearDown,
+            ConnectionState::Connecting,
+            ConnectionState::Connected,
+        ];
+        CONNECTIONSTATES.iter()
+    }
+}
 
 impl FromStr for ConnectionState {
     type Err = Error;
