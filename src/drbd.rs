@@ -61,7 +61,7 @@ pub struct Device {
     pub upper_pending: u64,
     pub lower_pending: u64,
     pub al_suspended: bool,
-    pub blocked: bool,
+    pub blocked: String,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
