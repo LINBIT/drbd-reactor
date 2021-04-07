@@ -1,9 +1,27 @@
-# Log configuration. If not configured, defaults to "info" level on stdout/stderr
+##########################
+## GLOBAL CONFIGURATION ##
+##########################
+
+# Extra configuration snippets
+# Path names in this directory matching *.toml get alphabetically sorted and appended to this configuration
+# If the path does not exist, or is not a directory, or is not absolute this setting is ingnored
+# IMPORTANT: this path gets path-joined with "*.toml" and the result is then subject to glob expansion
+snippets = "/etc/drbdd.d"
+
+#######################
+## LOG CONFIGURATION ##
+#######################
+
+# If not configured, defaults to "info" level on stdout/stderr
 [[log]]
 ## debugger plugin needs debug log level, default is "info"
 # level = "info" # trace, debug, info, warn, error, off
 ## Path to a log file
 # file = "/var/log/drbdd.log"
+
+##########################
+## PLUGIN CONFIGURATION ##
+##########################
 
 ## Enable the debugger
 # [[debugger]]

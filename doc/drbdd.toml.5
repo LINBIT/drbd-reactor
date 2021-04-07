@@ -12,11 +12,14 @@ The file has to be valid
 .Lk https://toml.io "toml"
 file.
 .Pp
-The configuration file consists of sections for logging and the actual plugin
-configuration. While this is rarely used and should be used with caution, it
-is possible to have multiple instances of a plugin as well as multiple loggers
+The configuration file consists of sections for global settings, logging, and
+the actual plugin configuration. While this is rarely used and should be used
+with caution, it is possible to have multiple instances of a plugin as well as
+multiple loggers
 .Sh EXAMPLES
 .Bd -literal -offset indent
+snippets = "/etc/drbdd.d"
+
 [[log]]
 level = "debug"
 
@@ -46,3 +49,9 @@ program was written by the following authors:
 .An -split
 .An Roland Kammerer Aq Mt rck@linbit.com
 .An Moritz Wanzenböck Aq Mt moritz.wanzenboeck@linbit.com
+.Sh CAVEATS
+Please note that the path specified in
+.Sy snippets
+gets path-joined with
+.Dq *.toml
+and the result is then subject to glob expansion.

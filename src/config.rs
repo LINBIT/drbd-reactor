@@ -10,6 +10,9 @@ pub struct Config {
     #[serde(default = "default_log")]
     pub log: Vec<LogConfig>,
 
+    #[serde(default)]
+    pub snippets: Option<PathBuf>,
+
     #[serde(flatten)]
     pub plugins: plugin::PluginConfig,
 }
