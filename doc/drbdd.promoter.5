@@ -29,6 +29,9 @@ action fails (e.g., triggering a reboot). Start/stop actions are interpreted
 as systemd units and handled as such. Other service mangers/scripts are
 supported by starting the action with an absolute path.
 .Pp
+The configuration can contain a setting that specifies that resources are
+stopped whenever the plugin exits (e.g., on service restart).
+.Pp
 In order for DRBD to use quorum as needed by this plugin, make sure the
 resource file of the DRBD resource contains the following option (this is the
 default for LINSTOR, but your resources needs to qualify for quorum).
@@ -52,6 +55,7 @@ start = ["foo.mount", "foo.service"]
 ## if unset/empty, services from 'start' will be stopped in reverse order
 # stop = []
 on-stop-failure =  "echo b > /proc/sysrq-trigger"
+stop-services-on-exit = true
 .Ed
 .Sh AUTHORS
 .An -nosplit

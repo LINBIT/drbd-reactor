@@ -13,6 +13,9 @@ The plugin's configuration can contain an action that is executed if a stop acti
 reboot). Start/stop actions are interpreted as systemd units and handled as such. Other service
 mangers/scripts are supported by starting the action with an absolute path.
 
+The configuration can contain a setting that specifies that resources are stopped whenever the plugin exits
+(e.g., on service restart).
+
 ## DRBD resource configuration
 
 Make sure the resource has the following options set:

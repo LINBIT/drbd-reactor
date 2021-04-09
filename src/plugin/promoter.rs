@@ -63,20 +63,25 @@ impl super::Plugin for Promoter {
                 PluginUpdate::Resource(u) => {
                     if !u.old.may_promote && u.new.may_promote {
                         info!("promoter: resource '{}' may promote", name);
-                        if start_actions(&res.start).is_err() && stop_actions(&res.stop).is_err() {
-                            on_failure(&res.on_stop_failure); // loops until success
+                        if start_actions(&res.start).is_err() {
+                            stop_and_on_failure(res); // loops util success
                         }
                     }
                 }
                 PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
                         info!("promoter: resource '{}' lost quorum", name);
-                        if stop_actions(&res.stop).is_err() {
-                            on_failure(&res.on_stop_failure); // loops until success
-                        }
+                        stop_and_on_failure(res); // loops util success
                     }
                 }
                 _ => (),
+            }
+        }
+
+        // stop services if configured
+        for res in cfg.resources.values() {
+            if res.stop_services_on_exit {
+                stop_and_on_failure(res); // loops util success
             }
         }
 
@@ -100,6 +105,8 @@ pub struct PromoterOptResource {
     pub stop: Vec<String>,
     #[serde(default)]
     pub on_stop_failure: String,
+    #[serde(default)]
+    pub stop_services_on_exit: bool,
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
@@ -172,6 +179,12 @@ fn adjust_resources(to_start: &[String]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn stop_and_on_failure(res: &PromoterOptResource) {
+    if stop_actions(&res.stop).is_err() {
+        on_failure(&res.on_stop_failure); // loops until success
+    }
 }
 
 enum State {
