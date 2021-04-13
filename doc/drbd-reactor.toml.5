@@ -15,10 +15,13 @@ file.
 The configuration file consists of sections for global settings, logging, and
 the actual plugin configuration. While this is rarely used and should be used
 with caution, it is possible to have multiple instances of a plugin as well as
-multiple loggers
+multiple loggers. The program ships with a commented version of the
+configuration file, please refer to that for further details.
 .Sh EXAMPLES
 .Bd -literal -offset indent
 snippets = "/etc/drbd-reactor.d"
+# update statistics every 45 seconds
+statistics-poll-interval = 45
 
 [[log]]
 level = "debug"

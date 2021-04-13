@@ -7,13 +7,14 @@ use log::{debug, warn};
 use regex::Regex;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::sync::mpsc::{SendError, Sender};
 use std::thread;
 use std::time::Duration;
 
-pub fn events2(tx: Sender<EventUpdate>) -> Result<()> {
+pub fn events2(tx: Sender<EventUpdate>, statistics_poll: Duration) -> Result<()> {
     // minimum version check
     let version = Command::new("drbdadm").arg("--version").output()?;
     if !version.status.success() {
@@ -27,25 +28,21 @@ pub fn events2(tx: Sender<EventUpdate>) -> Result<()> {
     // check drbdsetup events2 version
     let pattern = Regex::new(r"^DRBDADM_VERSION_CODE=0x([[:xdigit:]]+)$")?;
     let (major, minor, patch) = split_version(pattern, version.stdout.clone())?;
-    if let Err(e) = min_version((major, minor, patch), (9, 16, 0)) {
+    if let Err(e) = min_version((major, minor, patch), (9, 17, 0)) {
         return Err(anyhow::anyhow!(
-            "drbdsetup minimum version ('9.16.0') not fulfilled: {}",
+            "drbdsetup minimum version ('9.17.0') not fulfilled: {}",
             e
         ));
     }
-    let mut has_backing_dev = min_version((major, minor, patch), (9, 17, 0)).is_ok();
 
-    if has_backing_dev {
-        // minimal kernel version for backing_dev
-        let pattern = Regex::new(r"^DRBD_KERNEL_VERSION_CODE=0x([[:xdigit:]]+)$")?;
-        let (major, minor, patch) = split_version(pattern, version.stdout)?;
-        let drbd90 = min_version((major, minor, patch), (9, 0, 28));
-        let drbd911plus = min_version((major, minor, patch), (9, 1, 1));
+    // minimal kernel version for backing_dev; utils since 9.17.0
+    let pattern = Regex::new(r"^DRBD_KERNEL_VERSION_CODE=0x([[:xdigit:]]+)$")?;
+    let (major, minor, patch) = split_version(pattern, version.stdout)?;
+    let drbd90 = min_version((major, minor, patch), (9, 0, 28));
+    let drbd911plus = min_version((major, minor, patch), (9, 1, 1));
 
-        has_backing_dev =
-            drbd911plus.is_ok() || (drbd90.is_ok() && !(major == 9 && minor == 1 && patch == 0));
-    }
-
+    let has_backing_dev =
+        drbd911plus.is_ok() || (drbd90.is_ok() && !(major == 9 && minor == 1 && patch == 0));
     if !has_backing_dev {
         warn!("backing device information will be missing!");
     }
@@ -60,7 +57,7 @@ pub fn events2(tx: Sender<EventUpdate>) -> Result<()> {
         }
 
         debug!("events: events2_loop: starting process_events2 loop");
-        match process_events2(&tx) {
+        match process_events2(&tx, statistics_poll) {
             Ok(()) => break,
             Err(e) => {
                 if e.is::<SendError<EventUpdate>>() {
@@ -76,17 +73,31 @@ pub fn events2(tx: Sender<EventUpdate>) -> Result<()> {
     Ok(())
 }
 
-fn process_events2(tx: &Sender<EventUpdate>) -> Result<()> {
+fn process_events2(tx: &Sender<EventUpdate>, statistics_poll: Duration) -> Result<()> {
     let mut cmd = Command::new("drbdsetup")
         .arg("events2")
         .arg("--full")
+        .arg("--poll")
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("events: process_event: could not spawn 'drbdsetup events2 --full'");
+        .expect("events: process_events2: could not spawn 'drbdsetup events2 --full --poll'");
+
+    let mut stdin = cmd
+        .stdin
+        .take()
+        .expect("events:: process_events2: stdin set to Stdio::piped()");
+    thread::spawn(move || loop {
+        if stdin.write_all("n\n".as_bytes()).is_err() {
+            warn!("events: process_events2: could not update statistics");
+        }
+        thread::sleep(statistics_poll);
+    });
+
     let stdout = cmd
         .stdout
         .take()
-        .expect("events: process_event: stdout set to Stdio::piped()");
+        .expect("events: process_events2: stdout set to Stdio::piped()");
 
     let mut reader = BufReader::new(stdout);
 

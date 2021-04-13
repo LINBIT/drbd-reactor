@@ -8,6 +8,12 @@
 # IMPORTANT: this path gets path-joined with "*.toml" and the result is then subject to glob expansion
 snippets = "/etc/drbd-reactor.d"
 
+# DRBD statistcs (bytes written, out-of-sync,...) are recalculated every given seconds.
+# Note that this applies to statistics only, main events like resource/disk/connection states get updated
+# whenever such an event occurs. The default should be fine for most situations, but if you decide for very
+# fast updates in for example your Prometheus setup, you might want to decrease that interval as well.
+statistics-poll-interval = 60
+
 #######################
 ## LOG CONFIGURATION ##
 #######################

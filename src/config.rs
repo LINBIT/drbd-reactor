@@ -6,9 +6,14 @@ use serde::{Deserialize, Serialize};
 use crate::plugin;
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
     #[serde(default = "default_log")]
     pub log: Vec<LogConfig>,
+
+    // seconds
+    #[serde(default = "default_statistics")]
+    pub statistics_poll_interval: u64,
 
     #[serde(default)]
     pub snippets: Option<PathBuf>,
@@ -22,6 +27,10 @@ pub struct LogConfig {
     #[serde(default = "default_level")]
     pub level: LevelFilter,
     pub file: Option<PathBuf>,
+}
+
+fn default_statistics() -> u64 {
+    60
 }
 
 fn default_level() -> LevelFilter {

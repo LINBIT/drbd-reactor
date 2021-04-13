@@ -2,6 +2,7 @@ use glob::glob;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
+use std::time::Duration;
 use std::{any, io, sync, thread};
 
 use anyhow::{Context, Result};
@@ -116,6 +117,7 @@ impl Core {
         &mut self,
         change_plugin_txs: Vec<plugin::PluginSender>,
         event_plugin_txs: Vec<plugin::PluginSender>,
+        statistics_poll: Duration,
     ) -> Result<()> {
         if change_plugin_txs.is_empty() && event_plugin_txs.is_empty() {
             return Err(anyhow::anyhow!("You need to enable at least one plugin"));
@@ -144,8 +146,8 @@ impl Core {
 
         let (e2tx, e2rx) = sync::mpsc::channel();
         let done = e2tx.clone();
-        thread::spawn(|| {
-            if let Err(e) = events2(e2tx) {
+        thread::spawn(move || {
+            if let Err(e) = events2(e2tx, statistics_poll) {
                 error!("core: events2 processing failed: {}", e);
                 std::process::exit(1);
             }
@@ -247,9 +249,9 @@ fn main() -> Result<()> {
     init_loggers(cfg.log)?;
 
     let (handles, change_senders, event_senders) = plugin::start_from_config(cfg.plugins)?;
-
+    let statistics_poll = Duration::from_secs(cfg.statistics_poll_interval);
     Core::new()
-        .run(change_senders, event_senders)
+        .run(change_senders, event_senders, statistics_poll)
         .context("core did not exit successfully")?;
 
     for handle in handles {
