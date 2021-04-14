@@ -1103,6 +1103,44 @@ impl Resource {
             resource: self.clone(),
         }))
     }
+
+    pub fn to_plugin_updates(&self) -> Vec<PluginUpdate> {
+        let mut updates = vec![];
+        let mut r = Resource::with_name(&self.name);
+        let et = EventType::Exists;
+
+        // called on an empty resource for an existing resource
+        // this actually has to return something.
+        if let Some(u) = r.get_resource_update(&et, &self) {
+            updates.push(u);
+        }
+
+        for d in &self.devices {
+            if let Some(u) = r.get_device_update(&et, &d) {
+                updates.push(u);
+            }
+        }
+
+        for c in &self.connections {
+            if let Some(u) = r.get_connection_update(&et, &c) {
+                updates.push(u);
+            }
+
+            for p in &c.paths {
+                if let Some(u) = r.get_path_update(&et, &p) {
+                    updates.push(u);
+                }
+            }
+
+            for pd in &c.peerdevices {
+                if let Some(u) = r.get_peerdevice_update(&et, &pd) {
+                    updates.push(u);
+                }
+            }
+        }
+
+        updates
+    }
 }
 
 make_matchable![
