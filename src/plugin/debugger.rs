@@ -2,11 +2,13 @@ use anyhow::Result;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 
-pub struct Debugger {}
+pub struct Debugger {
+    cfg: DebuggerConfig,
+}
 
 impl Debugger {
-    pub fn new(_cfg: DebuggerConfig) -> Result<Self> {
-        Ok(Debugger {})
+    pub fn new(cfg: DebuggerConfig) -> Result<Self> {
+        Ok(Debugger { cfg })
     }
 }
 
@@ -21,7 +23,13 @@ impl super::Plugin for Debugger {
         trace!("debugger: exit");
         Ok(())
     }
+
+    fn get_id(&self) -> Option<String> {
+        self.cfg.id.clone()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct DebuggerConfig {}
+pub struct DebuggerConfig {
+    pub id: Option<String>,
+}

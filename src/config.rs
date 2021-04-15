@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::plugin;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
     #[serde(default = "default_log")]
@@ -22,7 +22,7 @@ pub struct Config {
     pub plugins: plugin::PluginConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LogConfig {
     #[serde(default = "default_level")]
     pub level: LevelFilter,

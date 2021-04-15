@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::time::Duration;
-use std::{any, io, sync, thread};
+use std::{io, sync, thread};
 
 use anyhow::{Context, Result};
 use fern;
-use log::error;
+use log::{debug, error, warn};
+use signal_hook::iterator::Signals;
 use structopt::StructOpt;
 
 use drbd_reactor::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
@@ -47,7 +48,7 @@ fn read_snippets(path: &PathBuf) -> Result<String> {
     Ok(s)
 }
 
-pub fn from_args() -> Result<config::Config> {
+pub fn read_config() -> Result<config::Config> {
     let cli_opt = CliOpt::from_args();
 
     let mut content = read_to_string(&cli_opt.config)
@@ -93,6 +94,11 @@ struct Core {
     resources: HashMap<String, Resource>,
 }
 
+enum CoreExit {
+    Stop,
+    Reload,
+}
+
 impl Core {
     /// Initialize a new Core
     ///
@@ -112,51 +118,57 @@ impl Core {
     /// Start the core
     ///
     /// This will start listening for DRBD events, keeping track of any changes, updating the
-    /// state of the world and forwarding this information to all plugins via the given senders.
+    /// state of the world and forwarding this information to all plugins.
     fn run(
         &mut self,
-        change_plugin_txs: Vec<plugin::PluginSender>,
-        event_plugin_txs: Vec<plugin::PluginSender>,
-        statistics_poll: Duration,
-    ) -> Result<()> {
-        if change_plugin_txs.is_empty() && event_plugin_txs.is_empty() {
-            return Err(anyhow::anyhow!("You need to enable at least one plugin"));
-        }
-
-        let send_to_plugins =
-            |up: PluginUpdate, plugin_txs: &Vec<plugin::PluginSender>| -> Result<()> {
+        e2rx: &sync::mpsc::Receiver<EventUpdate>,
+        started: &Vec<plugin::PluginStarted>,
+    ) -> Result<CoreExit> {
+        let _send_updates = |up: Option<PluginUpdate>,
+                             res: &Resource,
+                             et: &EventType,
+                             only_new: bool|
+         -> Result<()> {
+            if let Some(up) = up {
                 let up = sync::Arc::new(up);
-                for tx in plugin_txs {
-                    tx.send(up.clone())?;
+                for p in started {
+                    if !p.new && only_new {
+                        continue;
+                    }
+                    if let plugin::PluginType::Change = p.ptype {
+                        p.tx.send(up.clone())?;
+                    }
                 }
-                Ok(())
-            };
-
-        let send_updates =
-            |up: Option<PluginUpdate>, res: &Resource, et: &EventType| -> Result<()> {
-                if let Some(up) = up {
-                    send_to_plugins(up, &change_plugin_txs)?;
-                }
-                send_to_plugins(
-                    PluginUpdate::ResourceOnly(et.clone(), res.clone()),
-                    &event_plugin_txs,
-                )?;
-                Ok(())
-            };
-
-        let (e2tx, e2rx) = sync::mpsc::channel();
-        let done = e2tx.clone();
-        thread::spawn(move || {
-            if let Err(e) = events2(e2tx, statistics_poll) {
-                error!("core: events2 processing failed: {}", e);
-                std::process::exit(1);
             }
-        });
+            let up = PluginUpdate::ResourceOnly(et.clone(), res.clone());
+            let up = sync::Arc::new(up);
+            for p in started {
+                if !p.new && only_new {
+                    continue;
+                }
+                if let plugin::PluginType::Event = p.ptype {
+                    p.tx.send(up.clone())?;
+                }
+            }
+            Ok(())
+        };
+        let send_updates = |up: Option<PluginUpdate>,
+                            res: &Resource,
+                            et: &EventType|
+         -> Result<()> { _send_updates(up, res, et, false) };
+        let send_updates_only_new = |up: Option<PluginUpdate>,
+                                     res: &Resource,
+                                     et: &EventType|
+         -> Result<()> { _send_updates(up, res, et, true) };
 
-        ctrlc::set_handler(move || {
-            println!("received Ctrl+C!");
-            done.send(EventUpdate::Stop).unwrap();
-        })?;
+        // initial state, if there is one for new plugins
+        for res in self.resources.values() {
+            let ups = res.to_plugin_updates();
+            for up in ups {
+                let r = up.get_resource();
+                send_updates_only_new(Some(up), &r, &EventType::Exists)?;
+            }
+        }
 
         for r in e2rx {
             match r {
@@ -189,11 +201,12 @@ impl Core {
                     let up = res.get_path_update(&et, &p);
                     send_updates(up, &res, &EventType::Change)?;
                 }
-                EventUpdate::Stop => break,
+                EventUpdate::Stop => return Ok(CoreExit::Stop),
+                EventUpdate::Reload => return Ok(CoreExit::Reload),
             }
         }
 
-        Ok(())
+        Ok(CoreExit::Stop)
     }
 }
 
@@ -226,60 +239,69 @@ fn init_loggers(log_cfgs: Vec<config::LogConfig>) -> Result<()> {
     Ok(())
 }
 
-/// Converts a message generated by `panic!` into an error.
-///
-/// Useful to convert the Result of a thread handle `.join()` into a readable error message.
-fn thread_panic_error(original: Box<dyn any::Any + Send>) -> anyhow::Error {
-    match original.downcast_ref::<&str>() {
-        Some(d) => return anyhow::anyhow!("plugin panicked: {}", d),
-        None => (),
-    };
-
-    match original.downcast_ref::<String>() {
-        Some(d) => return anyhow::anyhow!("plugin panicked: {}", d),
-        None => (),
-    };
-
-    anyhow::anyhow!("plugin panicked with unrecoverable error message")
-}
-
 fn main() -> Result<()> {
-    let cfg = from_args()?;
-
-    init_loggers(cfg.log)?;
-
-    let (handles, change_senders, event_senders) = plugin::start_from_config(cfg.plugins)?;
+    let mut cfg = read_config()?;
     let statistics_poll = Duration::from_secs(cfg.statistics_poll_interval);
-    Core::new()
-        .run(change_senders, event_senders, statistics_poll)
-        .context("core did not exit successfully")?;
 
-    for handle in handles {
-        handle
-            .join()
-            .unwrap_or_else(|e| Err(thread_panic_error(e)))?;
-    }
+    let (e2tx, e2rx) = sync::mpsc::channel();
+    let done = e2tx.clone();
+    thread::spawn(move || {
+        if let Err(e) = events2(e2tx, statistics_poll) {
+            error!("core: events2 processing failed: {}", e);
+            std::process::exit(1);
+        }
+    });
 
-    Ok(())
-}
+    init_loggers(cfg.clone().log)?;
+    thread::spawn(move || {
+        let signals = Signals::new(&[
+            signal_hook::SIGHUP,
+            signal_hook::SIGINT,
+            signal_hook::SIGTERM,
+        ])
+        .unwrap();
+        for signal in signals.forever() {
+            debug!("sighandler loop");
+            match signal as libc::c_int {
+                signal_hook::SIGHUP => {
+                    done.send(EventUpdate::Reload).unwrap();
+                }
+                signal_hook::SIGINT | signal_hook::SIGTERM => {
+                    done.send(EventUpdate::Stop).unwrap();
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    let mut core = Core::new();
 
-    #[test]
-    fn test_panic_error() {
-        let str_result = thread::spawn(|| panic!("some &str panic")).join();
-        let panic_msg = str_result.expect_err("must panic");
-        let panic_err = thread_panic_error(panic_msg);
-        assert_eq!(panic_err.to_string(), "plugin panicked: some &str panic");
+    let mut started = vec![];
+    loop {
+        match read_config() {
+            Ok(new) => cfg = new,
+            Err(e) => {
+                warn!(
+                    "new configuration has an error ('{}'), reusing old config",
+                    e
+                );
+            }
+        };
 
-        let string_result = thread::spawn(|| panic!("some String panic: {}", 2)).join();
-        let panic_msg = string_result.expect_err("must panic");
-        let panic_err = thread_panic_error(panic_msg);
-        assert_eq!(
-            panic_err.to_string(),
-            "plugin panicked: some String panic: 2"
-        );
+        started = plugin::start_from_config(cfg.plugins.clone(), started)?;
+        debug!("started.len()={}", started.len());
+
+        let exit = core
+            .run(&e2rx, &started)
+            .context("core did not exit successfully")?;
+
+        if let CoreExit::Stop = exit {
+            for p in started {
+                //p.stop().unwrap_or_else(|e| Err(thread_panic_error(e)))?;
+                p.stop()?;
+            }
+
+            return Ok(());
+        }
     }
 }

@@ -33,7 +33,7 @@ statistics-poll-interval = 60
 # [[debugger]]
 
 # Configure a promoter
-[[promoter]]
+# [[promoter]]
 ## Specify which resource should be watched. For example resource 'foo':
 # [promoter.resources.foo]
 ## What should be started when the resource is promotable. Use absolute paths for arbitrary commands, otherwise

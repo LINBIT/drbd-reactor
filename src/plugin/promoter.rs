@@ -90,12 +90,17 @@ impl super::Plugin for Promoter {
         trace!("promoter: exit");
         Ok(())
     }
+
+    fn get_id(&self) -> Option<String> {
+        self.cfg.id.clone()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct PromoterConfig {
     #[serde(default)]
     pub resources: HashMap<String, PromoterOptResource>,
+    pub id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

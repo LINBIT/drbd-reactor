@@ -17,6 +17,18 @@ the actual plugin configuration. While this is rarely used and should be used
 with caution, it is possible to have multiple instances of a plugin as well as
 multiple loggers. The program ships with a commented version of the
 configuration file, please refer to that for further details.
+.Pp
+Every plugin can specify an
+.Sy id
+in its configuration section. On a daemon reload started plugins that are
+still present in the new configuration keep running. Plugins without an ID
+get stopped and restarted if still present in the new configuration. So for
+plugins without an
+.Sy id
+every
+.Em reload
+is a
+.Em restart .
 .Sh EXAMPLES
 .Bd -literal -offset indent
 snippets = "/etc/drbd-reactor.d"
@@ -43,6 +55,7 @@ new.role = "Primary"
 # Configure a prometheus exporter
 [[prometheus]]
 enums = true
+id = "prometheus"
 .Ed
 .Sh AUTHORS
 .An -nosplit

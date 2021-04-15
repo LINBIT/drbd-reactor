@@ -18,6 +18,7 @@ pub struct UMH {
     device_rules: Vec<(CommonRule, Option<DevicePluginUpdatePattern>)>,
     peer_device_rules: Vec<(CommonRule, Option<PeerDevicePluginUpdatePattern>)>,
     connection_rules: Vec<(CommonRule, Option<ConnectionPluginUpdatePattern>)>,
+    id: Option<String>,
 }
 
 impl UMH {
@@ -27,6 +28,7 @@ impl UMH {
             device_rules: cfg.device.into_iter().map(Into::into).collect(),
             peer_device_rules: cfg.peerdevice.into_iter().map(Into::into).collect(),
             connection_rules: cfg.connection.into_iter().map(Into::into).collect(),
+            id: cfg.id,
         })
     }
 }
@@ -52,6 +54,10 @@ impl super::Plugin for UMH {
 
         trace!("umh: exit");
         Ok(())
+    }
+
+    fn get_id(&self) -> Option<String> {
+        self.id.clone()
     }
 }
 
@@ -129,6 +135,7 @@ pub struct UMHConfig {
     device: Vec<DeviceRule>,
     peerdevice: Vec<PeerDeviceRule>,
     connection: Vec<ConnectionRule>,
+    pub id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

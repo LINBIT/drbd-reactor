@@ -441,6 +441,7 @@ pub enum EventUpdate {
     Connection(EventType, Connection),
     Path(EventType, Path),
     Stop,
+    Reload,
 }
 
 make_matchable![
@@ -717,6 +718,16 @@ impl PluginUpdate {
             Self::PeerDevice(u) => u.get_env(),
             Self::Connection(u) => u.get_env(),
             Self::ResourceOnly(_, _) => HashMap::new(),
+        }
+    }
+
+    pub fn get_resource(&self) -> Resource {
+        match self {
+            Self::Resource(u) => u.resource.clone(),
+            Self::Device(u) => u.resource.clone(),
+            Self::PeerDevice(u) => u.resource.clone(),
+            Self::Connection(u) => u.resource.clone(),
+            Self::ResourceOnly(_, r) => r.clone(),
         }
     }
 }

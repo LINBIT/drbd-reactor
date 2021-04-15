@@ -73,6 +73,10 @@ impl super::Plugin for Prometheus {
 
         Ok(())
     }
+
+    fn get_id(&self) -> Option<String> {
+        self.cfg.id.clone()
+    }
 }
 
 fn tcp_handler(listener: TcpListener, metrics: &Arc<Mutex<Metrics>>) -> Result<()> {
@@ -429,6 +433,7 @@ pub struct PrometheusConfig {
     pub address: String,
     #[serde(default)]
     pub enums: bool,
+    pub id: Option<String>,
 }
 fn default_address() -> String {
     "0.0.0.0:9942".to_string()
