@@ -3,11 +3,12 @@ use std::fmt::Write;
 use std::io::Read;
 use std::io::Write as IOWrite;
 use std::net::{TcpListener, TcpStream};
+use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use anyhow::Result;
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::drbd::{ConnectionState, DiskState, EventType, PluginUpdate, Resource, Role};
@@ -28,14 +29,15 @@ impl super::Plugin for Prometheus {
 
         let metrics = Arc::new(Mutex::new(Metrics::new(self.cfg.enums)));
 
-        let mut listener = TcpListener::bind(&self.cfg.address)?;
+        let listener = TcpListener::bind(&self.cfg.address)?;
         debug!(
             "prometheus: listening for connections on address {}",
             self.cfg.address
         );
+        let fd = listener.as_raw_fd();
 
         let handler_metrics = Arc::clone(&metrics);
-        thread::spawn(move || tcp_handler(&mut listener, &handler_metrics));
+        let handle = thread::spawn(move || tcp_handler(listener, &handler_metrics));
 
         for r in rx {
             match r.as_ref() {
@@ -58,30 +60,43 @@ impl super::Plugin for Prometheus {
                 _ => (),
             }
         }
+        unsafe {
+            // very unlikely, but has the potential to shutdown the wrong fd (e.g., got reused)
+            // but as good as it gets.
+            libc::shutdown(fd, libc::SHUT_RD);
+        }
+
+        handle
+            .join()
+            .unwrap_or(Err(anyhow::anyhow!("prometheus::run tcp handler panicked")))?;
         trace!("prometheus: exit");
 
         Ok(())
     }
 }
 
-fn tcp_handler(listener: &mut TcpListener, metrics: &Arc<Mutex<Metrics>>) -> Result<()> {
+fn tcp_handler(listener: TcpListener, metrics: &Arc<Mutex<Metrics>>) -> Result<()> {
     for stream in listener.incoming() {
-        if let Err(e) = handle_connection(stream, metrics) {
-            warn!(
-                "prometheus::tcp_handler: could not handle connection: {}",
-                e
-            );
+        match stream {
+            Ok(stream) => {
+                if let Err(e) = handle_connection(stream, metrics) {
+                    // warn but continue processing
+                    warn!(
+                        "prometheus::tcp_handler: could not handle connection: {}",
+                        e
+                    );
+                }
+            }
+            Err(_) => {
+                info!("error in stream, most likely harmless shutdown");
+                break;
+            }
         }
     }
     Ok(())
 }
 
-fn handle_connection(
-    stream: Result<TcpStream, std::io::Error>,
-    metrics: &Arc<Mutex<Metrics>>,
-) -> Result<()> {
-    let mut stream = stream?;
-
+fn handle_connection(mut stream: TcpStream, metrics: &Arc<Mutex<Metrics>>) -> Result<()> {
     // read request body
     // we have to, otherwise we will get a connection reset by peer
     let mut discard = [0u8; 4096];
