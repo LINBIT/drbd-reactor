@@ -1,14 +1,14 @@
 %define debug_package %{nil}
 
-Name:		drbdd
+Name:		drbd-reactor
 Version:	0.2.0
 Release:	1
-Summary:	Monitors DRBD resources via plugins.
+Summary:	React to DRBD events via plugins.
 %global	tarball_version %(echo "%{version}" | sed -e 's/~rc/-rc/' -e 's/~alpha/-alpha/')
 
 Group:		System Environment/Daemons
 License:	ASL 2.0
-URL:		https://www.github.com/LINBIT/drbdd
+URL:		https://www.github.com/LINBIT/drbd-reactor
 Source0:	https://www.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
 
 BuildRequires:	systemd
@@ -31,16 +31,16 @@ make install DESTDIR=%{buildroot}
 
 
 %files
-# %{_unitdir}/drbdd.service
-/lib/systemd/system/drbdd.service
-/usr/sbin/drbdd
-%{_mandir}/man1/drbdd.1*
-%{_mandir}/man5/drbdd.toml.5*
-%{_mandir}/man5/drbdd.umh.5*
-%{_mandir}/man5/drbdd.promoter.5*
-%{_mandir}/man5/drbdd.debugger.5*
-%{_mandir}/man5/drbdd.prometheus.5*
-%config(noreplace) /etc/drbdd.toml
+# %{_unitdir}/drbd-reactor.service
+/lib/systemd/system/drbd-reactor.service
+/usr/sbin/drbd-reactor
+%{_mandir}/man1/drbd-reactor.1*
+%{_mandir}/man5/drbd-reactor.toml.5*
+%{_mandir}/man5/drbd-reactor.umh.5*
+%{_mandir}/man5/drbd-reactor.promoter.5*
+%{_mandir}/man5/drbd-reactor.debugger.5*
+%{_mandir}/man5/drbd-reactor.prometheus.5*
+%config(noreplace) /etc/drbd-reactor.toml
 %doc README.md
 
 

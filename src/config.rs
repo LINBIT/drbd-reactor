@@ -44,7 +44,7 @@ mod tests {
     const EMPTY_CFG: &str = "";
     const OVERRIDE_LOG_CFG: &str = r#"[[log]]
     level = "trace"
-    file = "/var/log/drbdd.log"
+    file = "/var/log/drbd-reactor.log"
     "#;
 
     #[test]
@@ -60,6 +60,9 @@ mod tests {
         let cfg: Config = toml::from_str(OVERRIDE_LOG_CFG).expect("cfg must parse");
         assert_eq!(cfg.log.len(), 1);
         assert_eq!(cfg.log[0].level, LevelFilter::Trace);
-        assert_eq!(cfg.log[0].file, Some(PathBuf::from("/var/log/drbdd.log")));
+        assert_eq!(
+            cfg.log[0].file,
+            Some(PathBuf::from("/var/log/drbd-reactor.log"))
+        );
     }
 }

@@ -1,4 +1,4 @@
-use drbdd::drbd::{Connection, Device, PeerDevice, Resource, Role};
+use drbd_reactor::drbd::{Connection, Device, PeerDevice, Resource, Role};
 
 #[test]
 fn resource_update() {

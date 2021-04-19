@@ -9,13 +9,18 @@ use fern;
 use log::error;
 use structopt::StructOpt;
 
-use drbdd::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
-use drbdd::events::events2;
-use drbdd::{config, plugin};
+use drbd_reactor::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
+use drbd_reactor::events::events2;
+use drbd_reactor::{config, plugin};
 
 #[derive(Debug, StructOpt)]
 struct CliOpt {
-    #[structopt(short, long, parse(from_os_str), default_value = "/etc/drbdd.toml")]
+    #[structopt(
+        short,
+        long,
+        parse(from_os_str),
+        default_value = "/etc/drbd-reactor.toml"
+    )]
     config: PathBuf,
 }
 

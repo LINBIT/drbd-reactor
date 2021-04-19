@@ -1,4 +1,4 @@
-Source: drbdd
+Source: drbd-reactor
 Maintainer: LINBIT HA Solutions GmbH <drbd-dev@lists.linbit.com>
 Uploaders: Roland Kammerer <roland.kammerer@linbit.com>
 Section: admin
@@ -9,7 +9,7 @@ Build-Depends: debhelper (>= 9),
                rustc,
 Standards-Version: 3.9.6
 
-Package: drbdd
+Package: drbd-reactor
 Architecture: any
 Depends: ${misc:Depends},
 Description: Monitors DRBD resources via plugins.

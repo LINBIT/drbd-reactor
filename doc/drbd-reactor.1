@@ -1,8 +1,8 @@
 .Dd $Mdocdate$
-.Dt DRBDD 1
+.Dt DRBD-REACTOR 1
 .Os
 .Sh NAME
-.Nm drbdd
+.Nm drbd-reactor
 .Nd monitors DRBD resources via plugins
 .Sh SYNOPSIS
 .Nm
@@ -19,13 +19,13 @@ section.
 .Bl -tag -width Ds
 .It Fl c Ar config
 Path to the config file. By default
-.Pa /etc/drbdd.toml
+.Pa /etc/drbd-reactor.toml
 .El
 .Sh PLUGINS
 .Ss promoter
 The promoter plugin monitors events on resources an executes systemd units.
 This plugin can be used for simple high-availability. See
-.Xr drbdd.promoter 5
+.Xr drbd-reactor.promoter 5
 .Ss umh
 The user mode helper is a plugin that allows users to specify filters matched
 on DRBD state changes (e.g., from
@@ -34,35 +34,35 @@ to
 .Sy Primary
 ). If a filter rule matches, a user defined script gets
 executed and various useful environment variables get set. See
-.Xr drbdd.umh 5
+.Xr drbd-reactor.umh 5
 .Ss prometheus
 This plugin serves a
 .Lk https://prometheus.io "prometheus"
 compatible endpoint for DRBD resources exposing various DRBD metrics. See
-.Xr drbdd.prometheus 5
+.Xr drbd-reactor.prometheus 5
 .Ss debugger
 This is a simple plugin that prints change events to stderr. This is mainly
 useful as a simple showcase for users or plugin writers. It also helps
-developers to detect bugs in drbdd's core.
+developers to detect bugs in drbd-reactor's core.
 .Em Important:
 Messages are printed on debug level, so make sure to set an apropriate log
 level. See
-.Xr drbdd.debugger 5
+.Xr drbd-reactor.debugger 5
 .Sh FILES
 this
 .Sh FILES
 .Bl -tag -compact
-.It Pa /etc/drbdd.toml
+.It Pa /etc/drbd-reactor.toml
 Default configuration file.
 .El
 .Sh EXIT STATUS
 .Ex -std
 .Sh SEE ALSO
-.Xr drbdd.toml 5
-.Xr drbdd.promoter 5
-.Xr drbdd.umh 5
-.Xr drbdd.prometheus 5
-.Xr drbdd.debugger 5
+.Xr drbd-reactor.toml 5
+.Xr drbd-reactor.promoter 5
+.Xr drbd-reactor.umh 5
+.Xr drbd-reactor.prometheus 5
+.Xr drbd-reactor.debugger 5
 .Sh AUTHORS
 The
 .Nm

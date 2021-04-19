@@ -129,7 +129,7 @@ A match on such a rule calls the specified `command` and sets the following envi
 
 A note on `DRBD_BACKING_DEV*`: DRBD does not know the backing device path of its peer, so the device set in
 these variables is the *local* backing device path! Usually the backing device names on all peers are the same
-for diskful nodes, but it is not strictly required. This was not invented by `drbdd`, this is how these
+for diskful nodes, but it is not strictly required. This was not invented by `drbd-reactor`, this is how these
 variables always have been set when DRBD kernel called user mode helpers from kernel space. So this might be
 unexpected, but that is what it always was.
 

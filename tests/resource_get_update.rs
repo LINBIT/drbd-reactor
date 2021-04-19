@@ -1,4 +1,6 @@
-use drbdd::drbd::{Connection, Device, EventType, Path, PeerDevice, PluginUpdate, Resource, Role};
+use drbd_reactor::drbd::{
+    Connection, Device, EventType, Path, PeerDevice, PluginUpdate, Resource, Role,
+};
 
 #[test]
 fn get_resource_update() {

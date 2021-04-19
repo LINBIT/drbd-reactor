@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: drbdd
-Source: https://github.com/LINBIT/drbdd
+Upstream-Name: drbd-reactor
+Source: https://github.com/LINBIT/drbd-reactor
 
 Files: *
 Copyright: Copyright (C) 2021, LINBIT HA-Solutions GmbH

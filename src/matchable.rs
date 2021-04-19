@@ -68,10 +68,10 @@ common_matchable![String, bool, i32, u64];
 ///
 /// # Example
 ///```rust
-/// use drbdd::make_matchable;
-/// use drbdd::matchable::PartialMatchable;
-/// use drbdd::matchable::BasicPattern;
-/// use drbdd::matchable::BasicPatternOperator;
+/// use drbd_reactor::make_matchable;
+/// use drbd_reactor::matchable::PartialMatchable;
+/// use drbd_reactor::matchable::BasicPattern;
+/// use drbd_reactor::matchable::BasicPatternOperator;
 ///
 /// make_matchable!(struct Foo { item: String }, FooPattern);
 ///

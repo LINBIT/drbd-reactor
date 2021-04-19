@@ -1,6 +1,6 @@
-# drbdd
+# drbd-reactor
 
-`drbdd` is a daemon consisting of a core that does DRBD events processing and plugins that can react on
+`drbd-reactor` is a daemon consisting of a core that does DRBD events processing and plugins that can react on
 changes in a DRBD resource.
 
 # Plugins
@@ -21,8 +21,8 @@ changes in a DRBD resource.
 
 # Configuration
 This daemon is configured via a configuration file. The only command line option allowed is the path to the
-configuration. The default location for the config is `/etc/drbdd.toml`. The repository contains an example
-[drbdd.toml](./example/drbdd.toml).
+configuration. The default location for the config is `/etc/drbd-reactor.toml`. The repository contains an example
+[drbd-reactor.toml](./example/drbd-reactor.toml).
 
 # Building
 
@@ -76,7 +76,7 @@ currently under development by somebody else.
 
 ## Dependencies
 
-We have to be a bit careful introducing new dependencies as we want to provide `drbdd` via a
+We have to be a bit careful introducing new dependencies as we want to provide `drbd-reactor` via a
 [PPA](https://launchpad.net/~linbit/+archive/ubuntu/linbit-drbd9-stack). So please use only dependencies that
 are packaged as `librust-` package in Ubuntu Focal. We might relax that, but that would need to be a very very
 convincing argument. Again, talk to us early.

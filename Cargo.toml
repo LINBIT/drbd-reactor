@@ -1,9 +1,9 @@
 [package]
-name = "drbdd"
+name = "drbd-reactor"
 version = "0.2.0"
 authors = ["Roland Kammerer <roland.kammerer@linbit.com>", "Moritz Wanzenböck <moritz.wanzenboeck@linbit.com>"]
 edition = "2018"
-description = "Monitors DRBD resources via plugins."
+description = "Reacts to DRBD events via plugins."
 license = "Apache-2.0"
 readme = "README.md"
 

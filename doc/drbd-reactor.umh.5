@@ -1,13 +1,13 @@
 .Dd $Mdocdate$
-.Dt DRBDD.UMH 5
+.Dt DRBD-REACTOR.UMH 5
 .Os
 .Sh NAME
-.Nm drbdd.umh
-.Nd drbdd user mode helper plugin
+.Nm drbd-reactor.umh
+.Nd drbd-reactor user mode helper plugin
 .Sh DESCRIPTION
 .Nm
 is the user mode helper plugin for
-.Xr drbdd 1 .
+.Xr drbd-reactor 1 .
 .Pp
 The user mode helper is a plugin that allows users to specify filters matched
 on DRBD state changes. If a filter rule matches, a user defined script gets
@@ -177,7 +177,7 @@ these variables is the
 .Em local
 backing device path! Usually the backing device names on all peers are the same
 for diskful nodes, but it is not strictly required. This was not invented by
-.Xr drbdd 1 ,
+.Xr drbd-reactor 1 ,
 this is how these variables always have been set when DRBD kernel called
 user mode helpers from kernel space. So this might be unexpected, but that is
 what it always was.
@@ -378,7 +378,7 @@ new.role = "Primary"
 .Sh AUTHORS
 .An -nosplit
 The
-.Xr drbdd 1
+.Xr drbd-reactor 1
 program was written by the following authors:
 .An -split
 .An Roland Kammerer Aq Mt rck@linbit.com

@@ -1,13 +1,13 @@
 .Dd $Mdocdate$
-.Dt DRBDD.TOML 5
+.Dt DRBD-REACTOR.TOML 5
 .Os
 .Sh NAME
-.Nm drbdd.toml
-.Nd DRBDD daemon configuration file
+.Nm drbd-reactor.toml
+.Nd DRBD-REACTOR daemon configuration file
 .Sh DESCRIPTION
 .Nm
-is the configuration file for the DRBDD daemon,
-.Xr drbdd 1 .
+is the configuration file for the DRBD-REACTOR daemon,
+.Xr drbd-reactor 1 .
 The file has to be valid
 .Lk https://toml.io "toml"
 file.
@@ -18,7 +18,7 @@ with caution, it is possible to have multiple instances of a plugin as well as
 multiple loggers
 .Sh EXAMPLES
 .Bd -literal -offset indent
-snippets = "/etc/drbdd.d"
+snippets = "/etc/drbd-reactor.d"
 
 [[log]]
 level = "debug"
@@ -32,7 +32,7 @@ on-stop-failure =  "echo b > /proc/sysrq-trigger"
 # Configure a user mode helper filter
 [[umh]]
 [[umh.resource]]
-command = "drbdd-role-change.sh"
+command = "drbd-reactor-role-change.sh"
 event-type = "Change"
 old.role = { operator = "NotEquals", value = "Primary" }
 new.role = "Primary"
@@ -44,7 +44,7 @@ enums = true
 .Sh AUTHORS
 .An -nosplit
 The
-.Xr drbdd 1
+.Xr drbd-reactor 1
 program was written by the following authors:
 .An -split
 .An Roland Kammerer Aq Mt rck@linbit.com

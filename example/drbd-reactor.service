@@ -1,9 +1,9 @@
 [Unit]
-Description=DRBDD Service
+Description=DRBD-Reactor Service
 
 [Service]
 Type=notify
-ExecStart=/usr/sbin/drbdd
+ExecStart=/usr/sbin/drbd-reactor
 
 [Install]
 WantedBy=multi-user.target

@@ -1,10 +1,10 @@
-PROG := drbdd
+PROG := drbd-reactor
 DEBUG ?=
 DESTDIR =
-DEBCONTAINER=drbdd:deb
-RPMCONTAINER=drbdd:rpm
+DEBCONTAINER=drbd-reactor:deb
+RPMCONTAINER=drbd-reactor:rpm
 REL = $(PROG)-$(VERSION)
-MANPAGES = doc/drbdd.1 doc/drbdd.toml.5 doc/drbdd.umh.5 doc/drbdd.promoter.5 doc/drbdd.debugger.5 doc/drbdd.prometheus.5
+MANPAGES = doc/drbd-reactor.1 doc/drbd-reactor.toml.5 doc/drbd-reactor.umh.5 doc/drbd-reactor.promoter.5 doc/drbd-reactor.debugger.5 doc/drbd-reactor.prometheus.5
 
 DOCKERREGISTRY := drbd.io
 ARCH ?= amd64
@@ -60,8 +60,8 @@ rpm: ## Build a rpm package
 
 install:  # install binary and config
 	install -D -m 0750 target/$(TARGET)/$(PROG) $(DESTDIR)/usr/sbin/$(PROG)
-	install -D -m 0640 example/drbdd.toml $(DESTDIR)/etc/drbdd.toml
-	install -D -m 0640 example/drbdd.service $(DESTDIR)/lib/systemd/system/drbdd.service
+	install -D -m 0640 example/drbd-reactor.toml $(DESTDIR)/etc/drbd-reactor.toml
+	install -D -m 0640 example/drbd-reactor.service $(DESTDIR)/lib/systemd/system/drbd-reactor.service
 	for f in $(MANPAGES); do \
 		sect=$$(echo $$f | sed -e 's/.*\.\([0-9]\)$$/\1/'); \
 		install -D -m 0640 $$f $(DESTDIR)/usr/share/man/man$${sect}/$$(basename $$f); \
@@ -93,8 +93,8 @@ else
 checkVERSION:
 	test -z "$$(git ls-files -m)"
 	lbvers.py check --base=$(BASE) --build=$(BUILD) --build-nr=$(BUILD_NR) --pkg-nr=$(PKG_NR) \
-		--cargo=Cargo.toml --debian-changelog=debian/changelog --rpm-spec=drbdd.spec
-	if test $$(grep "ENV DRBDD_VERSION $(VERSION)" Dockerfile | wc -l) -ne 2; then \
+		--cargo=Cargo.toml --debian-changelog=debian/changelog --rpm-spec=drbd-reactor.spec
+	if test $$(grep "ENV DRBD_REACTOR_VERSION $(VERSION)" Dockerfile | wc -l) -ne 2; then \
 		echo -e "\n\tDockerfile needs update"; \
 	false; fi;
 endif

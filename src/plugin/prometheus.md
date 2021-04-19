@@ -3,7 +3,7 @@
 This plugin serves a [prometheus.io](https://prometheus.io) compatible endpoint
 for DRBD resources exposing various DRBD metrics.
 
-The plugin is enabled by adding a `prometheus` section to drbdd's configuration:
+The plugin is enabled by adding a `prometheus` section to drbd-reactor's configuration:
 
 ```
 [[prometheus]]

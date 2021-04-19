@@ -6,7 +6,7 @@
 # Path names in this directory matching *.toml get alphabetically sorted and appended to this configuration
 # If the path does not exist, or is not a directory, or is not absolute this setting is ingnored
 # IMPORTANT: this path gets path-joined with "*.toml" and the result is then subject to glob expansion
-snippets = "/etc/drbdd.d"
+snippets = "/etc/drbd-reactor.d"
 
 #######################
 ## LOG CONFIGURATION ##
@@ -17,7 +17,7 @@ snippets = "/etc/drbdd.d"
 ## debugger plugin needs debug log level, default is "info"
 # level = "info" # trace, debug, info, warn, error, off
 ## Path to a log file
-# file = "/var/log/drbdd.log"
+# file = "/var/log/drbd-reactor.log"
 
 ##########################
 ## PLUGIN CONFIGURATION ##
@@ -43,7 +43,7 @@ snippets = "/etc/drbdd.d"
 # [[umh]]
 ## Filter type
 # [[umh.resource]]
-# command = "drbdd-role-change.sh"
+# command = "drbd-reactor-role-change.sh"
 # event-type = "Change"
 ## everything not Primary
 # old.role = { operator = "NotEquals", value = "Primary" }
