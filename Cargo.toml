@@ -1,6 +1,6 @@
 [package]
 name = "drbd-reactor"
-version = "0.2.0"
+version = "0.3.0-rc.1"
 authors = ["Roland Kammerer <roland.kammerer@linbit.com>", "Moritz Wanzenböck <moritz.wanzenboeck@linbit.com>"]
 edition = "2018"
 description = "Reacts to DRBD events via plugins."

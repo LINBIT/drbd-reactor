@@ -1,3 +1,18 @@
+drbd-reactor (0.3.0~rc.1-1) experimental; urgency=medium
+
+  * events2: fix device blocked type
+  * events2: add "path" information
+  * plugins: split into "change" and "event" plugins
+  * prometheus: implement exporter
+  * add drbdd.d snippets
+  * promoter: add stop-services-on-exit
+  * prometheus: cleanly shutdown TCP handler
+  * drbdd -> drbd-reactor
+  * core: add statistics polling
+  * debian: rm dh-systemd
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 20 Apr 2021 13:42:46 +0200
+
 drbd-reactor (0.2.0-1) experimental; urgency=medium
 
   * doc: MAYPROMOTE vs. MAY_PROMOTE
