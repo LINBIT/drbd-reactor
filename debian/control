@@ -4,7 +4,6 @@ Uploaders: Roland Kammerer <roland.kammerer@linbit.com>
 Section: admin
 Priority: optional
 Build-Depends: debhelper (>= 9),
-               dh-systemd,
                cargo,
                rustc,
 Standards-Version: 3.9.6
