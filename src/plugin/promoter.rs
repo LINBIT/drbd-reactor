@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fs;
+use std::os::unix::fs::FileTypeExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
@@ -169,6 +171,29 @@ pub fn on_failure(action: &str) {
 
 fn adjust_resources(to_start: &[String]) -> Result<()> {
     for res in to_start {
+        let shlldev = Command::new("drbdadm").arg("sh-ll-dev").arg(res).output()?;
+        if !shlldev.status.success() {
+            return Err(anyhow::anyhow!(
+                "'drbdadm sh-ll-dev {}' not executed successfully, stdout: '{}', stderr: '{}'",
+                res,
+                String::from_utf8(shlldev.stdout)
+                    .unwrap_or("<Could not convert stdout>".to_string()),
+                String::from_utf8(shlldev.stderr)
+                    .unwrap_or("<Could not convert stderr>".to_string())
+            ));
+        }
+        let shlldev = String::from_utf8(shlldev.stdout)?;
+        for dev in shlldev.lines() {
+            info!(
+                "promoter: adjust: waiting for backing device '{}' to become ready",
+                dev
+            );
+            while !drbd_backing_device_ready(dev) {
+                thread::sleep(Duration::from_secs(2));
+            }
+            info!("promoter: adjust: backing device '{}' now ready", dev);
+        }
+
         let status = Command::new("drbdadm").arg("adjust").arg(res).status()?;
         if !status.success() {
             // for now let's keep it a warning, I don't think we should fail hard here.
@@ -179,6 +204,14 @@ fn adjust_resources(to_start: &[String]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn drbd_backing_device_ready(dev: &str) -> bool {
+    dev == "none"
+        || match fs::metadata(dev) {
+            Err(_) => false,
+            Ok(meta) => meta.file_type().is_block_device(),
+        }
 }
 
 fn stop_and_on_failure(res: &PromoterOptResource) {
