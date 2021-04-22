@@ -12,6 +12,7 @@ enums = true
 
 ## Metrics
 
+- `drbdreactor_up gauge`: Boolean indicating whether or not drbdreactor is running. Always 1
 - `drbd_connection_apinflight_bytes gauge`: Number of application requests in flight (not completed)
 - `drbd_connection_congested gauge`: Boolean whether the TCP send buffer of the data connection is more than 80% filled
 - `drbd_connection_rsinflight_bytes gauge`: Number of resync requests in flight

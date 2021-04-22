@@ -129,6 +129,7 @@ impl Metrics {
         Self {
             resources: HashMap::new(),
             enums,
+            dirty: true,
             ..Default::default()
         }
     }
@@ -149,6 +150,13 @@ impl Metrics {
         let mut metrics = HashMap::new();
 
         // higher level metric
+        let (k, m) = type_gauge(
+            "drbdreactor_up",
+            "Boolean indicating whether or not drbdreactor is running. Always 1",
+            &mut metrics,
+        );
+        write!(m, "{} 1\n", k)?;
+
         let (k, m) = type_gauge(
             "drbd_resource_resources",
             "Number of resources",
