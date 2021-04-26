@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "drbd-reactor"
-version = "0.3.0-rc.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "ctrlc",

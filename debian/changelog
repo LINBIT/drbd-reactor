@@ -1,3 +1,16 @@
+drbd-reactor (0.3.0-1) experimental; urgency=medium
+
+  [ Christoph Böhmwalder ]
+  * prometheus: add "drbdreactor_up" metric
+
+  [ Roland Kammerer ]
+  * build: add drbd-utils dependency
+  * promoter: wait till backing device shows up
+  * containers: don't setup toolchain in lbbuild
+  * containers: fix users and updates
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 26 Apr 2021 12:53:50 +0200
+
 drbd-reactor (0.3.0~rc.1-1) experimental; urgency=medium
 
   * events2: fix device blocked type
