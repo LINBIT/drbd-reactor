@@ -6,8 +6,7 @@ ENV DRBD_REACTOR_TGZNAME drbd-reactor
 ENV DRBD_REACTOR_TGZ ${DRBD_REACTOR_TGZNAME}-${DRBD_REACTOR_VERSION}.tar.gz
 
 # need to setup our own toolchain to cover archs not in rust:lastest
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-	sh -s -- --profile minimal -y -q --no-modify-path
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y -q --no-modify-path # !lbbuild
 
 RUN yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical && \
 	yum install -y gcc wget && \
