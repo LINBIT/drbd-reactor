@@ -10,7 +10,8 @@ Standards-Version: 3.9.6
 
 Package: drbd-reactor
 Architecture: any
-Depends: ${misc:Depends},
+Depends: drbd-utils (>= 9.17.0),
+         ${shlibs:Depends},
 Description: Monitors DRBD resources via plugins.
  Daemon monitoring the state of DRBD resources, and executing plugins
  acting on state changes.

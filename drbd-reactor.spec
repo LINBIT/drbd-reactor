@@ -12,6 +12,7 @@ URL:		https://www.github.com/LINBIT/drbd-reactor
 Source0:	https://www.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
 
 BuildRequires:	systemd
+Requires:	drbd-utils >= 9.17.0
 
 %description
 Daemon monitoring the state of DRBD resources, and executing plugins
