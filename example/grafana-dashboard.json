@@ -1,4 +1,52 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "alertlist",
+      "name": "Alert list",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "7.5.2"
+    },
+    {
+      "type": "panel",
+      "id": "graph",
+      "name": "Graph",
+      "version": ""
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -15,13 +63,13 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 6,
-  "iteration": 1619775023766,
+  "id": null,
+  "iteration": 1619790416969,
   "links": [],
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -34,7 +82,7 @@
       "type": "row"
     },
     {
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -89,7 +137,7 @@
     {
       "dashboardFilter": "",
       "dashboardTags": [],
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -159,7 +207,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "unit": "s"
@@ -246,7 +294,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:5510",
           "format": "s",
           "label": null,
           "logBase": 1,
@@ -255,7 +302,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:5511",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -270,7 +316,7 @@
       }
     },
     {
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -438,7 +484,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "description": "DRBD data out of sync with a peer",
       "fieldConfig": {
         "defaults": {
@@ -526,7 +572,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:225",
           "format": "bytes",
           "label": null,
           "logBase": 1,
@@ -535,7 +580,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:226",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -554,7 +598,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -622,7 +666,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:194",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -631,7 +674,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:195",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -650,7 +692,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "description": "",
       "fieldConfig": {
         "defaults": {},
@@ -741,7 +783,7 @@
       }
     },
     {
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -873,7 +915,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -961,7 +1003,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:169",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -970,7 +1011,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:170",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1029,7 +1069,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "unit": "binBps"
@@ -1117,7 +1157,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:76",
           "format": "binBps",
           "label": null,
           "logBase": 1,
@@ -1126,7 +1165,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:77",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1185,7 +1223,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "fieldConfig": {
         "defaults": {
           "unit": "binBps"
@@ -1273,7 +1311,6 @@
       },
       "yaxes": [
         {
-          "$$hashKey": "object:76",
           "format": "binBps",
           "label": null,
           "logBase": 1,
@@ -1282,7 +1319,6 @@
           "show": true
         },
         {
-          "$$hashKey": "object:77",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1305,12 +1341,8 @@
     "list": [
       {
         "allValue": null,
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": null,
+        "current": {},
+        "datasource": "${DS_PROMETHEUS}",
         "definition": "label_values(drbdreactor_up, instance)",
         "description": null,
         "error": null,
@@ -1342,7 +1374,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "FoxesDrbd",
+  "title": "DRBD",
   "uid": "f_tZtVlMz",
   "version": 44
 }
