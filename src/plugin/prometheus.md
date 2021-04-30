@@ -35,3 +35,18 @@ enums = true
 - `drbd_resource_resources gauge`: Number of resources
 - `drbd_resource_role gauge`: DRBD role of the resource
 - `drbd_resource_suspended gauge`: Boolean whether the resource is suspended
+
+## Grafana Dashboard
+
+With its Prometheus plugin, drbd-reactor exports a powerful set of Prometheus
+metrics which can be used to optimally monitor a DRBD deployment.
+
+In this repository, we provide an [example dashboard](/example/grafana-dashboard.json)
+that showcases some of the generic use cases that can be accomplished with
+these metrics.
+
+The json files can simply be imported into your Grafana instance.
+
+---
+
+![dashboard](/example/grafana-dashboard.png)
