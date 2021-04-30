@@ -17,7 +17,7 @@ changes in a DRBD resource.
 - [x] promoter
 - [x] umh (user defined filters)
 - [ ] umh (replacement for kernel called helpers: Under active development)
-- [ ] prometheus (Under active development)
+- [x] prometheus
 
 # Configuration
 This daemon is configured via a configuration file. The only command line option allowed is the path to the
