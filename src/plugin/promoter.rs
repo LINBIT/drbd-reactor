@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
 use std::os::unix::fs::FileTypeExt;
-use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
@@ -65,7 +64,7 @@ impl super::Plugin for Promoter {
                 PluginUpdate::Resource(u) => {
                     if !u.old.may_promote && u.new.may_promote {
                         info!("promoter: resource '{}' may promote", name);
-                        if start_actions(&res.start).is_err() {
+                        if start_actions(&res.start, &res.runner).is_err() {
                             stop_and_on_failure(res); // loops util success
                         }
                     }
@@ -114,6 +113,8 @@ pub struct PromoterOptResource {
     pub on_stop_failure: String,
     #[serde(default)]
     pub stop_services_on_exit: bool,
+    #[serde(default)]
+    pub runner: Runner,
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
@@ -134,32 +135,26 @@ fn systemd_start(unit: &str) -> Result<()> {
     plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())
 }
 
-fn action(to: State, what: &str) -> Result<()> {
-    let words = what.split_whitespace().collect::<Vec<&str>>();
-    if words.is_empty() {
-        return Err(anyhow::anyhow!("action is empty"));
-    }
-
-    if Path::new(words[0]).is_absolute() {
-        return plugin::system(what);
-    }
-
-    match to {
-        State::Start => systemd_start(what),
-        State::Stop => systemd_stop(what),
+fn action(what: &str, to: State, how: &Runner) -> Result<()> {
+    match how {
+        Runner::Shell => plugin::system(what),
+        Runner::Systemd => match to {
+            State::Start => systemd_start(what),
+            State::Stop => systemd_stop(what),
+        },
     }
 }
 
-fn start_actions(actions: &[String]) -> Result<()> {
+fn start_actions(actions: &[String], how: &Runner) -> Result<()> {
     for a in actions {
-        action(State::Start, a)?;
+        action(a, State::Start, how)?;
     }
     Ok(())
 }
 
-fn stop_actions(actions: &[String]) -> Result<()> {
+fn stop_actions(actions: &[String], how: &Runner) -> Result<()> {
     for a in actions {
-        action(State::Stop, a)?;
+        action(a, State::Stop, how)?;
     }
     Ok(())
 }
@@ -171,6 +166,12 @@ pub fn on_failure(action: &str) {
             return;
         }
         thread::sleep(Duration::from_secs(2));
+    }
+}
+
+fn stop_and_on_failure(res: &PromoterOptResource) {
+    if stop_actions(&res.stop, &res.runner).is_err() {
+        on_failure(&res.on_stop_failure); // loops until success
     }
 }
 
@@ -219,13 +220,20 @@ fn drbd_backing_device_ready(dev: &str) -> bool {
         }
 }
 
-fn stop_and_on_failure(res: &PromoterOptResource) {
-    if stop_actions(&res.stop).is_err() {
-        on_failure(&res.on_stop_failure); // loops until success
-    }
-}
-
 enum State {
     Start,
     Stop,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum Runner {
+    #[serde(rename = "systemd")]
+    Systemd,
+    #[serde(rename = "shell")]
+    Shell,
+}
+impl Default for Runner {
+    fn default() -> Self {
+        Self::Systemd
+    }
 }
