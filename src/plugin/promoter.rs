@@ -1,6 +1,10 @@
+use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::os::unix::fs::FileTypeExt;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
@@ -8,6 +12,8 @@ use std::time::Duration;
 use anyhow::Result;
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use tinytemplate::TinyTemplate;
 
 use crate::drbd::{EventType, PluginUpdate};
 use crate::plugin;
@@ -20,6 +26,12 @@ impl Promoter {
     pub fn new(cfg: PromoterConfig) -> Result<Self> {
         let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
         adjust_resources(&names)?;
+
+        for (name, res) in &cfg.resources {
+            if res.runner == Runner::Systemd {
+                generate_systemd_templates(name, &res.start)?;
+            }
+        }
 
         Ok(Self { cfg })
     }
@@ -64,15 +76,15 @@ impl super::Plugin for Promoter {
                 PluginUpdate::Resource(u) => {
                     if !u.old.may_promote && u.new.may_promote {
                         info!("promoter: resource '{}' may promote", name);
-                        if start_actions(&res.start, &res.runner).is_err() {
-                            stop_and_on_failure(res); // loops util success
+                        if start_actions(&name, &res.start, &res.runner).is_err() {
+                            stop_and_on_failure(&name, res); // loops util success
                         }
                     }
                 }
                 PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
                         info!("promoter: resource '{}' lost quorum", name);
-                        stop_and_on_failure(res); // loops util success
+                        stop_and_on_failure(&name, res); // loops util success
                     }
                 }
                 _ => (),
@@ -80,9 +92,9 @@ impl super::Plugin for Promoter {
         }
 
         // stop services if configured
-        for res in cfg.resources.values() {
+        for (name, res) in cfg.resources {
             if res.stop_services_on_exit {
-                stop_and_on_failure(res); // loops util success
+                stop_and_on_failure(&name, &res); // loops util success
             }
         }
 
@@ -145,18 +157,28 @@ fn action(what: &str, to: State, how: &Runner) -> Result<()> {
     }
 }
 
-fn start_actions(actions: &[String], how: &Runner) -> Result<()> {
-    for a in actions {
-        action(a, State::Start, how)?;
+fn start_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
+    match how {
+        Runner::Shell => {
+            for a in actions {
+                action(a, State::Start, how)?;
+            }
+            Ok(())
+        }
+        Runner::Systemd => action(&format!("drbd-services@{}.target", name), State::Start, how),
     }
-    Ok(())
 }
 
-fn stop_actions(actions: &[String], how: &Runner) -> Result<()> {
-    for a in actions {
-        action(a, State::Stop, how)?;
+fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
+    match how {
+        Runner::Shell => {
+            for a in actions {
+                action(a, State::Stop, how)?;
+            }
+            Ok(())
+        }
+        Runner::Systemd => action(&format!("drbd-services@{}.target", name), State::Stop, how),
     }
-    Ok(())
 }
 
 pub fn on_failure(action: &str) {
@@ -169,32 +191,39 @@ pub fn on_failure(action: &str) {
     }
 }
 
-fn stop_and_on_failure(res: &PromoterOptResource) {
-    if stop_actions(&res.stop, &res.runner).is_err() {
+fn stop_and_on_failure(name: &str, res: &PromoterOptResource) {
+    if stop_actions(name, &res.stop, &res.runner).is_err() {
         on_failure(&res.on_stop_failure); // loops until success
     }
 }
 
+fn get_backing_devices(resname: &str) -> Result<Vec<String>> {
+    let shlldev = Command::new("drbdadm")
+        .arg("sh-ll-dev")
+        .arg(resname)
+        .output()?;
+    if !shlldev.status.success() {
+        return Err(anyhow::anyhow!(
+            "'drbdadm sh-ll-dev {}' not executed successfully, stdout: '{}', stderr: '{}'",
+            resname,
+            String::from_utf8(shlldev.stdout).unwrap_or("<Could not convert stdout>".to_string()),
+            String::from_utf8(shlldev.stderr).unwrap_or("<Could not convert stderr>".to_string())
+        ));
+    }
+
+    let shlldev = String::from_utf8(shlldev.stdout)?;
+    let devices: Vec<String> = shlldev.lines().map(|s| s.to_string()).collect();
+    Ok(devices)
+}
+
 fn adjust_resources(to_start: &[String]) -> Result<()> {
     for res in to_start {
-        let shlldev = Command::new("drbdadm").arg("sh-ll-dev").arg(res).output()?;
-        if !shlldev.status.success() {
-            return Err(anyhow::anyhow!(
-                "'drbdadm sh-ll-dev {}' not executed successfully, stdout: '{}', stderr: '{}'",
-                res,
-                String::from_utf8(shlldev.stdout)
-                    .unwrap_or("<Could not convert stdout>".to_string()),
-                String::from_utf8(shlldev.stderr)
-                    .unwrap_or("<Could not convert stderr>".to_string())
-            ));
-        }
-        let shlldev = String::from_utf8(shlldev.stdout)?;
-        for dev in shlldev.lines() {
+        for dev in get_backing_devices(res)? {
             info!(
                 "promoter: adjust: waiting for backing device '{}' to become ready",
                 dev
             );
-            while !drbd_backing_device_ready(dev) {
+            while !drbd_backing_device_ready(&dev) {
                 thread::sleep(Duration::from_secs(2));
             }
             info!("promoter: adjust: backing device '{}' now ready", dev);
@@ -220,6 +249,179 @@ fn drbd_backing_device_ready(dev: &str) -> bool {
         }
 }
 
+const SYSTEMD_PREFIX: &str = "/run/systemd/system";
+const SYSTEMD_CONF: &str = "reactor.conf";
+
+fn generate_systemd_templates(name: &str, actions: &[String]) -> Result<()> {
+    let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", name));
+    systemd_write_unit(prefix, SYSTEMD_CONF, systemd_devices(name)?)?;
+
+    let mut target_requires: Vec<String> = Vec::new();
+
+    let ocf_pattern = Regex::new(r"^ocf:([[:word:]]+):([[:word:]]+)(.*)$")?;
+
+    let mut service = "".to_string();
+    for (i, action) in actions.iter().enumerate() {
+        let mut deps = vec![format!("drbd-promote@{}.service", name)];
+        if i > 0 {
+            deps.push(service.clone());
+        }
+
+        service = match ocf_pattern.captures(action) {
+            Some(ocf) => {
+                let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
+                systemd_ocf(name, vendor, agent, args, deps)?
+            }
+            _ => {
+                let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", action));
+                systemd_write_unit(prefix, SYSTEMD_CONF, systemd_unit(name, deps, vec![])?)?;
+                action.to_string()
+            }
+        };
+
+        // we need to keep the order and the Vecs are short
+        for existing_requirement in &target_requires {
+            if service == *existing_requirement {
+                return Err(anyhow::anyhow!(
+                    "generate_systemd_templates: Service name '{}' already used",
+                    service
+                ));
+            }
+        }
+        target_requires.push(service.clone());
+    }
+
+    let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", name));
+    systemd_write_unit(
+        prefix,
+        SYSTEMD_CONF,
+        systemd_target_requires(target_requires)?,
+    )
+}
+
+fn systemd_ocf(
+    name: &str,
+    vendor: &str,
+    agent: &str,
+    args: &str,
+    deps: Vec<String>,
+) -> Result<String> {
+    let mut args = args.split_whitespace();
+
+    let ra_name = args.next().ok_or(anyhow::anyhow!(
+        "promoter::systemd_ocf: agent needs at least one argument (its name)"
+    ))?;
+    let ra_name = format!("{}_{}", ra_name, name);
+    let service_name = format!("ocf.ra@{}.service", ra_name);
+
+    let mut env: Vec<String> = args.map(|e| format!("OCF_RESKEY_{}", e)).collect();
+    env.push(format!(
+        "AGENT=/usr/lib/ocf/resource.d/{}/{}",
+        vendor, agent
+    ));
+
+    let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", service_name));
+    systemd_write_unit(prefix, SYSTEMD_CONF, systemd_unit(name, deps, env)?)?;
+
+    Ok(service_name)
+}
+
+fn systemd_devices(name: &str) -> Result<String> {
+    const DEVICE_TEMPLATE: &str = r"[Unit]
+{{ for device in devices -}}
+ConditionPathExists = {device}
+Requisite           = {device | systemd_path}.device
+After               = {device | systemd_path}.device
+{{- endfor -}}";
+
+    let mut tt = TinyTemplate::new();
+    tt.add_template("devices", DEVICE_TEMPLATE)?;
+    tt.add_formatter("systemd_path", |value, output| match value {
+        Value::String(s) => tinytemplate::format(&Value::String(systemd_path(&s)), output),
+        _ => tinytemplate::format(value, output),
+    });
+
+    #[derive(Serialize)]
+    struct Context {
+        devices: Vec<String>,
+    }
+    tt.render(
+        "devices",
+        &Context {
+            devices: get_backing_devices(name)?,
+        },
+    )
+    .map_err(|e| anyhow::anyhow!("{}", e))
+}
+
+fn systemd_unit(name: &str, deps: Vec<String>, env: Vec<String>) -> Result<String> {
+    const UNIT_TEMPLATE: &str = r"[Unit]
+PartOf     =  drbd-services@{name}.target
+{{ for dep in deps }}
+Requisite  =  {dep}
+After      =  {dep}
+{{- endfor -}}
+
+{{ for e in env }}
+{{ if @first  }}
+[Service]
+{{ endif -}}
+Environment= {e}
+{{- endfor -}}";
+
+    let mut tt = TinyTemplate::new();
+    tt.add_template("unit", UNIT_TEMPLATE)?;
+
+    #[derive(Serialize)]
+    struct Context {
+        name: String,
+        deps: Vec<String>,
+        env: Vec<String>,
+    }
+    tt.render(
+        "unit",
+        &Context {
+            name: name.to_string(),
+            deps,
+            env,
+        },
+    )
+    .map_err(|e| anyhow::anyhow!("{}", e))
+}
+
+fn systemd_target_requires(requires: Vec<String>) -> Result<String> {
+    const WANTS_TEMPLATE: &str = r"[Unit]
+{{- for require in requires }}
+Requires = {require}
+{{- endfor -}}";
+
+    let mut tt = TinyTemplate::new();
+    tt.add_template("requires", WANTS_TEMPLATE)?;
+
+    #[derive(Serialize)]
+    struct Context {
+        requires: Vec<String>,
+    }
+    tt.render("requires", &Context { requires })
+        .map_err(|e| anyhow::anyhow!("{}", e))
+}
+
+fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()> {
+    let path = prefix.join(unit);
+    let tmp_path = prefix.join(format!("{}.tmp", unit));
+    info!("systemd_write_unit: creating {:?}", path);
+
+    fs::create_dir_all(&prefix)?;
+
+    let mut f = File::create(&tmp_path)?;
+    f.write_all(content.as_bytes())?;
+    f.write_all("\n".as_bytes())?;
+    f.sync_all()?;
+    fs::rename(tmp_path, path)?;
+    info!("systemd_write_unit: reloading systemd daemon");
+    plugin::system("systemctl daemon-reload")
+}
+
 enum State {
     Start,
     Stop,
@@ -235,5 +437,40 @@ pub enum Runner {
 impl Default for Runner {
     fn default() -> Self {
         Self::Systemd
+    }
+}
+
+// inlined copy from https://crates.io/crates/libsystemd
+// inlined because currently not packaged in Ubuntu Focal
+pub fn systemd_path(name: &str) -> String {
+    let trimmed = name.trim_matches('/');
+    if trimmed.is_empty() {
+        return "-".to_string();
+    }
+
+    let mut slash_seq = false;
+    let parts: Vec<String> = trimmed
+        .bytes()
+        .filter(|b| {
+            let is_slash = *b == b'/';
+            let res = !(is_slash && slash_seq);
+            slash_seq = is_slash;
+            res
+        })
+        .enumerate()
+        .map(|(n, b)| escape_byte(b, n))
+        .collect();
+    parts.join("")
+}
+
+// inlined copy from https://crates.io/crates/libsystemd
+// inlined because currently not packaged in Ubuntu Focal
+fn escape_byte(b: u8, index: usize) -> String {
+    let c = char::from(b);
+    match c {
+        '/' => '-'.to_string(),
+        ':' | '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => c.to_string(),
+        '.' if index > 0 => c.to_string(),
+        _ => format!(r#"\x{:02x}"#, b),
     }
 }

@@ -12,35 +12,169 @@ is the promoter plugin for
 The promoter plugin monitors events on resources an executes systemd units.
 This plugin can be used for simple high-availability.
 .Pp
-If a resource changes its state to
-.Dq may promote ,
-the plugin (i.e., all plugins on all nodes in the cluster) start the defined
-.Xr systemd.unit 5 .
-If this is a mount unit, and DRBD
-.Sy auto-promote
-is enabled (the default), one of the plugins will succeed and promote the DRBD
-resource to DRBD Primary. All the others will fail.
+By default the plugin generates a series of systemd service overrides and a
+systemd target unit that contains dependencies on these generated services.
+The services, and their order, is defined via the list specified in
+.Sy start .
 .Pp
-If a resource looses DRBD quorum, it stops all the systemd units in reverse
-order.
+The plugin generates two implicit extra units:
+.Bl -bullet -compact
+.It
+a
+.Sy drbd-promote@
+override that promotes the DRBD resource (i.e., switches it to Primary). This
+is a dependency for all the other units from
+.Sy start
+(according overrides are generated).
+.It
+a
+.Sy drbd-resource@
+target that subsumes all the generated dependencies from the
+.Sy start
+list.
+.El
+.Pp
+Let's look at a simple example to see which overrides get generated from a
+dummy start list like this:
+.Bd -literal -offset indent
+[[promoter]]
+[promoter.resources.foo]
+start = [ "a.service", "b.service", "c.service" ]
+.Ed
+.Pp
+.Bl -bullet -compact
+.It
+.Pa /var/run/systemd/system/drbd-promote@foo.d/reactor.conf
+containing the necessary pieces to wait for the backing devices of DRBD
+resource
+.Dq foo
+and to promote it to Primary.
+.It
+.Pa /var/run/systemd/system/a.service.d/reactor.conf
+containing a dependency on
+.Sy drbd-promote@foo
+.It
+.Pa /var/run/systemd/system/b.service.d/reactor.conf
+containing dependencies on
+.Sy drbd-promote@foo
+and on
+.Sy a.service .
+.It
+.Pa /var/run/systemd/system/c.service.d/reactor.conf
+containing dependencies on
+.Sy drbd-promote@foo
+and on
+.Sy b.service .
+.It
+.Pa /var/run/systemd/system/drbd-resource@foo.target.d/reactor.conf
+containing dependencies on
+.Sy a.service ,
+.Sy b.service ,
+and
+.Sy c.service .
+.El
+.Pp
+If a DRBD resource changes its state to
+.Dq may promote ,
+the plugin (i.e., all plugins on all nodes in the cluster)
+start the generated systemd target (e.g.,
+.Sy drbd-resource@foo.target
+). All will try to start the
+.Sy drbd-promote@
+unit first, but only one will succeed and continue to start the rest of the
+services. All the others will fail intentionally.
+.Pp
+If a resource looses
+.Dq quorum ,
+it stops the systemd
+.Sy drbd-resource@
+target and all the dependencies.
 .Pp
 The plugin's configuration can contain an action that is executed if a stop
-action fails (e.g., triggering a reboot). Start/stop actions are interpreted
-as systemd units and handled as such. Other service mangers/scripts are
-supported by starting the action with an absolute path.
+action fails (e.g., triggering a reboot). Start actions in
+.Sy start
+are
+interpreted as 
+.Xr systemd.unit 5 .
+and have to have an according postfix like 
+.Sy .service
+or
+.Sy `.mount` .
+.Sy ocf
+resource agents are supported via the
+.Sy ocf.ra@
+service. Please see
+.Sx OCF RESOURCE AGENTS
+for a detailed overview.
 .Pp
 The configuration can contain a setting that specifies that resources are
 stopped whenever the plugin exits (e.g., on service restart).
 .Pp
+It also contains a
+.Sy runner
+that can be set to
+.Sy shell .
+Then the items in
+.Sy start
+are interpreted as shell scripts and started in order (no explicit targets or
+anything) and stopped in reverse order or as defined via
+.Sy stop .
+This can be used on systems without systemd and might be useful for Windows
+systems in the future. If you can, use the default systemd method, it is the
+preferred one.
+.Pb
 In order for DRBD to use quorum as needed by this plugin, make sure the
 resource file of the DRBD resource contains the following option (this is the
 default for LINSTOR, but your resources needs to qualify for quorum).
 .Bd -literal -offset indent
 options {
+   auto-promote no;
    quorum majority;
    on-no-quorum io-error;
 }
 .Ed
+.Sh OCF RESOURCE AGENTS
+It is possible to use
+.Lk https://github.com/ClusterLabs/resource-agents "resource agents"
+in the
+.Sy start
+list of
+services via
+.Sy ocf:$vendor:$agent instance-id name=value ...
+The
+.Sy instance-id
+is user defined and gets
+postfixed with
+.Sy _$resourcename .
+For example the generated systemd unit for an
+.Sy instance-id
+of
+.Dq p_iscsi_demo1
+for a DRBD resource
+.Dq foo
+would be
+.Sy ocf.ra@p_iscsi_demo1_foo .
+.Sy name
+/
+.Sy value
+pairs are passed
+to the unit as environment variables prefixed with
+.Sy OCF_RESKEY_ .
+In a concrete example using the
+.Dq heartbeat:IPaddr2
+agent this could look like this:
+.Bd -literal -offset indent
+start = [
+  "foo.service",
+  "ocf:heartbeat:IPaddr2 p_iscsi_demo1_ip ip=10.43.7.223 cidr_netmask=16 arp_sender=iputils_arping",
+  "bar.service"
+]
+.Ed
+.Sh FILES
+.Bl -tag -compact
+.It Pa /usr/lib/ocf/resource.d/
+Path used for for OCF agents.
+.El
 .Sh EXAMPLES
 This configures a promoter for resource
 .Dq foo .

@@ -52,7 +52,7 @@ pub fn map_status(status: std::result::Result<ExitStatus, std::io::Error>) -> Re
 }
 
 pub fn system(action: &str) -> Result<()> {
-    info!("promoter: sh -c {}", action);
+    info!("system: sh -c {}", action);
     map_status(Command::new("sh").arg("-c").arg(action).status())
 }
 
