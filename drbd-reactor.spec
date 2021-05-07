@@ -13,6 +13,15 @@ Source0:	https://www.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.
 
 BuildRequires:	systemd
 Requires:	drbd-utils >= 9.18.0
+Requires:	python3
+# python3{,6}-toml is for rhel7/8 only in epel, but we mirror that pkg
+%if 0%{?suse_version} >= 1500 || 0%{?rhel} >= 8
+Requires:	python3-toml
+%else
+%if 0%{?rhel} == 7
+Requires:	python36-toml
+%endif
+%endif
 
 %description
 Daemon monitoring the state of DRBD resources, and executing plugins
@@ -35,6 +44,7 @@ make install DESTDIR=%{buildroot}
 # %{_unitdir}/drbd-reactor.service
 /lib/systemd/system/drbd-reactor.service
 /usr/sbin/drbd-reactor
+/usr/sbin/drbd-reactorctl
 %{_mandir}/man1/drbd-reactor.1*
 %{_mandir}/man5/drbd-reactor.toml.5*
 %{_mandir}/man5/drbd-reactor.umh.5*

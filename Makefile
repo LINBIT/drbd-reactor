@@ -60,6 +60,7 @@ rpm: ## Build a rpm package
 
 install:  # install binary and config
 	install -D -m 0750 target/$(TARGET)/$(PROG) $(DESTDIR)/usr/sbin/$(PROG)
+	install -D -m 0750 $(PROG)ctl.py $(DESTDIR)/usr/sbin/$(PROG)ctl
 	install -D -m 0640 example/drbd-reactor.toml $(DESTDIR)/etc/drbd-reactor.toml
 	install -D -m 0640 example/drbd-reactor.service $(DESTDIR)/lib/systemd/system/drbd-reactor.service
 	for f in $(MANPAGES); do \

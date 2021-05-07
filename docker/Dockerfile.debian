@@ -2,5 +2,5 @@ FROM debian:buster
 MAINTAINER Roland Kammerer <roland.kammerer@linbit.com>
 
 RUN apt-get update && \
-	apt-get install -y gcc curl dh-systemd devscripts cargo rustc && \
+	apt-get install -y gcc curl dh-systemd dh-python devscripts cargo rustc && \
 	apt-get clean -y

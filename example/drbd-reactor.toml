@@ -25,9 +25,12 @@ statistics-poll-interval = 60
 ## Path to a log file
 # file = "/var/log/drbd-reactor.log"
 
-##########################
-## PLUGIN CONFIGURATION ##
-##########################
+########################################
+## PLUGIN CONFIGURATION DOCUMENTATION ##
+########################################
+# IMPORTANT: This is for documentation only!
+# Plugins should be stored in the "snippets" directory
+# use "drbd-reactorctl edit" to create and edit such snippets
 
 ## Enable the debugger
 # [[debugger]]
