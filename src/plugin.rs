@@ -232,16 +232,20 @@ pub fn start_from_config(
 }
 
 fn maybe_systemd_notify_ready() -> Result<()> {
-    let socket = match env::var_os("NOTIFY_SOCKET") {
+    let key = "NOTIFY_SOCKET";
+    let socket = match env::var_os(key) {
         Some(socket) => socket,
         None => return Ok(()),
     };
+
+    env::remove_var(key);
 
     let sock = UnixDatagram::unbound()?;
     let msg = "READY=1\n";
     if sock.send_to(msg.as_bytes(), socket)? != msg.len() {
         Err(anyhow::anyhow!(
-            "Could not completely write 'READY=1' to NOTIFY_SOCKET"
+            "Could not completely write 'READY=1' to {}",
+            key
         ))
     } else {
         Ok(())
