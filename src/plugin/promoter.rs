@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -29,7 +30,7 @@ impl Promoter {
 
         for (name, res) in &cfg.resources {
             if res.runner == Runner::Systemd {
-                generate_systemd_templates(name, &res.start)?;
+                generate_systemd_templates(name, &res.start, &res.dependencies_as)?;
             }
         }
 
@@ -127,6 +128,8 @@ pub struct PromoterOptResource {
     pub stop_services_on_exit: bool,
     #[serde(default)]
     pub runner: Runner,
+    #[serde(default)]
+    pub dependencies_as: SystemdDependency,
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
@@ -252,9 +255,13 @@ fn drbd_backing_device_ready(dev: &str) -> bool {
 const SYSTEMD_PREFIX: &str = "/run/systemd/system";
 const SYSTEMD_CONF: &str = "reactor.conf";
 
-fn generate_systemd_templates(name: &str, actions: &[String]) -> Result<()> {
+fn generate_systemd_templates(
+    name: &str,
+    actions: &[String],
+    strictness: &SystemdDependency,
+) -> Result<()> {
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", name));
-    systemd_write_unit(prefix, SYSTEMD_CONF, systemd_devices(name)?)?;
+    systemd_write_unit(prefix, SYSTEMD_CONF, systemd_devices(name, strictness)?)?;
 
     let mut target_requires: Vec<String> = Vec::new();
 
@@ -270,16 +277,22 @@ fn generate_systemd_templates(name: &str, actions: &[String]) -> Result<()> {
         service = match ocf_pattern.captures(action) {
             Some(ocf) => {
                 let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-                systemd_ocf(name, vendor, agent, args, deps)?
+                systemd_ocf(name, vendor, agent, args, deps, strictness)?
             }
             _ => {
                 let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", action));
-                systemd_write_unit(prefix, SYSTEMD_CONF, systemd_unit(name, deps, vec![])?)?;
+                systemd_write_unit(
+                    prefix,
+                    SYSTEMD_CONF,
+                    systemd_unit(name, deps, strictness, vec![])?,
+                )?;
                 action.to_string()
             }
         };
 
-        // we need to keep the order and the Vecs are short
+        // we would not need to keep the order here, as it does not matter
+        // what matters is After=, but IMO it would confuse unexperienced users
+        // just keep the order, so no HashSet, the Vecs are short, does not matter.
         for existing_requirement in &target_requires {
             if service == *existing_requirement {
                 return Err(anyhow::anyhow!(
@@ -295,7 +308,7 @@ fn generate_systemd_templates(name: &str, actions: &[String]) -> Result<()> {
     systemd_write_unit(
         prefix,
         SYSTEMD_CONF,
-        systemd_target_requires(target_requires)?,
+        systemd_target_requires(target_requires, strictness)?,
     )
 }
 
@@ -305,6 +318,7 @@ fn systemd_ocf(
     agent: &str,
     args: &str,
     deps: Vec<String>,
+    strictness: &SystemdDependency,
 ) -> Result<String> {
     let mut args = args.split_whitespace();
 
@@ -321,17 +335,21 @@ fn systemd_ocf(
     ));
 
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", service_name));
-    systemd_write_unit(prefix, SYSTEMD_CONF, systemd_unit(name, deps, env)?)?;
+    systemd_write_unit(
+        prefix,
+        SYSTEMD_CONF,
+        systemd_unit(name, deps, strictness, env)?,
+    )?;
 
     Ok(service_name)
 }
 
-fn systemd_devices(name: &str) -> Result<String> {
+fn systemd_devices(name: &str, strictness: &SystemdDependency) -> Result<String> {
     const DEVICE_TEMPLATE: &str = r"[Unit]
 {{ for device in devices -}}
 ConditionPathExists = {device}
-Requisite           = {device | systemd_path}.device
-After               = {device | systemd_path}.device
+{strictness} = {device | systemd_path}.device
+After = {device | systemd_path}.device
 {{- endfor -}}";
 
     let mut tt = TinyTemplate::new();
@@ -344,22 +362,29 @@ After               = {device | systemd_path}.device
     #[derive(Serialize)]
     struct Context {
         devices: Vec<String>,
+        strictness: String,
     }
     tt.render(
         "devices",
         &Context {
             devices: get_backing_devices(name)?,
+            strictness: strictness.to_string(),
         },
     )
     .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
-fn systemd_unit(name: &str, deps: Vec<String>, env: Vec<String>) -> Result<String> {
+fn systemd_unit(
+    name: &str,
+    deps: Vec<String>,
+    strictness: &SystemdDependency,
+    env: Vec<String>,
+) -> Result<String> {
     const UNIT_TEMPLATE: &str = r"[Unit]
-PartOf     =  drbd-services@{name}.target
+PartOf = drbd-services@{name}.target
 {{ for dep in deps }}
-Requisite  =  {dep}
-After      =  {dep}
+{strictness} = {dep}
+After = {dep}
 {{- endfor -}}
 
 {{ for e in env }}
@@ -377,6 +402,7 @@ Environment= {e}
         name: String,
         deps: Vec<String>,
         env: Vec<String>,
+        strictness: String,
     }
     tt.render(
         "unit",
@@ -384,15 +410,19 @@ Environment= {e}
             name: name.to_string(),
             deps,
             env,
+            strictness: strictness.to_string(),
         },
     )
     .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
-fn systemd_target_requires(requires: Vec<String>) -> Result<String> {
+fn systemd_target_requires(
+    requires: Vec<String>,
+    strictness: &SystemdDependency,
+) -> Result<String> {
     const WANTS_TEMPLATE: &str = r"[Unit]
 {{- for require in requires }}
-Requires = {require}
+{strictness} = {require}
 {{- endfor -}}";
 
     let mut tt = TinyTemplate::new();
@@ -401,9 +431,16 @@ Requires = {require}
     #[derive(Serialize)]
     struct Context {
         requires: Vec<String>,
+        strictness: String,
     }
-    tt.render("requires", &Context { requires })
-        .map_err(|e| anyhow::anyhow!("{}", e))
+    tt.render(
+        "requires",
+        &Context {
+            requires,
+            strictness: strictness.to_string(),
+        },
+    )
+    .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
 fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()> {
@@ -425,6 +462,29 @@ fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()
 enum State {
     Start,
     Stop,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum SystemdDependency {
+    Wants,
+    Requires,
+    Requisite,
+    BindsTo,
+}
+impl Default for SystemdDependency {
+    fn default() -> Self {
+        Self::Requires
+    }
+}
+impl fmt::Display for SystemdDependency {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Wants => write!(f, "Wants"),
+            Self::Requires => write!(f, "Requires"),
+            Self::Requisite => write!(f, "Requisite"),
+            Self::BindsTo => write!(f, "BindsTo"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
