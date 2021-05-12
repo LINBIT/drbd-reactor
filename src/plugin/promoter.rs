@@ -35,6 +35,7 @@ impl Promoter {
                     target_as: res.target_as.clone(),
                 };
                 generate_systemd_templates(name, &res.start, &dependencies)?;
+                systemd_daemon_reload()?;
             }
         }
 
@@ -460,8 +461,11 @@ fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()
     f.write_all(content.as_bytes())?;
     f.write_all("\n".as_bytes())?;
     f.sync_all()?;
-    fs::rename(tmp_path, path)?;
-    info!("systemd_write_unit: reloading systemd daemon");
+    fs::rename(tmp_path, path).map_err(|e| anyhow::anyhow!("{}", e))
+}
+
+fn systemd_daemon_reload() -> Result<()> {
+    info!("reloading systemd daemon");
     plugin::system("systemctl daemon-reload")
 }
 
