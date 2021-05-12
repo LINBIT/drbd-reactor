@@ -30,7 +30,11 @@ impl Promoter {
 
         for (name, res) in &cfg.resources {
             if res.runner == Runner::Systemd {
-                generate_systemd_templates(name, &res.start, &res.dependencies_as)?;
+                let dependencies = SystemdDependencies {
+                    dependencies_as: res.dependencies_as.clone(),
+                    target_as: res.target_as.clone(),
+                };
+                generate_systemd_templates(name, &res.start, &dependencies)?;
             }
         }
 
@@ -130,6 +134,8 @@ pub struct PromoterOptResource {
     pub runner: Runner,
     #[serde(default)]
     pub dependencies_as: SystemdDependency,
+    #[serde(default)]
+    pub target_as: SystemdDependency,
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
@@ -258,7 +264,7 @@ const SYSTEMD_CONF: &str = "reactor.conf";
 fn generate_systemd_templates(
     name: &str,
     actions: &[String],
-    strictness: &SystemdDependency,
+    strictness: &SystemdDependencies,
 ) -> Result<()> {
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", name));
     systemd_write_unit(prefix, SYSTEMD_CONF, systemd_devices(name, strictness)?)?;
@@ -318,7 +324,7 @@ fn systemd_ocf(
     agent: &str,
     args: &str,
     deps: Vec<String>,
-    strictness: &SystemdDependency,
+    strictness: &SystemdDependencies,
 ) -> Result<String> {
     let mut args = args.split_whitespace();
 
@@ -344,7 +350,7 @@ fn systemd_ocf(
     Ok(service_name)
 }
 
-fn systemd_devices(name: &str, strictness: &SystemdDependency) -> Result<String> {
+fn systemd_devices(name: &str, strictness: &SystemdDependencies) -> Result<String> {
     const DEVICE_TEMPLATE: &str = r"[Unit]
 {{ for device in devices -}}
 ConditionPathExists = {device}
@@ -368,7 +374,7 @@ After = {device | systemd_path}.device
         "devices",
         &Context {
             devices: get_backing_devices(name)?,
-            strictness: strictness.to_string(),
+            strictness: strictness.dependencies_as.to_string(),
         },
     )
     .map_err(|e| anyhow::anyhow!("{}", e))
@@ -377,7 +383,7 @@ After = {device | systemd_path}.device
 fn systemd_unit(
     name: &str,
     deps: Vec<String>,
-    strictness: &SystemdDependency,
+    strictness: &SystemdDependencies,
     env: Vec<String>,
 ) -> Result<String> {
     const UNIT_TEMPLATE: &str = r"[Unit]
@@ -410,7 +416,7 @@ Environment= {e}
             name: name.to_string(),
             deps,
             env,
-            strictness: strictness.to_string(),
+            strictness: strictness.dependencies_as.to_string(),
         },
     )
     .map_err(|e| anyhow::anyhow!("{}", e))
@@ -418,7 +424,7 @@ Environment= {e}
 
 fn systemd_target_requires(
     requires: Vec<String>,
-    strictness: &SystemdDependency,
+    strictness: &SystemdDependencies,
 ) -> Result<String> {
     const WANTS_TEMPLATE: &str = r"[Unit]
 {{- for require in requires }}
@@ -437,7 +443,7 @@ fn systemd_target_requires(
         "requires",
         &Context {
             requires,
-            strictness: strictness.to_string(),
+            strictness: strictness.target_as.to_string(),
         },
     )
     .map_err(|e| anyhow::anyhow!("{}", e))
@@ -485,6 +491,11 @@ impl fmt::Display for SystemdDependency {
             Self::BindsTo => write!(f, "BindsTo"),
         }
     }
+}
+
+struct SystemdDependencies {
+    dependencies_as: SystemdDependency,
+    target_as: SystemdDependency,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
