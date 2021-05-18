@@ -284,14 +284,14 @@ fn generate_systemd_templates(
         service = match ocf_pattern.captures(action) {
             Some(ocf) => {
                 let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-                systemd_ocf(name, vendor, agent, args, deps, strictness)?
+                systemd_ocf(name, vendor, agent, args, &deps, strictness)?
             }
             _ => {
                 let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", action));
                 systemd_write_unit(
                     prefix,
                     SYSTEMD_CONF,
-                    systemd_unit(name, deps, strictness, vec![])?,
+                    systemd_unit(name, &deps, strictness, &[])?,
                 )?;
                 action.to_string()
             }
@@ -315,7 +315,7 @@ fn generate_systemd_templates(
     systemd_write_unit(
         prefix,
         SYSTEMD_CONF,
-        systemd_target_requires(target_requires, strictness)?,
+        systemd_target_requires(&target_requires, strictness)?,
     )
 }
 
@@ -324,7 +324,7 @@ fn systemd_ocf(
     vendor: &str,
     agent: &str,
     args: &str,
-    deps: Vec<String>,
+    deps: &[String],
     strictness: &SystemdDependencies,
 ) -> Result<String> {
     let mut args = args.split_whitespace();
@@ -345,7 +345,7 @@ fn systemd_ocf(
     systemd_write_unit(
         prefix,
         SYSTEMD_CONF,
-        systemd_unit(name, deps, strictness, env)?,
+        systemd_unit(name, deps, strictness, &env)?,
     )?;
 
     Ok(service_name)
@@ -383,9 +383,9 @@ After = {device | systemd_path}.device
 
 fn systemd_unit(
     name: &str,
-    deps: Vec<String>,
+    deps: &[String],
     strictness: &SystemdDependencies,
-    env: Vec<String>,
+    env: &[String],
 ) -> Result<String> {
     const UNIT_TEMPLATE: &str = r"[Unit]
 PartOf = drbd-services@{name}.target
@@ -405,10 +405,10 @@ Environment= {e}
     tt.add_template("unit", UNIT_TEMPLATE)?;
 
     #[derive(Serialize)]
-    struct Context {
+    struct Context<'a> {
         name: String,
-        deps: Vec<String>,
-        env: Vec<String>,
+        deps: &'a [String],
+        env: &'a [String],
         strictness: String,
     }
     tt.render(
@@ -424,7 +424,7 @@ Environment= {e}
 }
 
 fn systemd_target_requires(
-    requires: Vec<String>,
+    requires: &[String],
     strictness: &SystemdDependencies,
 ) -> Result<String> {
     const WANTS_TEMPLATE: &str = r"[Unit]
@@ -436,8 +436,8 @@ fn systemd_target_requires(
     tt.add_template("requires", WANTS_TEMPLATE)?;
 
     #[derive(Serialize)]
-    struct Context {
-        requires: Vec<String>,
+    struct Context<'a> {
+        requires: &'a [String],
         strictness: String,
     }
     tt.render(
