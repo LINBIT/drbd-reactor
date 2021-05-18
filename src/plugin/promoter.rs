@@ -369,14 +369,14 @@ After = {device | systemd_path}.device
         devices: Vec<String>,
         strictness: String,
     }
-    tt.render(
+    let result = tt.render(
         "devices",
         &Context {
             devices: get_backing_devices(name)?,
             strictness: strictness.dependencies_as.to_string(),
         },
-    )
-    .map_err(|e| anyhow::anyhow!("{}", e))
+    )?;
+    Ok(result)
 }
 
 fn systemd_unit(
@@ -409,7 +409,7 @@ Environment= {e}
         env: &'a [String],
         strictness: String,
     }
-    tt.render(
+    let result = tt.render(
         "unit",
         &Context {
             name: name.to_string(),
@@ -417,8 +417,8 @@ Environment= {e}
             env,
             strictness: strictness.dependencies_as.to_string(),
         },
-    )
-    .map_err(|e| anyhow::anyhow!("{}", e))
+    )?;
+    Ok(result)
 }
 
 fn systemd_target_requires(
@@ -438,14 +438,14 @@ fn systemd_target_requires(
         requires: &'a [String],
         strictness: String,
     }
-    tt.render(
+    let result = tt.render(
         "requires",
         &Context {
             requires,
             strictness: strictness.target_as.to_string(),
         },
-    )
-    .map_err(|e| anyhow::anyhow!("{}", e))
+    )?;
+    Ok(result)
 }
 
 fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()> {
@@ -459,7 +459,9 @@ fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()
         f.write_all(content.as_bytes())?;
         f.write_all("\n".as_bytes())?;
     }
-    fs::rename(tmp_path, path).map_err(|e| anyhow::anyhow!("{}", e))
+    fs::rename(tmp_path, path)?;
+
+    Ok(())
 }
 
 fn systemd_daemon_reload() -> Result<()> {
