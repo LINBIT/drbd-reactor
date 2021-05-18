@@ -300,13 +300,11 @@ fn generate_systemd_templates(
         // we would not need to keep the order here, as it does not matter
         // what matters is After=, but IMO it would confuse unexperienced users
         // just keep the order, so no HashSet, the Vecs are short, does not matter.
-        for existing_requirement in &target_requires {
-            if service == *existing_requirement {
-                return Err(anyhow::anyhow!(
-                    "generate_systemd_templates: Service name '{}' already used",
-                    service
-                ));
-            }
+        if target_requires.contains(&service) {
+            return Err(anyhow::anyhow!(
+                "generate_systemd_templates: Service name '{}' already used",
+                service
+            ));
         }
         target_requires.push(service.clone());
     }
