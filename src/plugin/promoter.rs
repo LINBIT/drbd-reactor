@@ -454,11 +454,11 @@ fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()
     info!("systemd_write_unit: creating {:?}", path);
 
     fs::create_dir_all(&prefix)?;
-
-    let mut f = File::create(&tmp_path)?;
-    f.write_all(content.as_bytes())?;
-    f.write_all("\n".as_bytes())?;
-    f.sync_all()?;
+    {
+        let mut f = File::create(&tmp_path)?;
+        f.write_all(content.as_bytes())?;
+        f.write_all("\n".as_bytes())?;
+    }
     fs::rename(tmp_path, path).map_err(|e| anyhow::anyhow!("{}", e))
 }
 
