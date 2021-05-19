@@ -5,7 +5,7 @@ use std::sync::{mpsc, Arc};
 use std::{any, env, thread};
 
 use anyhow::Result;
-use log::{debug, info};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 
 use crate::drbd::{EventType, PluginUpdate};
@@ -179,24 +179,36 @@ pub fn start_from_config(
     let mut change_plugins: Vec<Box<dyn Plugin>> = Vec::new();
     for debug_cfg in cfg.debugger {
         if start_new_plugin(&debug_cfg.id, &survived) {
-            change_plugins.push(Box::new(debugger::Debugger::new(debug_cfg)?));
+            match debugger::Debugger::new(debug_cfg) {
+                Ok(p) => change_plugins.push(Box::new(p)),
+                Err(e) => error!("Could not start debugger plugin, ignoring it: {}", e),
+            };
         }
     }
     for promote_cfg in cfg.promoter {
         if start_new_plugin(&promote_cfg.id, &survived) {
-            change_plugins.push(Box::new(promoter::Promoter::new(promote_cfg)?));
+            match promoter::Promoter::new(promote_cfg) {
+                Ok(p) => change_plugins.push(Box::new(p)),
+                Err(e) => error!("Could not start promoter plugin, ignoring it: {}", e),
+            };
         }
     }
     for umh_cfg in cfg.umh {
         if start_new_plugin(&umh_cfg.id, &survived) {
-            change_plugins.push(Box::new(umh::UMH::new(umh_cfg)?));
+            match umh::UMH::new(umh_cfg) {
+                Ok(p) => change_plugins.push(Box::new(p)),
+                Err(e) => error!("Could not start umh plugin, ignoring it: {}", e),
+            };
         }
     }
 
     let mut event_plugins: Vec<Box<dyn Plugin>> = Vec::new();
     for prometheus_cfg in cfg.prometheus {
         if start_new_plugin(&prometheus_cfg.id, &survived) {
-            event_plugins.push(Box::new(prometheus::Prometheus::new(prometheus_cfg)?));
+            match prometheus::Prometheus::new(prometheus_cfg) {
+                Ok(p) => event_plugins.push(Box::new(p)),
+                Err(e) => error!("Could not start prometheus plugin, ignoring it: {}", e),
+            };
         }
     }
 
