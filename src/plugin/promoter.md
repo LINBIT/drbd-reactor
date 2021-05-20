@@ -49,6 +49,23 @@ scripts and started in order (no explicit targets or anything) and stopped in re
 `stop`. This can be used on systems without systemd and might be useful for Windows systems in the future. If
 you can, use the default systemd method, it is the preferred one.
 
+## Service dependencies
+Let's get back to our simple example with `start = [ "a.service", "b.service", "c.service" ]`. As we noted in
+the previous section we generate a dependency chain for these services (i.e., all depend on `drbd-promote@`
+as well as on the previous services). The strictness of these dependencies can be set via `dependencies-as`,
+where the default is `Requires` (see `systemd.unit(5)` for details).
+
+We also generate the mentioned `drbd-services@.target`, which lists all the services from `start`. The
+dependencies for that are generated via the value set in `target-as`.
+
+Especially when one debugs services it might make sense to lower these defaults to for example `Wants`.
+Otherwise a failed service might prohibit a successful start of the `drbd-services@.target`, which then
+triggers a stop of the target and its dependencies, which might again trigger a start because the resource is
+DRBD promotable again and so on.
+
+It is really up to you and how strict/hard you want your dependencies and what their outcome should be.
+`Requires` should be a good default, you might lower or increase the strictness depending on the scenario.
+
 ## OCF resource agents
 It is possible to use [resource agents](https://github.com/ClusterLabs/resource-agents) in the `start` list of
 services via `ocf:$vendor:$agent instance-id name=value ...`. The `instance-id` is user defined and gets

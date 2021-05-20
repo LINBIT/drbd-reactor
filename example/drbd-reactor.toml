@@ -36,10 +36,19 @@ statistics-poll-interval = 60
 # [[promoter]]
 ## Specify which resource should be watched. For example resource 'foo':
 # [promoter.resources.foo]
-## What should be started when the resource is promotable. Use absolute paths for arbitrary commands, otherwise
-## the promoter assumes the item is a systemd unit.
+## what should be used to execute services. systemd is the default.
+## 'shell' should only be used on non systemd/Windows systems.
+# runner = "systemd"
+## if the runner is systemd, generate inter service dependencies as this:
+# dependencies-as = "Requires"
+## if the runner is systemd, generate service dependencies in the final target unit as this:
+# target-as = "Requires"
+## What should be started when the resource is promotable.
+## the promoter assumes the item is a systemd unit if the runner is "systemd" (the default)
+## if the runner is "shell", the start list is exected via a shell (e.g., sh -c).
 # start = ["foo.mount", "foo.service"]
-## if unset/empty, services from 'start' will be stopped in reverse order
+## if unset/empty, services from 'start' will be stopped in reverse order if the runner is "shell".
+## if the runner is "systemd", it always starts and stops the auto-generated implicit target unit.
 # stop = []
 ## shell one-liner executed in a loop if a stop action fails
 ## if unset, this defaults to "true"
