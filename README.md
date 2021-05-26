@@ -5,12 +5,12 @@ changes in a DRBD resource.
 
 # Plugins
 
-| Plugin                                   | Purpose                        |
-| ---------------------------------------- | ------------------------------ |
-| [debugger](./src/plugin/debugger.md)     | Demo that prints state changes |
-| [promoter](./src/plugin/promoter.md)     | Simple HA for resources        |
-| [umh](./src/plugin/umh.md)               | User mode helper               |
-| [prometheus](./src/plugin/prometheus.md) | Prometheus endpoint            |
+| Plugin                           | Purpose                        |
+| -------------------------------- | ------------------------------ |
+| [debugger](/doc/debugger.md)     | Demo that prints state changes |
+| [promoter](/doc/promoter.md)     | Simple HA for resources        |
+| [umh](/doc/umh.md)               | User mode helper               |
+| [prometheus](/doc/prometheus.md) | Prometheus endpoint            |
 
 ## Implementation
 - [x] debugger
@@ -22,7 +22,7 @@ changes in a DRBD resource.
 # Configuration
 This daemon is configured via a configuration file. The only command line option allowed is the path to the
 configuration. The default location for the config is `/etc/drbd-reactor.toml`. The repository contains an example
-[drbd-reactor.toml](./example/drbd-reactor.toml).
+[drbd-reactor.toml](/example/drbd-reactor.toml).
 
 # Building
 
