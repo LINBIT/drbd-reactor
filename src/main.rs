@@ -43,6 +43,7 @@ fn read_snippets(path: &PathBuf) -> Result<String> {
     let mut s = String::new();
     for snippet in snippets {
         s.push_str(&read_to_string(snippet)?);
+        s.push('\n');
     }
 
     Ok(s)
@@ -68,6 +69,7 @@ pub fn read_config() -> Result<config::Config> {
 
     let snippets =
         read_snippets(&snippets_path).with_context(|| format!("Could not read config snippets"))?;
+    content.push_str("# Content from snippets:\n");
     content.push_str(&snippets);
     config = toml::from_str(&content).with_context(|| {
         format!(
