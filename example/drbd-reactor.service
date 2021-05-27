@@ -4,6 +4,7 @@ Description=DRBD-Reactor Service
 [Service]
 Type=notify
 ExecStart=/usr/sbin/drbd-reactor
+ExecReload=kill -HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target
