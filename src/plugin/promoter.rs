@@ -83,14 +83,14 @@ impl super::Plugin for Promoter {
                     if !u.old.may_promote && u.new.may_promote {
                         info!("promoter: resource '{}' may promote", name);
                         if start_actions(&name, &res.start, &res.runner).is_err() {
-                            stop_and_on_failure(&name, res); // loops util success
+                            stop_and_on_failure(&name, res, true); // loops util success
                         }
                     }
                 }
                 PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
                         info!("promoter: resource '{}' lost quorum", name);
-                        stop_and_on_failure(&name, res); // loops util success
+                        stop_and_on_failure(&name, res, true); // loops util success
                     }
                 }
                 _ => (),
@@ -100,7 +100,7 @@ impl super::Plugin for Promoter {
         // stop services if configured
         for (name, res) in cfg.resources {
             if res.stop_services_on_exit {
-                stop_and_on_failure(&name, &res); // loops util success
+                stop_and_on_failure(&name, &res, false); // loops util success
             }
         }
 
@@ -201,9 +201,17 @@ pub fn on_failure(action: &str) {
     }
 }
 
-fn stop_and_on_failure(name: &str, res: &PromoterOptResource) {
-    if stop_actions(name, &res.stop, &res.runner).is_err() {
-        on_failure(&res.on_stop_failure); // loops until success
+fn stop_and_on_failure(name: &str, res: &PromoterOptResource, wait_on_stop: bool) {
+    match stop_actions(name, &res.stop, &res.runner) {
+        Ok(_) => {
+            if wait_on_stop {
+                thread::sleep(Duration::from_secs(2)); // give some peer a little time to promote
+            }
+        }
+        Err(e) => {
+            warn!("{}", e);
+            on_failure(&res.on_stop_failure); // loops until success
+        }
     }
 }
 
