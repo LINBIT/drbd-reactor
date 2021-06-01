@@ -1,3 +1,39 @@
+drbd-reactor (0.4.0~rc.1-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * README.md: mark prometheus as done
+  * drbd, Resource: add to_plugin_updates
+  * core: allow plugins to be reloaded
+  * systemd notify: unset NOTIFY_SOCKET
+  * doc,man,prometheus: Sx -> Sy
+  * core: don't fail if plugin fails to start
+  * doc: rm dummy placeholder
+  * promoter: make runner explicit
+  * promoter: switch to systemd templates
+  * promoter: add dependencies-as
+  * promoter: add target-as
+  * promoter: reload daemon only once
+  * promoter: use [String] in templates
+  * promoter: use contains
+  * promoter: use anonymous block for file write
+  * promoter: don't use map_err
+  * doc,promoter: document dependencies-as, target-as
+  * deps: bump drbd-utils to 9.18.0
+  * doc: mv from src/ to doc/
+  * doc,promoter: fix pragraph macro
+  * doc,promoter: fix .Sy macro
+  * allow daemon reloading via service
+  * core: add newlines between snippets
+  * promoter: wait a bit after stop
+  * drbd-reactorctl: add tool
+  * build: switch rpm to RHEL8 alike
+
+  [ Christoph Böhmwalder ]
+  * add example grafana dashboard
+  * example: amend grafana dashboard
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 01 Jun 2021 09:09:35 +0200
+
 drbd-reactor (0.3.0-1) experimental; urgency=medium
 
   [ Christoph Böhmwalder ]
