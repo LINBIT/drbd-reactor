@@ -1,4 +1,4 @@
-FROM centos:centos7
+FROM almalinux:8
 MAINTAINER Roland Kammerer <roland.kammerer@linbit.com>
 
 RUN yum install -y gcc git make rpm-build systemd && \

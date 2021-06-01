@@ -40,11 +40,11 @@ help:
 
 .PHONY: debcontainer
 debcontainer: ## build docker container for deb packaging
-	cd docker && docker build -t $(DEBCONTAINER) -f Dockerfile.debian .
+	cd docker && docker build -t $(DEBCONTAINER) -f Dockerfile.deb .
 
 .PHONY: rpmcontainer
 rpmcontainer: ## build docker container for rpm packaging
-	cd docker && docker build -t $(RPMCONTAINER) -f Dockerfile.centos .
+	cd docker && docker build -t $(RPMCONTAINER) -f Dockerfile.rpm .
 
 .PHONY: deb
 deb: ## Build a deb package
