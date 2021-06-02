@@ -45,7 +45,7 @@ impl Promoter {
 
 impl super::Plugin for Promoter {
     fn run(&self, rx: super::PluginReceiver) -> Result<()> {
-        trace!("promoter: start");
+        trace!("run: start");
 
         let type_exists = plugin::typefilter(&EventType::Exists);
         let type_change = plugin::typefilter(&EventType::Change);
@@ -81,7 +81,7 @@ impl super::Plugin for Promoter {
             match r.as_ref() {
                 PluginUpdate::Resource(u) => {
                     if !u.old.may_promote && u.new.may_promote {
-                        info!("promoter: resource '{}' may promote", name);
+                        info!("run: resource '{}' may promote", name);
                         if start_actions(&name, &res.start, &res.runner).is_err() {
                             stop_and_on_failure(&name, res, true); // loops util success
                         }
@@ -89,7 +89,7 @@ impl super::Plugin for Promoter {
                 }
                 PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
-                        info!("promoter: resource '{}' lost quorum", name);
+                        info!("run: resource '{}' lost quorum", name);
                         stop_and_on_failure(&name, res, true); // loops util success
                     }
                 }
@@ -104,7 +104,7 @@ impl super::Plugin for Promoter {
             }
         }
 
-        trace!("promoter: exit");
+        trace!("run: exit");
         Ok(())
     }
 
@@ -140,7 +140,7 @@ pub struct PromoterOptResource {
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
-    info!("promoter: systemctl stop {}", unit);
+    info!("systemd_stop: systemctl stop {}", unit);
     plugin::map_status(Command::new("systemctl").arg("stop").arg(unit).status())
 }
 
@@ -153,7 +153,7 @@ fn systemd_start(unit: &str) -> Result<()> {
         .arg(unit)
         .status();
 
-    info!("promoter: systemctl start {}", unit);
+    info!("systemd_start: systemctl start {}", unit);
     plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())
 }
 
@@ -192,7 +192,7 @@ fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
 }
 
 pub fn on_failure(action: &str) {
-    info!("promoter: starting on-failure action in a loop");
+    info!("on_failure: starting on-failure action in a loop");
     loop {
         if plugin::system(action).is_ok() {
             return;
@@ -209,7 +209,7 @@ fn stop_and_on_failure(name: &str, res: &PromoterOptResource, wait_on_stop: bool
             }
         }
         Err(e) => {
-            warn!("{}", e);
+            warn!("stop_and_on_failure: {}", e);
             on_failure(&res.on_stop_failure); // loops until success
         }
     }
@@ -238,20 +238,20 @@ fn adjust_resources(to_start: &[String]) -> Result<()> {
     for res in to_start {
         for dev in get_backing_devices(res)? {
             info!(
-                "promoter: adjust: waiting for backing device '{}' to become ready",
+                "adjust_resources: waiting for backing device '{}' to become ready",
                 dev
             );
             while !drbd_backing_device_ready(&dev) {
                 thread::sleep(Duration::from_secs(2));
             }
-            info!("promoter: adjust: backing device '{}' now ready", dev);
+            info!("adjust_resources: backing device '{}' now ready", dev);
         }
 
         let status = Command::new("drbdadm").arg("adjust").arg(res).status()?;
         if !status.success() {
             // for now let's keep it a warning, I don't think we should fail hard here.
             warn!(
-                "promoter: 'drbdadm adjust {}' did not return successfully",
+                "adjust_resources: 'drbdadm adjust {}' did not return successfully",
                 res
             );
         }
@@ -473,7 +473,7 @@ fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()
 }
 
 fn systemd_daemon_reload() -> Result<()> {
-    info!("reloading systemd daemon");
+    info!("systemd_daemon_reload: reloading daemon");
     plugin::system("systemctl daemon-reload")
 }
 

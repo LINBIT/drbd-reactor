@@ -44,7 +44,7 @@ pub fn events2(tx: Sender<EventUpdate>, statistics_poll: Duration) -> Result<()>
     let has_backing_dev =
         drbd911plus.is_ok() || (drbd90.is_ok() && !(major == 9 && minor == 1 && patch == 0));
     if !has_backing_dev {
-        warn!("backing device information will be missing!");
+        warn!("events2: backing device information will be missing!");
     }
 
     // TODO(): add some duration, like if we failed 5 times in the last minute or so
@@ -56,12 +56,12 @@ pub fn events2(tx: Sender<EventUpdate>, statistics_poll: Duration) -> Result<()>
             ));
         }
 
-        debug!("events: events2_loop: starting process_events2 loop");
+        debug!("events2_loop: starting process_events2 loop");
         match process_events2(&tx, statistics_poll) {
             Ok(()) => break,
             Err(e) => {
                 if e.is::<SendError<EventUpdate>>() {
-                    debug!("events: events2: send error on chanel, bye");
+                    debug!("events2_loop: send error on chanel, bye");
                     return Err(e);
                 }
                 failed += 1;
@@ -89,7 +89,7 @@ fn process_events2(tx: &Sender<EventUpdate>, statistics_poll: Duration) -> Resul
         .expect("events:: process_events2: stdin set to Stdio::piped()");
     thread::spawn(move || loop {
         if stdin.write_all("n\n".as_bytes()).is_err() {
-            warn!("events: process_events2: could not update statistics");
+            warn!("process_events2: could not update statistics");
         }
         thread::sleep(statistics_poll);
     });
@@ -112,12 +112,15 @@ fn process_events2(tx: &Sender<EventUpdate>, statistics_poll: Duration) -> Resul
 
         match parse_events2_line(&line) {
             Ok(update) => tx.send(update)?,
-            Err(e) => debug!("could not parse line '{}', because {}", line, e),
+            Err(e) => debug!(
+                "process_events2: could not parse line '{}', because {}",
+                line, e
+            ),
         }
         buf.clear();
     }
 
-    warn!("events: process_events2: exit");
+    warn!("process_events2: exit");
     Err(anyhow::anyhow!("events: process_events2: exit"))
 }
 

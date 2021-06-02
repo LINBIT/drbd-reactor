@@ -35,7 +35,7 @@ impl UMH {
 
 impl super::Plugin for UMH {
     fn run(&self, rx: super::PluginReceiver) -> Result<()> {
-        trace!("umh: start");
+        trace!("run: start");
 
         for r in rx.into_iter() {
             let handlers = match r.as_ref() {
@@ -47,12 +47,12 @@ impl super::Plugin for UMH {
             };
 
             for handler in handlers {
-                info!("umh: match for rule: {}", handler.name);
+                info!("run: match for rule: {}", handler.name);
                 spawn_command(&handler.command, &r.get_env(), &handler.env)
             }
         }
 
-        trace!("umh: exit");
+        trace!("run: exit");
         Ok(())
     }
 
@@ -82,7 +82,7 @@ fn spawn_command(
     filter_env: &HashMap<String, String>,
     user_env: &HashMap<String, String>,
 ) {
-    debug!("umh: starting handler '{}'", cmd);
+    debug!("spawn_command: starting handler '{}'", cmd);
 
     let common_env = common_env();
 
@@ -99,22 +99,25 @@ fn spawn_command(
     {
         Ok(c) => c,
         Err(e) => {
-            warn!("umh: could not execute handler: {}", e);
+            warn!("spawn_command: could not execute handler: {}", e);
             return;
         }
     };
     thread::spawn(move || match child.wait_with_output() {
         Ok(output) => {
             if !output.status.success() {
-                warn!("umh: handler did not not exit successfully")
+                warn!("spawn_command: handler did not not exit successfully")
             }
             let out = std::str::from_utf8(&output.stdout).unwrap_or("<Could not convert stdout>");
             let err = std::str::from_utf8(&output.stderr).unwrap_or("<Could not convert stderr>");
             if !out.is_empty() || !err.is_empty() {
-                debug!("umh: handler stdout: '{}'; stderr: '{}'", out, err);
+                debug!(
+                    "spawn_command: handler stdout: '{}'; stderr: '{}'",
+                    out, err
+                );
             }
         }
-        Err(e) => warn!("umh: could not execute handler: {}", e),
+        Err(e) => warn!("spawn_command: could not execute handler: {}", e),
     });
 }
 

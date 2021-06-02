@@ -249,7 +249,7 @@ fn main() -> Result<()> {
     let done = e2tx.clone();
     thread::spawn(move || {
         if let Err(e) = events2(e2tx, statistics_poll) {
-            error!("core: events2 processing failed: {}", e);
+            error!("main: events2 processing failed: {}", e);
             std::process::exit(1);
         }
     });
@@ -263,7 +263,7 @@ fn main() -> Result<()> {
         ])
         .unwrap();
         for signal in signals.forever() {
-            debug!("sighandler loop");
+            debug!("main: sighandler loop");
             match signal as libc::c_int {
                 signal_hook::SIGHUP => {
                     done.send(EventUpdate::Reload).unwrap();
@@ -284,22 +284,21 @@ fn main() -> Result<()> {
             Ok(new) => cfg = new,
             Err(e) => {
                 warn!(
-                    "new configuration has an error ('{}'), reusing old config",
+                    "main: new configuration has an error ('{}'), reusing old config",
                     e
                 );
             }
         };
 
         started = plugin::start_from_config(cfg.plugins.clone(), started)?;
-        debug!("started.len()={}", started.len());
+        debug!("main: started.len()={}", started.len());
 
         let exit = core
             .run(&e2rx, &started)
-            .context("core did not exit successfully")?;
+            .context("main: core did not exit successfully")?;
 
         if let CoreExit::Stop = exit {
             for p in started {
-                //p.stop().unwrap_or_else(|e| Err(thread_panic_error(e)))?;
                 p.stop()?;
             }
 

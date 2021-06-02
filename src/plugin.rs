@@ -106,13 +106,13 @@ fn stop_not_in_new(
                 filtered.push(p);
             } else {
                 debug!(
-                    "plugin: stop_not_in_new: stopping plugin with ID '{}'",
+                    "stop_not_in_new: stopping plugin with ID '{}'",
                     id.to_string()
                 );
                 p.stop()?
             }
         } else {
-            debug!("plugin: stop_not_in_new: stopping plugin without ID");
+            debug!("stop_not_in_new: stopping plugin without ID");
             p.stop()?
         }
     }
@@ -164,7 +164,7 @@ pub fn start_from_config(
             Some(id) => {
                 survived.insert(id.to_string(), true);
                 debug!(
-                    "plugin: start_from_config: plugin with ID '{}' survived",
+                    "start_from_config: plugin with ID '{}' survived",
                     id.to_string()
                 );
             }
@@ -181,7 +181,10 @@ pub fn start_from_config(
         if start_new_plugin(&debug_cfg.id, &survived) {
             match debugger::Debugger::new(debug_cfg) {
                 Ok(p) => change_plugins.push(Box::new(p)),
-                Err(e) => error!("Could not start debugger plugin, ignoring it: {}", e),
+                Err(e) => error!(
+                    "start_from_config: Could not start debugger plugin, ignoring it: {}",
+                    e
+                ),
             };
         }
     }
@@ -189,7 +192,10 @@ pub fn start_from_config(
         if start_new_plugin(&promote_cfg.id, &survived) {
             match promoter::Promoter::new(promote_cfg) {
                 Ok(p) => change_plugins.push(Box::new(p)),
-                Err(e) => error!("Could not start promoter plugin, ignoring it: {}", e),
+                Err(e) => error!(
+                    "start_from_config: Could not start promoter plugin, ignoring it: {}",
+                    e
+                ),
             };
         }
     }
@@ -197,7 +203,10 @@ pub fn start_from_config(
         if start_new_plugin(&umh_cfg.id, &survived) {
             match umh::UMH::new(umh_cfg) {
                 Ok(p) => change_plugins.push(Box::new(p)),
-                Err(e) => error!("Could not start umh plugin, ignoring it: {}", e),
+                Err(e) => error!(
+                    "start_from_config: Could not start umh plugin, ignoring it: {}",
+                    e
+                ),
             };
         }
     }
@@ -207,7 +216,10 @@ pub fn start_from_config(
         if start_new_plugin(&prometheus_cfg.id, &survived) {
             match prometheus::Prometheus::new(prometheus_cfg) {
                 Ok(p) => event_plugins.push(Box::new(p)),
-                Err(e) => error!("Could not start prometheus plugin, ignoring it: {}", e),
+                Err(e) => error!(
+                    "start_from_config: Could not start prometheus plugin, ignoring it: {}",
+                    e
+                ),
             };
         }
     }

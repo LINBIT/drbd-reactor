@@ -25,13 +25,13 @@ impl Prometheus {
 
 impl super::Plugin for Prometheus {
     fn run(&self, rx: super::PluginReceiver) -> Result<()> {
-        trace!("prometheus: start");
+        trace!("run: start");
 
         let metrics = Arc::new(Mutex::new(Metrics::new(self.cfg.enums)));
 
         let listener = TcpListener::bind(&self.cfg.address)?;
         debug!(
-            "prometheus: listening for connections on address {}",
+            "run: listening for connections on address {}",
             self.cfg.address
         );
         let fd = listener.as_raw_fd();
@@ -46,14 +46,14 @@ impl super::Plugin for Prometheus {
                 | PluginUpdate::ResourceOnly(EventType::Change, u) => match metrics.lock() {
                     Ok(mut m) => m.update(&u),
                     Err(e) => {
-                        error!("prometheus::run: could not lock metrics: {}", e);
+                        error!("run: could not lock metrics: {}", e);
                         return Err(anyhow::anyhow!("Tried accessing a poisoned lock"));
                     }
                 },
                 PluginUpdate::ResourceOnly(EventType::Destroy, u) => match metrics.lock() {
                     Ok(mut m) => m.delete(&u.name),
                     Err(e) => {
-                        error!("prometheus::run: could not lock metrics: {}", e);
+                        error!("run: could not lock metrics: {}", e);
                         return Err(anyhow::anyhow!("Tried accessing a poisoned lock"));
                     }
                 },
@@ -69,7 +69,7 @@ impl super::Plugin for Prometheus {
         handle
             .join()
             .unwrap_or(Err(anyhow::anyhow!("prometheus::run tcp handler panicked")))?;
-        trace!("prometheus: exit");
+        trace!("run: exit");
 
         Ok(())
     }
@@ -85,14 +85,11 @@ fn tcp_handler(listener: TcpListener, metrics: &Arc<Mutex<Metrics>>) -> Result<(
             Ok(stream) => {
                 if let Err(e) = handle_connection(stream, metrics) {
                     // warn but continue processing
-                    warn!(
-                        "prometheus::tcp_handler: could not handle connection: {}",
-                        e
-                    );
+                    warn!("tcp_handler: could not handle connection: {}", e);
                 }
             }
             Err(_) => {
-                info!("error in stream, most likely harmless shutdown");
+                info!("tcp_handler: error in stream, most likely harmless shutdown");
                 break;
             }
         }
@@ -146,11 +143,11 @@ impl Metrics {
 
     fn get(&mut self) -> Result<String> {
         if !self.dirty {
-            trace!("prometheus: serving from cache");
+            trace!("Metrics::get: serving from cache");
             return Ok(self.cache.clone());
         }
 
-        trace!("prometheus: calculating metrics");
+        trace!("Metrics::get: calculating metrics");
         let mut metrics = HashMap::new();
 
         // higher level metric

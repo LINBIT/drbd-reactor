@@ -14,13 +14,13 @@ impl Debugger {
 
 impl super::Plugin for Debugger {
     fn run(&self, rx: super::PluginReceiver) -> Result<()> {
-        trace!("debugger: start");
+        trace!("run: start");
 
         for r in rx {
             debug!("{:#?}", r);
         }
 
-        trace!("debugger: exit");
+        trace!("run: exit");
         Ok(())
     }
 
