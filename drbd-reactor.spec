@@ -46,6 +46,7 @@ make install DESTDIR=%{buildroot}
 /usr/sbin/drbd-reactor
 /usr/sbin/drbd-reactorctl
 %{_mandir}/man1/drbd-reactor.1*
+%{_mandir}/man1/drbd-reactorctl.1*
 %{_mandir}/man5/drbd-reactor.toml.5*
 %{_mandir}/man5/drbd-reactor.umh.5*
 %{_mandir}/man5/drbd-reactor.promoter.5*

@@ -1,0 +1,127 @@
+.Dd $Mdocdate$
+.Dt DRBD-REACTORCTL 1
+.Os
+.Sh NAME
+.Nm drbd-reactorctl
+.Nd Control the drbd-reactor daemon an its plugins
+.Sh SYNOPSIS
+.Nm
+.Op Fl -config Ar CONFIG
+.Op Fl -color Ar auto | always | never
+.Ar subcommand
+.Nm edit
+.Op Fl -type Ar TYPE
+.Ar file
+.Nm enable
+.Op Ar
+.Nm disable
+.Op Fl -now
+.Op Ar
+.Nm status
+.Op Fl -verbose
+.Op Ar
+.Nm cat
+.Op Ar
+.Nm restart
+.Op Ar
+.Nm rm
+.Op Fl -force
+.Op Fl -disabled
+.Op Ar
+.Nm ls
+.Op Fl -disabled
+.Op Ar
+.Sh DESCRIPTION
+The
+.Nm
+utility is used to control the
+.Xr drbd-reactor 1
+daemon.
+.Pp
+It is important to note that this utility only operates on plugin snippets
+(configured via
+.Sy snippets
+in the main configuration file). Existing plugin configurations in the main
+configuration file should be moved to snippets by the user.
+.Pp
+The
+.Ar file
+arguments shown in
+.Sx SYNOPSIS
+can be specified as absolute path, or as the basename. The suffixes
+.Qq .disabled
+and
+.Qq .toml
+are optional. These get stripped and readded by the utility accordingly, see
+.Sx EXAMPLES
+for details.
+.Pp
+Global arguments are:
+.Bl -tag -width Ds
+.It Fl c, -config Ar CONFIG
+Main configuration file, defaults to
+.Pa /etc/drbd-reactor.toml
+.It Fl -color Ar auto | always | never
+Use colorized output, the defautl is
+.Sy auto
+.El
+.Pp
+The subcommands and their arguments are as follows:
+.Ss edit
+edit an existing plugin configuration or create a new one from a template.
+.Bl -tag -width Ds
+.It Fl t, -type Ar promoter | prometheus | debugger | umh
+Type of the plugin to create from template. The default is
+.Sy promoter .
+.El
+.Ss enable
+enable a currently disabled plugin.
+.Ss disable
+disable a currently disabled plugin.
+.Bl -tag -width Ds
+.It Fl -now
+In case of a promoter plugin also disable the target unit.
+.El
+.Ss status
+print the status of a plugin.
+.Bl -tag -width Ds
+.It Fl -verbose
+verbose output depending on the plugin type.
+.El
+.Ss cat
+cat the toml configuration of a plugin. Tries to use a pretty printer (e.g.,
+.Sy bat )
+if available.
+.Ss restart
+restarts the given plugins or the daemon itself if no
+.Ar files
+are given.
+.Ss rm
+removes the given plugins and reloads the daemon.
+.Bl -tag -width Ds
+.It Fl f, -force
+Do not ask for confirmation
+.It Fl -disabled
+Remove a disabled plugin.
+.El
+.Ss ls
+lists activated plugins.
+.Bl -tag -width Ds
+.It Fl -disabled
+Remove a disabled plugin.
+.El
+.Sh EXAMPLES
+.Bd -literal -offset indent
+drbd-reactorctl edit -t prometheus myprometheus
+drbd-reactorctl restart myprometheus.toml
+drbd-reactorctl restart myprometheus
+drbd-reactorctl status /etc/drbd-reactor.d/myprometheus.toml
+drbd-reactorctl disable --now mylinstorpromoter
+.Ed
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr drbd-reactorctl 1
+program was written by the following authors:
+.An -split
+.An Roland Kammerer Aq Mt rck@linbit.com
