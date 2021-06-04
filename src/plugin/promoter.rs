@@ -377,10 +377,15 @@ After = {device | systemd_path}.device
         devices: Vec<String>,
         strictness: String,
     }
+    // filter diskless (== "none" devices)
+    let devices = get_backing_devices(name)?
+        .into_iter()
+        .filter(|d| d != "none")
+        .collect();
     let result = tt.render(
         "devices",
         &Context {
-            devices: get_backing_devices(name)?,
+            devices: devices,
             strictness: strictness.dependencies_as.to_string(),
         },
     )?;
