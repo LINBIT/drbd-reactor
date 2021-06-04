@@ -360,7 +360,7 @@ fn systemd_ocf(
 fn systemd_devices(name: &str, strictness: &SystemdDependencies) -> Result<String> {
     const DEVICE_TEMPLATE: &str = r"[Unit]
 {{ for device in devices -}}
-ConditionPathExists = {device}
+ConditionPathExists = {device | unescaped}
 {strictness} = {device | systemd_path}.device
 After = {device | systemd_path}.device
 {{- endfor -}}";
@@ -368,8 +368,10 @@ After = {device | systemd_path}.device
     let mut tt = TinyTemplate::new();
     tt.add_template("devices", DEVICE_TEMPLATE)?;
     tt.add_formatter("systemd_path", |value, output| match value {
-        Value::String(s) => tinytemplate::format(&Value::String(systemd_path(&s)), output),
-        _ => tinytemplate::format(value, output),
+        Value::String(s) => {
+            tinytemplate::format_unescaped(&Value::String(systemd_path(&s)), output)
+        }
+        _ => tinytemplate::format_unescaped(value, output),
     });
 
     #[derive(Serialize)]
@@ -401,7 +403,7 @@ fn systemd_unit(
     const UNIT_TEMPLATE: &str = r"[Unit]
 PartOf = drbd-services@{name}.target
 {{ for dep in deps }}
-{strictness} = {dep}
+{strictness} = {dep | unescaped}
 After = {dep}
 {{- endfor -}}
 
@@ -409,7 +411,7 @@ After = {dep}
 {{ if @first  }}
 [Service]
 {{ endif -}}
-Environment= {e}
+Environment= {e | unescaped}
 {{- endfor -}}";
 
     let mut tt = TinyTemplate::new();
@@ -440,7 +442,7 @@ fn systemd_target_requires(
 ) -> Result<String> {
     const WANTS_TEMPLATE: &str = r"[Unit]
 {{- for require in requires }}
-{strictness} = {require}
+{strictness} = {require | unescaped}
 {{- endfor -}}";
 
     let mut tt = TinyTemplate::new();
