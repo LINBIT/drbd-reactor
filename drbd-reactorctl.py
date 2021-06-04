@@ -194,7 +194,7 @@ start = ["${service.mount}", "${service.service}"]
                         if len(ra) < 2:
                             eprint("could not parse ocf service ('{}')".format(service))
                             continue
-                        service = 'ocf.ra{}_{}.service'.format(ra[1], name)
+                        service = 'ocf.ra@{}_{}.service'.format(ra[1], name)
                     systemctl('status', '--no-pager', service)
             else:
                 systemctl('list-dependencies', '--no-pager', target)
