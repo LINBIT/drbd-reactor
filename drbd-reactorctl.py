@@ -375,6 +375,7 @@ def restart_files(plugin_files):
 def restart(args):
     plugin_files = get_plugin_files(args.config, args.configs)
     if len(plugin_files) == 0:
+        systemctl('restart', REACTOR_SERVICE)
         return 0
 
     restart_files(plugin_files)
