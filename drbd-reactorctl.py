@@ -370,9 +370,11 @@ def disable(args):
         reload_service()
 
     if args.now:
-        for plugin in Plugin.from_files(plugin_files):
-            for target in plugin.targets:
-                systemctl('stop', target)
+        for pf in plugin_files:
+            content = toml.load(fdisable(pf))
+            for plugin in Plugin.new(content):
+                for target in plugin.targets:
+                    systemctl('stop', target)
 
     return len(plugin_files)
 
