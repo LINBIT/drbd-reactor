@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 import os
 import shutil
+import socket
+import subprocess
 import sys
 import urllib.request
 
@@ -178,11 +181,31 @@ start = ["${service.mount}", "${service.service}"]
     def _get_start(self, name):
         return self._config.get('resources', {}).get(name, {}).get('start', [])
 
+    def _get_primary_on(self, name):
+        UNKNOWN = '<unknown>'
+        try:
+            out = subprocess.run(['drbdsetup', 'status', '--json', name],
+                                 check=True, stdout=subprocess.PIPE).stdout
+            out = json.loads(out)[0]  # always a single res
+        except Exception:
+            return UNKNOWN
+
+        # is it me?
+        if out.get('role') == 'Primary':
+            return socket.gethostname()
+        # one of the peers?
+        for con in out.get('connections', []):
+            if con.get('peer-role') == 'Primary':
+                return con.get('name', UNKNOWN)
+        return UNKNOWN
+
     def show_status(self, verbose=False):
         super().show_status(verbose)
         print(color_string(self.header, color=GREEN))
 
         for name in self._get_names():
+            print('Most likely active on node '
+                  '"{}"'.format(self._get_primary_on(name)))
             target = Promoter.target_name(name)
             if verbose:
                 systemctl('status', '--no-pager', target)
