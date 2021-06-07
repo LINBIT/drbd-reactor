@@ -145,13 +145,15 @@ fn systemd_stop(unit: &str) -> Result<()> {
 }
 
 fn systemd_start(unit: &str) -> Result<()> {
-    // we really don't care
-    let _ = Command::new("systemctl")
-        .arg("reset-failed")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .arg(unit)
-        .status();
+    for action in &["reset-failed", "stop"] {
+        // we really don't care
+        let _ = Command::new("systemctl")
+            .arg(action)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .arg(unit)
+            .status();
+    }
 
     info!("systemd_start: systemctl start {}", unit);
     plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())
