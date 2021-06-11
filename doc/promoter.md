@@ -95,7 +95,7 @@ In a concrete example using the "heartbeat:IPaddr2" agent this could look like t
 ```
 start = [
 	"foo.service",
-	"ocf:heartbeat:IPaddr2 p_iscsi_demo1_ip ip=10.43.7.223 cidr_netmask=16 arp_sender=iputils_arping",
+	"ocf:heartbeat:IPaddr2 p_iscsi_demo1_ip ip=10.43.7.223 cidr_netmask=16",
 	"bar.service"
 ]
 ```
