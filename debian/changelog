@@ -1,3 +1,21 @@
+drbd-reactor (0.4.0~rc.2-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * treewide: cleanup log messages
+  * promoter: filter diskless devices for drbd-promote
+  * ctl: fix verbose output for ocf.ra
+  * promoter: switch to unescaped output
+  * ctl: restart daemon if no files given
+  * ctl,promoter: print where likely active
+  * ctl: fix disable --now
+  * ctl,build: add man page
+  * promoter: try to stop services before start
+  * doc,promoter: add design document
+  * doc,promoter: add review fixes from Lars
+  * doc,promoter: rm arp_sender
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 11 Jun 2021 14:55:59 +0200
+
 drbd-reactor (0.4.0~rc.1-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
