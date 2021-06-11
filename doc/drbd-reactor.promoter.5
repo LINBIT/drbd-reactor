@@ -12,9 +12,11 @@ is the promoter plugin for
 The promoter plugin monitors events on resources an executes systemd units.
 This plugin can be used for simple high-availability.
 .Pp
-By default the plugin generates a series of systemd service overrides and a
-systemd target unit that contains dependencies on these generated services.
-The services, and their order, is defined via the list specified in
+By default the plugin generates a series of systemd service overrides (i.e.,
+what systemd calls
+.Qq Drop-In )
+and a systemd target unit that contains dependencies on these generated
+services.  The services, and their order, is defined via the list specified in
 .Sy start .
 .Pp
 The plugin generates two implicit extra units:
@@ -87,7 +89,7 @@ services. All the others will fail intentionally.
 If a resource looses
 .Dq quorum ,
 it stops the systemd
-.Sy drbd-resource@
+.Sy drbd-services@
 target and all the dependencies.
 .Pp
 The plugin's configuration can contain an action that is executed if a stop
@@ -231,7 +233,7 @@ stop-services-on-exit = true
 For furhter design notes and handled failure scenarios see
 .Pa doc/promoter.md
 in the source code. An online version is available at
-.Lk https://github.com/LINBIT/drbd-reactor/doc/promoter.md promoter.md
+.Lk https://github.com/LINBIT/drbd-reactor/blob/master/doc/promoter.md promoter.md
 .Sh AUTHORS
 .An -nosplit
 The

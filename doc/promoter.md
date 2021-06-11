@@ -13,16 +13,16 @@ decides where services should run, but depending on cluster communication, membe
 factors, that may or may not agree with where DRBD has "best access to good data".
 
 If you need to base decisions on other factors, like external connectivity, or other "environmental health",
-or auto-rebalance resource placement, or have complex resource dependency tree, you still want to use your
+or auto-rebalance resource placement, or have a complex resource dependency tree, you still want to use your
 favorite cluster manager (Pacemaker).
 
 But if we can take away the cluster manager, and get away with it (in "relevant" scenarios), that would be a
 win for some setups.
 
 # Configuration
-By default the plugin generates a series of systemd service overrides and a systemd target unit that contains
-dependencies on these generated services. The services, and their order, is defined via the list specified via
-`start = []`. The plugin generates two implicit extra units:
+By default the plugin generates a series of systemd service overrides (i.e., what systemd calls "Drop-In") and
+a systemd target unit that contains dependencies on these generated services. The services, and their order,
+is defined via the list specified via `start = []`. The plugin generates two implicit extra units:
 
 - a `drbd-promote@` override that promotes the DRBD resource (i.e., switches it to Primary). This is a
 dependency for all the other units from `start` (according overrides are generated).
@@ -51,7 +51,7 @@ start the generated systemd target (e.g., `drbd-resource@foo.target`). All will 
 `drbd-promote@` unit first, but only one will succeed and continue to start the rest of the services. All the
 others will fail intentionally.
 
-If a resource looses "quorum", it stops the systemd `drbd-resource@` target and therefore all the dependencies.
+If a resource looses "quorum", it stops the systemd `drbd-services@` target and therefore all the dependencies.
 
 The plugin's configuration can contain an action that is executed if a stop action fails (e.g., triggering a
 reboot). Start actions in `start` are interpreted as systemd units and have to have an according postfix (i.e.
@@ -155,8 +155,8 @@ by systemd, the `drbd-services@.target` instance will be stopped by systemd, res
 resource again.
 
 It is very important to know that the promoter plugin does not do any service monitoring at all! So in order
-to make `drbd-serivices@.target` restart (i.e., stop and start), one needs to make sure a service failure
-gets propagated to `drbd-serivices@.target`. The `ocf.ra` service does that by setting `Restart=always`.
+to make `drbd-services@.target` restart (i.e., stop and start), one needs to make sure a service failure
+gets propagated to `drbd-services@.target`. The `ocf.ra` service does that by setting `Restart=always`.
 If in your configuration `ocf.ra` is not used, then it is up to you to make sure a service failure is propaged
 to the target. This can for example be done setting `Restart=always` in your service (e.g., via a systemd
 override).
@@ -175,13 +175,13 @@ stop of the target can be a solution.
 
 If the other peers form a promotable partition, they will claim the resource and start services.
 
-If not, then no service is possible at this times.
+If not, then no service is possible at this time.
 
 Once quorum returns, either the local services have long since been stopped already (due to propagated
 "io-errors"), DRBD reconnects and resyncs, or IO (and services) are still blocked.
 
 In the "still blocked" case, DRBD may have to refuse the connection, we cannot join an other Primary while
-still being Primary ourselves. But this even should trigger the local `drbd-reactor` to request an explicit
+still being Primary ourselves. But this event should trigger the local `drbd-reactor` to request an explicit
 stop, which would reconfigure for io-error, and finally demote the resource. As last `ExecStopPost` action, we
 call drbdadm adjust, which should cause DRBD to reconnect again, this time as Secondary, and finally sync up.
 
