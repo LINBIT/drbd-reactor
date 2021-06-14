@@ -360,7 +360,10 @@ fn systemd_ocf(
 }
 
 fn systemd_devices(name: &str, strictness: &SystemdDependencies) -> Result<String> {
-    const DEVICE_TEMPLATE: &str = r"[Unit]
+    const DEVICE_TEMPLATE: &str = r"[Service]
+ExecStart=/usr/sbin/drbdsetup primary %I
+ExecCondition=
+[Unit]
 {{ for device in devices -}}
 ConditionPathExists = {device | unescaped}
 {strictness} = {device | systemd_path}.device
