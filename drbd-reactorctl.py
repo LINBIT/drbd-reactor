@@ -204,8 +204,13 @@ start = ["${service.mount}", "${service.service}"]
         print(color_string(self.header, color=GREEN))
 
         for name in self._get_names():
-            print('Most likely active on node '
-                  '"{}"'.format(self._get_primary_on(name)))
+            primary = self._get_primary_on(name)
+            if primary == socket.gethostname():
+                primary = 'this node'
+            else:
+                primary = 'node "{}"'.format(primary)
+            print('Most likely active on {}'.format(primary))
+
             target = Promoter.target_name(name)
             if verbose:
                 systemctl('status', '--no-pager', target)
