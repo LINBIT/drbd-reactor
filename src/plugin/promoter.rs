@@ -446,6 +446,7 @@ fn systemd_target_requires(
     strictness: &SystemdDependencies,
 ) -> Result<String> {
     const WANTS_TEMPLATE: &str = r"[Unit]
+Before=drbd-reactor.service
 {{- for require in requires }}
 {strictness} = {require | unescaped}
 {{- endfor -}}";
