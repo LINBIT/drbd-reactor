@@ -1,3 +1,12 @@
+drbd-reactor (0.4.0-1) experimental; urgency=medium
+
+  * ctl,promoter: improve active on
+  * promoter: compat with older systemd, make promotion a dependency
+  * start after network is online
+  * promoter: improve system shutdown
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 18 Jun 2021 08:01:22 +0200
+
 drbd-reactor (0.4.0~rc.2-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
