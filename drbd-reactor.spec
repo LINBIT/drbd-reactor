@@ -9,7 +9,7 @@ Summary:	React to DRBD events via plugins.
 Group:		System Environment/Daemons
 License:	ASL 2.0
 URL:		https://www.github.com/LINBIT/drbd-reactor
-Source0:	https://www.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
+Source0:	https://pkg.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
 
 BuildRequires:	systemd
 Requires:	drbd-utils >= 9.18.0

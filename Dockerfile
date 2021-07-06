@@ -12,7 +12,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profi
 RUN yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical && yum install -y gcc wget && yum clean all -y # !lbbuild
 
 # one can not comment COPY
-RUN cd /tmp && wget https://www.linbit.com/downloads/drbd/utils/${DRBD_REACTOR_TGZ} # !lbbuild
+RUN cd /tmp && wget https://pkg.linbit.com/downloads/drbd/utils/${DRBD_REACTOR_TGZ} # !lbbuild
 # =lbbuild COPY /${DRBD_REACTOR_TGZ} /tmp/
 
 # =lbbuild USER makepkg
