@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tinytemplate::TinyTemplate;
 
-use crate::drbd::{EventType, PluginUpdate};
+use crate::drbd::{DiskState, EventType, PluginUpdate, Resource};
 use crate::plugin;
 
 pub struct Promoter {
@@ -81,7 +81,17 @@ impl super::Plugin for Promoter {
             match r.as_ref() {
                 PluginUpdate::Resource(u) => {
                     if !u.old.may_promote && u.new.may_promote {
-                        info!("run: resource '{}' may promote", name);
+                        let sleep_millis = get_sleep_before_promote_ms(
+                            &u.resource,
+                            res.sleep_before_promote_factor,
+                        );
+                        info!(
+                            "run: resource '{}' may promote after {}ms",
+                            name, sleep_millis
+                        );
+                        if sleep_millis > 0 {
+                            thread::sleep(Duration::from_millis(sleep_millis));
+                        }
                         if start_actions(&name, &res.start, &res.runner).is_err() {
                             stop_and_on_failure(&name, res, true); // loops util success
                         }
@@ -137,6 +147,12 @@ pub struct PromoterOptResource {
     pub dependencies_as: SystemdDependency,
     #[serde(default)]
     pub target_as: SystemdDependency,
+    #[serde(default = "default_promote_sleep")]
+    pub sleep_before_promote_factor: f32,
+}
+
+fn default_promote_sleep() -> f32 {
+    1.0
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
@@ -536,6 +552,29 @@ impl Default for Runner {
     }
 }
 
+fn get_sleep_before_promote_ms(resource: &Resource, factor: f32) -> u64 {
+    let max_sleep_s: i32 = resource
+        .devices
+        .iter()
+        .map(|d| match d.disk_state {
+            DiskState::Diskless => 6,
+            DiskState::Attaching => 6,
+            DiskState::Detaching => 6,
+            DiskState::Failed => 6,
+            DiskState::Negotiating => 6,
+            DiskState::DUnknown => 6,
+            DiskState::Inconsistent => 3,
+            DiskState::Outdated => 2,
+            DiskState::Consistent => 1,
+            DiskState::UpToDate => 0,
+        })
+        .max()
+        .unwrap_or_default();
+
+    // convert to ms and scale by factor
+    (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
+}
+
 // inlined copy from https://crates.io/crates/libsystemd
 // inlined because currently not packaged in Ubuntu Focal
 pub fn systemd_path(name: &str) -> String {
@@ -568,5 +607,35 @@ fn escape_byte(b: u8, index: usize) -> String {
         ':' | '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => c.to_string(),
         '.' if index > 0 => c.to_string(),
         _ => format!(r#"\x{:02x}"#, b),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::drbd::Device;
+
+    #[test]
+    fn sleep_before_promote_ms() {
+        let r = Resource {
+            name: "test".to_string(),
+            devices: vec![
+                Device {
+                    disk_state: DiskState::Diskless,
+                    ..Default::default()
+                },
+                Device {
+                    disk_state: DiskState::Failed,
+                    ..Default::default()
+                },
+                Device {
+                    disk_state: DiskState::UpToDate,
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        assert_eq!(get_sleep_before_promote_ms(&r, 1.0), 6000);
+        assert_eq!(get_sleep_before_promote_ms(&r, 0.5), 3000);
     }
 }

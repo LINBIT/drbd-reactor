@@ -123,6 +123,24 @@ promoted), and wait for further state changes.  The winning node continues to st
 in order.  If a start failure occurs, they will be stopped again in order, drbd will be demoted, the peers
 will see it as "promotable".  The process repeats.
 
+In order to prefer nodes with a favorable disk state, actual promotion will be delayed based on the worst
+case of local disk/volume states as below:
+
+| DiskState      | Sleep time in seconds |
+| -------------- | --------------------- |
+| `Diskless`     | 6                     |
+| `Attaching`    | 6                     |
+| `Detaching`    | 6                     |
+| `Failed`       | 6                     |
+| `Negotiating`  | 6                     |
+| `Unknown`      | 6                     |
+| `Inconsistent` | 3                     |
+| `Outdated`     | 2                     |
+| `Consistent`   | 1                     |
+| `UpToDate`     | 0                     |
+
+The configuration can contain a `sleep-before-promote-factor` that can be used to scale the sleep time.
+
 There should be some max retry or backoff delay to avoid busy loops for services that continuously fail to
 start. It is up to the user to set these if the systemd defaults do not fit, systemd provides
 `StartLimitIntervalSec=` and `StartLimitBurst=`.

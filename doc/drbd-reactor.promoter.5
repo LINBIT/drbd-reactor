@@ -86,6 +86,30 @@ start the generated systemd target (e.g.,
 unit first, but only one will succeed and continue to start the rest of the
 services. All the others will fail intentionally.
 .Pp
+In order to promote the resource with the best disk state, the plugin
+evaluates its local disk states and waits a short period of time, which might
+give a promoter on another host the chance (i.e., because its sleep time is
+shorter) to promote the resource first. Sleep times are calculated as follows:
+.TS
+allbox tab(:);
+r r .
+DiskState:Sleep time in seconds
+Diskless:6
+Attaching:6
+Detaching:6
+Failed:6
+Negotiating:6
+Unknown:6
+Inconsistent:3
+Outdated:2
+Consistent:1
+UpToDate:0
+.TE
+.Pp
+The actual sleep time is calculated as the worst case of all the volumes in a
+resource and can be scaled by setting
+.Sy sleep-before-promote-factor .
+.Pp
 If a resource looses
 .Dq quorum ,
 it stops the systemd
