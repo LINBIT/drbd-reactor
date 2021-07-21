@@ -1,5 +1,6 @@
 [Unit]
 Description=DRBD-Reactor Service
+Documentation=man:drbd-reactor man:drbd-reactorctl man:drbd-reactor.toml
 ConditionKernelCommandLine=!nocluster
 Requires=network-online.target
 After=network-online.target
