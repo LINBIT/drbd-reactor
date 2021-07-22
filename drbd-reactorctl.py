@@ -7,6 +7,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import urllib.request
 
 DEFAULT_SNIPPETS = '/etc/drbd-reactor.d'
@@ -451,8 +452,6 @@ def remove(args):
 def edit(args):
     config = toml.load(args.config)
     snippets = config.get('snippets', DEFAULT_SNIPPETS)
-    edit = os.path.join(snippets, '.edit')
-    os.makedirs(edit, 0o700, exist_ok=True)
 
     plugin_name = args.configs[0]
     config_file = plugin_name + '.toml'  # single file enforced by argparse
@@ -464,31 +463,33 @@ def edit(args):
             final_file = disabled
         # else we keep the orinal and populate it
 
-    tmp_file = os.path.join(edit, config_file)
-    try:
-        os.remove(tmp_file)
-    except FileNotFoundError:
-        pass
-
-    editor = os.environ.get('EDITOR', 'vi')
+    tmp_file = tempfile.NamedTemporaryFile()
 
     final_exists = os.path.exists(final_file)
     if final_exists:
-        shutil.copy(final_file, tmp_file)
+        shutil.copy(final_file, tmp_file.name)
     else:
         template = Plugin.new_template(args.type)
         template = template.replace('${id}', plugin_name)
-        with open(tmp_file, 'w') as f:
+        with open(tmp_file.name, 'w') as f:
             f.write(template + '\n')
 
-    os.system('{} {}'.format(editor, tmp_file))
+    editor = os.environ.get('EDITOR', 'vi')
+    os.system('{} {}'.format(editor, tmp_file.name))
 
+    toml_valid = True
     try:
-        toml.load(tmp_file)
+        toml.load(tmp_file.name)
     except Exception as e:
-        die('toml snippet not valid ({}), bye'.format(e))
+        toml_valid = False
+        eprint('toml snippet not valid ({}), bye'.format(e))
+    finally:
+        if toml_valid:
+            shutil.copy(tmp_file.name, final_file)
+        tmp_file.close()
+        if not toml_valid:
+            sys.exit(1)
 
-    os.rename(tmp_file, final_file)
     if final_file.endswith('.disabled'):
         print(color_string('NOTE:', color=YELLOW),
               'Disabled file ({}) is not enabled automatically, use "enable" subcommand'.format(final_file))
