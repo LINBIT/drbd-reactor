@@ -54,6 +54,9 @@ make install DESTDIR=%{buildroot}
 %{_mandir}/man5/drbd-reactor.prometheus.5*
 %config(noreplace) /etc/drbd-reactor.toml
 %doc README.md
+%doc example/drbd-reactor-reload.path
+%doc example/drbd-reactor-reload.service
+%doc example/drbd-reactor.toml
 
 
 %changelog

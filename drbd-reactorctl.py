@@ -12,6 +12,7 @@ import urllib.request
 
 DEFAULT_SNIPPETS = '/etc/drbd-reactor.d'
 REACTOR_SERVICE = 'drbd-reactor.service'
+REACTOR_RELOAD_PATH = 'drbd-reactor-reload.path'
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = list(range(8))
 PLUGIN_TYPES = ('promoter', 'umh', 'debugger', 'prometheus')
 
@@ -300,13 +301,8 @@ def reload_service():
     systemctl('reload', REACTOR_SERVICE)
 
 
-def reload(func):
-    def wrap(*args, **kwargs):
-        result = func(*args, **kwargs)
-        if result:
-            reload_service()
-        return result
-    return wrap
+def has_autoload():
+    return subprocess.run(('systemctl', 'is-active', '-q', REACTOR_RELOAD_PATH)).returncode == 0
 
 
 def get_plugin_files(config, plugins, ext='.toml'):
@@ -372,7 +368,7 @@ def disable(args):
 
     # we have to keep this order
     # reload first, so that a stop does not trigger a start again
-    if len(plugin_files) > 0:
+    if len(plugin_files) > 0 and not has_autoload():
         reload_service()
 
     if args.now:
@@ -385,22 +381,26 @@ def disable(args):
     return len(plugin_files)
 
 
-@reload
 def enable(args):
     plugin_files = get_plugin_files(args.config, args.configs, ext='.toml.disabled')
     for pf in plugin_files:
         os.rename(pf, fenable(pf))
-    return len(plugin_files)
+    nr_plugins = len(plugin_files)
+    if nr_plugins > 0 and not has_autoload():
+        reload_service()
+    return nr_plugins
 
 
 def restart_files(plugin_files):
     for pf in plugin_files:
         print('Restarting {}'.format(pf))
         os.rename(pf, fdisable(pf))
-    reload_service()
+    if not has_autoload():
+        reload_service()
     for pf in plugin_files:
         os.rename(fdisable(pf), pf)
-    reload_service()
+    if not has_autoload():
+        reload_service()
 
 
 def restart(args):
@@ -437,16 +437,17 @@ def ask(what, force=False, default=False):
             return True
 
 
-@reload
 def remove(args):
     ext = '.toml.disabled' if args.disabled else '.toml'
     plugin_files = get_plugin_files(args.config, args.configs, ext=ext)
-    removed = 0
+    nr_removed = 0
     for pf in plugin_files:
         if ask("Remove '{}'?".format(pf), force=args.force):
             os.remove(pf)
-            removed += 1
-    return removed
+            nr_removed += 1
+    if nr_removed > 0 and not has_autoload():
+        reload_service()
+    return nr_removed
 
 
 def edit(args):
@@ -495,10 +496,11 @@ def edit(args):
               'Disabled file ({}) is not enabled automatically, use "enable" subcommand'.format(final_file))
         return 0
 
-    if final_exists:
-        restart_files([final_file])
-    else:
-        reload_service()
+    if not has_autoload():
+        if final_exists:
+            restart_files([final_file])
+        else:
+            reload_service()
 
     print(color_string('INFO:', color=GREEN),
           'Please make sure to copy to {} to all other cluster nodes '
