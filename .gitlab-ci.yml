@@ -1,37 +1,23 @@
-# This file is a template, and might need editing before it works on your project.
-# Official language image. Look for the different tagged releases at:
-# https://hub.docker.com/r/library/rust/tags/
-image: "rust:latest"
-
-# Optional: Pick zero or more services to be used on all builds.
-# Only needed when using a docker container to run your tests in.
-# Check out: http://docs.gitlab.com/ee/ci/docker/using_docker_images.html#what-is-a-service
-# services:
-#   - mysql:latest
-#   - redis:latest
-#   - postgres:latest
-
-# Optional: Install a C compiler, cmake and git into the container.
-# You will often need this when you (or any of your dependencies) depends on C code.
-# before_script:
-#   - apt-get update -yqq
-#   - apt-get install -yqq --no-install-recommends build-essential
+image: "$CI_REGISTRY/linbit/linbit-admin-backend/test-image"
 
 # Use cargo to test the project
 test:cargo:
-  before_script:
-    - cargo install cargo2junit
+  variables:
+    RUSTFLAGS: "-Zinstrument-coverage"
+    LLVM_PROFILE_FILE: "coverage-%p-%m.profraw"
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo test --locked -- -Z unstable-options --format json | cargo2junit > results.xml
+    - grcov . --binary-path ./target/debug/ -s . -t cobertura --branch --ignore-not-existing --ignore "*cargo*" -o coverage.xml
+    - grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "*cargo*" -o coverage.lcov
+    - lcov --summary coverage.lcov
   artifacts:
     reports:
       junit:
         - results.xml
+      cobertura: coverage.xml
 
 test:rustfmt:
-  before_script:
-    - rustup component add rustfmt
   script:
     - cargo fmt -- --version && cargo fmt -- --print-config current .
     - cargo fmt -- --check
