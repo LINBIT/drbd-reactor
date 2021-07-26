@@ -298,7 +298,7 @@ fn generate_systemd_templates(
 
     let mut target_requires: Vec<String> = Vec::new();
 
-    let ocf_pattern = Regex::new(r"^ocf:([[:word:]]+):([[:word:]]+)(.*)$")?;
+    let ocf_pattern = Regex::new(r"^ocf:(\S+):(\S+) (.*)$")?;
 
     let mut service = "".to_string();
     for (i, action) in actions.iter().enumerate() {
