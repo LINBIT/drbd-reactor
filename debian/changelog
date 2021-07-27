@@ -1,3 +1,15 @@
+drbd-reactor (0.4.2-1) experimental; urgency=medium
+
+  [ Rene Peinthor ]
+  * gitlab: add coverage report and use prebuilt image
+
+  [ Roland Kammerer ]
+  * promoter: fix ocf regex
+  * ctl: use tempfile not in snippets
+  * core,ctl: add autoload
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 27 Jul 2021 09:06:38 +0200
+
 drbd-reactor (0.4.1-1) experimental; urgency=medium
 
   * treewide: update download urls
