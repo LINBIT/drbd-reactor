@@ -22,7 +22,11 @@ changes in a DRBD resource.
 # Configuration
 This daemon is configured via a configuration file. The only command line option allowed is the path to the
 configuration. The default location for the config is `/etc/drbd-reactor.toml`. The repository contains an example
-[drbd-reactor.toml](/example/drbd-reactor.toml).
+[drbd-reactor.toml](/example/drbd-reactor.toml). This file should act as the entry point only to specify a snippets
+directory where one places one snippet per plugin instance. Users should  use `drbd-reactorctl` to manage these
+snippets. In very dynamic environments it might be favorable to automatically reload the daemon if a configuration
+snippet is added or removed. This can be done by using `drbd-reactor-reload.{service,path}` and enabling/staring the
+path unit. Both these units are shipped in the examples directory.
 
 # Building
 
