@@ -14,6 +14,7 @@ use anyhow::Result;
 use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use shell_words;
 use tinytemplate::TinyTemplate;
 
 use crate::drbd::{DiskState, EventType, PluginUpdate, Resource};
@@ -300,39 +301,37 @@ fn generate_systemd_templates(
 
     let ocf_pattern = Regex::new(r"^ocf:(\S+):(\S+) (.*)$")?;
 
-    let mut service = "".to_string();
-    for (i, action) in actions.iter().enumerate() {
-        let mut deps = vec![format!("drbd-promote@{}.service", name)];
-        if i > 0 {
-            deps.push(service.clone());
-        }
+    for action in actions {
+        let deps = match target_requires.last() {
+            Some(prev) => vec![format!("drbd-promote@{}.service", name), prev.to_string()],
+            None => vec![format!("drbd-promote@{}.service", name)],
+        };
 
-        service = match ocf_pattern.captures(action) {
+        let (service_name, env) = match ocf_pattern.captures(action) {
             Some(ocf) => {
                 let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-                systemd_ocf(name, vendor, agent, args, &deps, strictness)?
+                systemd_ocf_parse_to_env(name, vendor, agent, args)?
             }
-            _ => {
-                let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", action));
-                systemd_write_unit(
-                    prefix,
-                    SYSTEMD_CONF,
-                    systemd_unit(name, &deps, strictness, &[])?,
-                )?;
-                action.to_string()
-            }
+            _ => (action.to_string(), Vec::new()),
         };
+
+        let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", service_name));
+        systemd_write_unit(
+            prefix,
+            SYSTEMD_CONF,
+            systemd_unit(name, &deps, strictness, &env)?,
+        )?;
 
         // we would not need to keep the order here, as it does not matter
         // what matters is After=, but IMO it would confuse unexperienced users
         // just keep the order, so no HashSet, the Vecs are short, does not matter.
-        if target_requires.contains(&service) {
+        if target_requires.contains(&service_name) {
             return Err(anyhow::anyhow!(
                 "generate_systemd_templates: Service name '{}' already used",
-                service
+                service_name
             ));
         }
-        target_requires.push(service.clone());
+        target_requires.push(service_name.clone());
     }
 
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", name));
@@ -343,36 +342,38 @@ fn generate_systemd_templates(
     )
 }
 
-fn systemd_ocf(
+fn systemd_ocf_parse_to_env(
     name: &str,
     vendor: &str,
     agent: &str,
     args: &str,
-    deps: &[String],
-    strictness: &SystemdDependencies,
-) -> Result<String> {
-    let mut args = args.split_whitespace();
+) -> Result<(String, Vec<String>)> {
+    let args = shell_words::split(args)?;
 
-    let ra_name = args.next().ok_or(anyhow::anyhow!(
-        "promoter::systemd_ocf: agent needs at least one argument (its name)"
-    ))?;
+    if args.len() < 1 {
+        anyhow::bail!("promoter::systemd_ocf: agent needs at least one argument (its name)")
+    }
+
+    let ra_name = &args[0];
     let ra_name = format!("{}_{}", ra_name, name);
     let service_name = format!("ocf.ra@{}.service", ra_name);
+    let mut env = Vec::with_capacity(args.len() - 1);
+    for item in &args[1..] {
+        let mut split = item.splitn(2, "=");
+        let add = match (split.next(), split.next()) {
+            (Some(k), Some(v)) => format!("OCF_RESKEY_{}={}", k, shell_words::quote(v)),
+            (Some(k), None) => format!("OCF_RESKEY_{}=", k),
+            _ => continue, // skip empty items
+        };
+        env.push(add)
+    }
 
-    let mut env: Vec<String> = args.map(|e| format!("OCF_RESKEY_{}", e)).collect();
     env.push(format!(
         "AGENT=/usr/lib/ocf/resource.d/{}/{}",
         vendor, agent
     ));
 
-    let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", service_name));
-    systemd_write_unit(
-        prefix,
-        SYSTEMD_CONF,
-        systemd_unit(name, deps, strictness, &env)?,
-    )?;
-
-    Ok(service_name)
+    Ok((service_name, env))
 }
 
 fn systemd_devices(name: &str, strictness: &SystemdDependencies) -> Result<String> {
@@ -637,5 +638,29 @@ mod tests {
         };
         assert_eq!(get_sleep_before_promote_ms(&r, 1.0), 6000);
         assert_eq!(get_sleep_before_promote_ms(&r, 0.5), 3000);
+    }
+
+    #[test]
+    fn test_systemd_ocf_parse_to_env() {
+        let (name, env) = systemd_ocf_parse_to_env(
+            "res1",
+            "vendor1",
+            "agent1",
+            "name1 k1=v1 k2=\"with whitespace\" k3=with\\ different\\ whitespace foo empty=''",
+        )
+        .expect("should work");
+
+        assert_eq!(name, "ocf.ra@name1_res1.service");
+        assert_eq!(
+            &env[..],
+            &[
+                "OCF_RESKEY_k1=v1",
+                "OCF_RESKEY_k2='with whitespace'",
+                "OCF_RESKEY_k3='with different whitespace'",
+                "OCF_RESKEY_foo=",
+                "OCF_RESKEY_empty=''",
+                "AGENT=/usr/lib/ocf/resource.d/vendor1/agent1"
+            ]
+        );
     }
 }
