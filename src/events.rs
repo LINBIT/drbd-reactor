@@ -28,9 +28,9 @@ pub fn events2(tx: Sender<EventUpdate>, statistics_poll: Duration) -> Result<()>
     // check drbdsetup events2 version
     let pattern = Regex::new(r"^DRBDADM_VERSION_CODE=0x([[:xdigit:]]+)$")?;
     let (major, minor, patch) = split_version(pattern, version.stdout.clone())?;
-    if let Err(e) = min_version((major, minor, patch), (9, 18, 1)) {
+    if let Err(e) = min_version((major, minor, patch), (9, 18, 2)) {
         return Err(anyhow::anyhow!(
-            "drbdsetup minimum version ('9.18.1') not fulfilled: {}",
+            "drbdsetup minimum version ('9.18.2') not fulfilled: {}",
             e
         ));
     }

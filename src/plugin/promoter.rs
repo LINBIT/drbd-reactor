@@ -383,7 +383,7 @@ fn systemd_ocf_parse_to_env(
 
 fn systemd_devices(devices: Vec<String>, strictness: &SystemdDependencies) -> Result<String> {
     const DEVICE_TEMPLATE: &str = r"[Service]
-ExecStart=/usr/sbin/drbdsetup primary %I
+ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
 ExecCondition=
 [Unit]
 {{ for device in devices -}}
@@ -678,7 +678,7 @@ mod tests {
 
         assert_eq!(
             r"[Service]
-ExecStart=/usr/sbin/drbdsetup primary %I
+ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
 ExecCondition=
 [Unit]
 ",
@@ -699,7 +699,7 @@ ExecCondition=
 
         assert_eq!(
             r"[Service]
-ExecStart=/usr/sbin/drbdsetup primary %I
+ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
 ExecCondition=
 [Unit]
 ConditionPathExists = /dev/vg0/backing0
