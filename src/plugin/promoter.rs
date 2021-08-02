@@ -294,8 +294,13 @@ fn generate_systemd_templates(
     actions: &[String],
     strictness: &SystemdDependencies,
 ) -> Result<()> {
+    let devices = get_backing_devices(name)?
+        .into_iter()
+        .filter(|d| d != "none")
+        .collect();
+
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", name));
-    systemd_write_unit(prefix, SYSTEMD_CONF, systemd_devices(name, strictness)?)?;
+    systemd_write_unit(prefix, SYSTEMD_CONF, systemd_devices(devices, strictness)?)?;
 
     let mut target_requires: Vec<String> = Vec::new();
 
@@ -376,7 +381,7 @@ fn systemd_ocf_parse_to_env(
     Ok((service_name, env))
 }
 
-fn systemd_devices(name: &str, strictness: &SystemdDependencies) -> Result<String> {
+fn systemd_devices(devices: Vec<String>, strictness: &SystemdDependencies) -> Result<String> {
     const DEVICE_TEMPLATE: &str = r"[Service]
 ExecStart=/usr/sbin/drbdsetup primary %I
 ExecCondition=
@@ -385,7 +390,7 @@ ExecCondition=
 ConditionPathExists = {device | unescaped}
 {strictness} = {device | systemd_path}.device
 After = {device | systemd_path}.device
-{{- endfor -}}";
+{{ endfor -}}";
 
     let mut tt = TinyTemplate::new();
     tt.add_template("devices", DEVICE_TEMPLATE)?;
@@ -402,14 +407,10 @@ After = {device | systemd_path}.device
         strictness: String,
     }
     // filter diskless (== "none" devices)
-    let devices = get_backing_devices(name)?
-        .into_iter()
-        .filter(|d| d != "none")
-        .collect();
     let result = tt.render(
         "devices",
         &Context {
-            devices: devices,
+            devices,
             strictness: strictness.dependencies_as.to_string(),
         },
     )?;
@@ -661,6 +662,54 @@ mod tests {
                 "OCF_RESKEY_empty=''",
                 "AGENT=/usr/lib/ocf/resource.d/vendor1/agent1"
             ]
+        );
+    }
+
+    #[test]
+    fn test_systemd_devices() {
+        let empty = systemd_devices(
+            Vec::new(),
+            &SystemdDependencies {
+                target_as: SystemdDependency::Wants,
+                dependencies_as: SystemdDependency::Wants,
+            },
+        )
+        .expect("should work");
+
+        assert_eq!(
+            r"[Service]
+ExecStart=/usr/sbin/drbdsetup primary %I
+ExecCondition=
+[Unit]
+",
+            empty
+        );
+
+        let two_volumes = systemd_devices(
+            vec![
+                "/dev/vg0/backing0".to_string(),
+                "/dev/disk/by-uuid/1123-456".to_string(),
+            ],
+            &SystemdDependencies {
+                target_as: SystemdDependency::Wants,
+                dependencies_as: SystemdDependency::Wants,
+            },
+        )
+        .expect("should work");
+
+        assert_eq!(
+            r"[Service]
+ExecStart=/usr/sbin/drbdsetup primary %I
+ExecCondition=
+[Unit]
+ConditionPathExists = /dev/vg0/backing0
+Wants = dev-vg0-backing0.device
+After = dev-vg0-backing0.device
+ConditionPathExists = /dev/disk/by-uuid/1123-456
+Wants = dev-disk-by\x2duuid-1123\x2d456.device
+After = dev-disk-by\x2duuid-1123\x2d456.device
+",
+            two_volumes
         );
     }
 }
