@@ -1,3 +1,19 @@
+drbd-reactor (0.4.3-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * debian: add source/format
+  * doc: add snippets dir to FILES
+  * README.md: add info about autoload
+  * ctl: add .flake8
+  * promoter: use drbd-service-shim.sh
+
+  [ Moritz "WanzenBug" Wanzenböck ]
+  * pkgs: create /etc/drbd-reactor.d from deb/rpm
+  * promoter: split ocf args using shell word splitting
+  * promoter: fix drbd-promote template in multi-volume scenario
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 02 Aug 2021 14:05:22 +0200
+
 drbd-reactor (0.4.2-1) experimental; urgency=medium
 
   [ Rene Peinthor ]
