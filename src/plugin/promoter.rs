@@ -570,8 +570,11 @@ fn get_sleep_before_promote_ms(resource: &Resource, factor: f32) -> u64 {
             DiskState::Consistent => 1,
             DiskState::UpToDate => 0,
         })
-        .max()
-        .unwrap_or_default();
+        .max() // if there are none, try the res file
+        .unwrap_or_else(|| match get_backing_devices(&resource.name) {
+            Ok(devices) if devices.contains(&"none".into()) => 6, // Diskless
+            _ => 0,
+        });
 
     // convert to ms and scale by factor
     (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
@@ -619,6 +622,7 @@ mod tests {
 
     #[test]
     fn sleep_before_promote_ms() {
+        // be careful to only use a Resource *with* devices filter out the unwarp_or_else?
         let r = Resource {
             name: "test".to_string(),
             devices: vec![
