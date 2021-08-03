@@ -1,3 +1,14 @@
+drbd-reactor (0.4.4-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * build: rename build Dockerfiles
+  * promoter: handle sleep for "cold boot" if res exists
+
+  [ Moritz "WanzenBug" Wanzenböck ]
+  * ensure reload updates don't trigger promoter early
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 10 Aug 2021 08:25:07 +0200
+
 drbd-reactor (0.4.3-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
