@@ -54,7 +54,7 @@ statistics-poll-interval = 60
 ## if the runner is "systemd", it always starts and stops the auto-generated implicit target unit.
 # stop = []
 ## shell one-liner executed in a loop if a stop action fails
-## if unset, this defaults to "true"
+## if unset, no action is executed
 # on-stop-failure =  "echo b > /proc/sysrq-trigger"
 
 # Configure a user mode helper filter

@@ -53,16 +53,13 @@ impl super::Plugin for Promoter {
         let names = self.cfg.resources.keys().cloned().collect::<Vec<String>>();
         let names = plugin::namefilter(&names);
 
-        // set default stop actions (i.e., reversed start, and default on-stop-failure (i.e., true)
+        // set default stop actions (i.e., reversed start)
         let cfg = {
             let mut cfg = self.cfg.clone();
             for res in cfg.resources.values_mut() {
                 if res.stop.is_empty() {
                     res.stop = res.start.clone();
                     res.stop.reverse();
-                }
-                if res.on_stop_failure == "" {
-                    res.on_stop_failure = "true".to_string();
                 }
             }
             cfg
@@ -176,6 +173,13 @@ fn systemd_start(unit: &str) -> Result<()> {
     plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())
 }
 
+fn persist_journal() {
+    let _ = Command::new("journalctl")
+        .arg("--flush")
+        .arg("--sync")
+        .status();
+}
+
 fn action(what: &str, to: State, how: &Runner) -> Result<()> {
     match how {
         Runner::Shell => plugin::system(what),
@@ -210,8 +214,20 @@ fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
     }
 }
 
-pub fn on_failure(action: &str) {
-    info!("on_failure: starting on-failure action in a loop");
+pub fn on_failure(name: &str, action: &str) {
+    if action == "" {
+        return;
+    }
+
+    // this is critical information, also for a "blame game", so:
+    // print independent of log level.
+    eprintln!(
+        "on_failure: starting on-failure action for '{}' in a loop",
+        name
+    );
+    // try our best to persist it
+    persist_journal();
+
     loop {
         if plugin::system(action).is_ok() {
             return;
@@ -228,8 +244,8 @@ fn stop_and_on_failure(name: &str, res: &PromoterOptResource, wait_on_stop: bool
             }
         }
         Err(e) => {
-            warn!("stop_and_on_failure: {}", e);
-            on_failure(&res.on_stop_failure); // loops until success
+            warn!("stop_and_on_failure: Could not stop services: {}", e);
+            on_failure(&name, &res.on_stop_failure); // loops until success
         }
     }
 }
