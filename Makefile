@@ -103,7 +103,7 @@ endif
 
 .PHONY: dockerimage
 dockerimage:
-	docker build -t $(DOCKERREGPATH):$(DOCKER_TAG) .
+	docker build -t $(DOCKERREGPATH):$(DOCKER_TAG) $(EXTRA_DOCKER_BUILDARGS) .
 	docker tag $(DOCKERREGPATH):$(DOCKER_TAG) $(DOCKERREGPATH):latest
 
 .PHONY: dockerpath
