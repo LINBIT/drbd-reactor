@@ -8,7 +8,7 @@ After=network-online.target
 [Service]
 Type=notify
 ExecStart=/usr/sbin/drbd-reactor
-ExecReload=kill -HUP $MAINPID
+ExecReload=/usr/bin/env kill -HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target
