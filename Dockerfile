@@ -1,4 +1,4 @@
-ARG BUILDER registry.access.redhat.com/ubi8/ubi as builder
+ARG BUILDER=registry.access.redhat.com/ubi8/ubi
 FROM $BUILDER as builder
 
 ENV DRBD_REACTOR_VERSION 0.4.4
