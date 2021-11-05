@@ -42,7 +42,7 @@ level = "debug"
 [[promoter]]
 [promoter.resources.foo]
 start = ["foo.mount", "foo.service"]
-on-stop-failure =  "echo b > /proc/sysrq-trigger"
+on-drbd-demote-failure = "reboot"
 
 # Configure a user mode helper filter
 [[umh]]

@@ -53,9 +53,9 @@ statistics-poll-interval = 60
 ## if unset/empty, services from 'start' will be stopped in reverse order if the runner is "shell".
 ## if the runner is "systemd", it always starts and stops the auto-generated implicit target unit.
 # stop = []
-## shell one-liner executed in a loop if a stop action fails
-## if unset, no action is executed
-# on-stop-failure =  "echo b > /proc/sysrq-trigger"
+## systemd OnFailure action that is executed on DRBD demote failures
+## if unset, or set to "none", then no action is executed
+# on-stop-failure =  "reboot"
 
 # Configure a user mode helper filter
 # [[umh]]

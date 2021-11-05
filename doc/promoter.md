@@ -215,22 +215,17 @@ configure the resource for "io-error". If you want to, drbd-utils starting from 
 
 ## Service Stop Failure
 
-If a service fails to stop, we need to "escalate" the recovery.  One way could be to "force disconnect",
-causing DRBD quorum loss, and have the services die by the resulting io-errors, to the point where we can
-demote DRBD. Again, the before mentioned adjust on `ExecStopPost` will re-connect and sync.
+If a service fails to stop, we need to "escalate" the recovery. We expect that services propagate failures to
+the systemd target, which then restarts the services.
 
-If DRBD still can not be demoted, that resource is blocked and would need manual cleanup.  I don't think we
-want to escalate to "hard-reboot the node", which would be an other option.
+This also demotes the DRBD device and another peer might promote the device and start the services.
 
-Meanwhile, the other peers would form a promotable partition and continue to provide service, unless we are in
-a multiple failure scenario and it was already degraded.
+What we are interested in is when the demotion of the DRBD device fails on a node. Then we have to react with
+power off/reboot/...
 
-| !! | Current implementation: |
-| -- | ----------------------- |
-
-A user can define whatever action via the `on-stop-failure` configuration option. A hard reboot for example
+A user can define a `systemd` `OnFailure` action via the `on-drbd-demote-failure` configuration option. A hard reboot for example
 can be realized via:
 
 ```
-on-stop-failure =  "echo b > /proc/sysrq-trigger"
+on-drbd-demote-failure =  "reboot-immediate"
 ```

@@ -30,12 +30,18 @@ impl Promoter {
         adjust_resources(&names)?;
 
         for (name, res) in &cfg.resources {
+            // deprecated settings
+            if !res.on_stop_failure.is_empty() {
+                warn!("'on-stop-failure' is deprecated and ignored!; use 'on-drbd-demote-failure'");
+            }
+
             if res.runner == Runner::Systemd {
-                let dependencies = SystemdDependencies {
+                let systemd_settings = SystemdSettings {
                     dependencies_as: res.dependencies_as.clone(),
                     target_as: res.target_as.clone(),
+                    failure_action: res.on_drbd_demote_failure.clone(),
                 };
-                generate_systemd_templates(name, &res.start, &dependencies)?;
+                generate_systemd_templates(name, &res.start, &systemd_settings)?;
                 systemd_daemon_reload()?;
             }
         }
@@ -91,14 +97,14 @@ impl super::Plugin for Promoter {
                             thread::sleep(Duration::from_millis(sleep_millis));
                         }
                         if start_actions(&name, &res.start, &res.runner).is_err() {
-                            stop_and_on_failure(&name, res, true); // loops util success
+                            let _ = stop_actions(&name, &res.stop, &res.runner);
                         }
                     }
                 }
                 PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
                         info!("run: resource '{}' lost quorum", name);
-                        stop_and_on_failure(&name, res, true); // loops util success
+                        let _ = stop_actions(&name, &res.stop, &res.runner);
                     }
                 }
                 _ => (),
@@ -108,7 +114,7 @@ impl super::Plugin for Promoter {
         // stop services if configured
         for (name, res) in cfg.resources {
             if res.stop_services_on_exit {
-                stop_and_on_failure(&name, &res, false); // loops util success
+                let _ = stop_actions(&name, &res.stop, &res.runner);
             }
         }
 
@@ -136,7 +142,7 @@ pub struct PromoterOptResource {
     #[serde(default)]
     pub stop: Vec<String>,
     #[serde(default)]
-    pub on_stop_failure: String,
+    pub on_stop_failure: String, // ! deprecated !
     #[serde(default)]
     pub stop_services_on_exit: bool,
     #[serde(default)]
@@ -145,6 +151,8 @@ pub struct PromoterOptResource {
     pub dependencies_as: SystemdDependency,
     #[serde(default)]
     pub target_as: SystemdDependency,
+    #[serde(default)]
+    pub on_drbd_demote_failure: SystemdFailureAction,
     #[serde(default = "default_promote_sleep")]
     pub sleep_before_promote_factor: f32,
 }
@@ -159,15 +167,13 @@ fn systemd_stop(unit: &str) -> Result<()> {
 }
 
 fn systemd_start(unit: &str) -> Result<()> {
-    for action in &["reset-failed", "stop"] {
-        // we really don't care
-        let _ = Command::new("systemctl")
-            .arg(action)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .arg(unit)
-            .status();
-    }
+    // we really don't care
+    let _ = Command::new("systemctl")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .arg("reset-failed")
+        .arg(unit)
+        .status();
 
     info!("systemd_start: systemctl start {}", unit);
     plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())
@@ -203,6 +209,11 @@ fn start_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
 }
 
 fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
+    info!(
+        "stop_actions (could trigger failure actions (e.g., reboot)): {}",
+        name
+    );
+
     match how {
         Runner::Shell => {
             for a in actions {
@@ -210,42 +221,11 @@ fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
             }
             Ok(())
         }
-        Runner::Systemd => action(&format!("drbd-services@{}.target", name), State::Stop, how),
-    }
-}
-
-pub fn on_failure(name: &str, action: &str) {
-    if action == "" {
-        return;
-    }
-
-    // this is critical information, also for a "blame game", so:
-    // print independent of log level.
-    eprintln!(
-        "on_failure: starting on-failure action for '{}' in a loop",
-        name
-    );
-    // try our best to persist it
-    persist_journal();
-
-    loop {
-        if plugin::system(action).is_ok() {
-            return;
-        }
-        thread::sleep(Duration::from_secs(2));
-    }
-}
-
-fn stop_and_on_failure(name: &str, res: &PromoterOptResource, wait_on_stop: bool) {
-    match stop_actions(name, &res.stop, &res.runner) {
-        Ok(_) => {
-            if wait_on_stop {
-                thread::sleep(Duration::from_secs(2)); // give some peer a little time to promote
-            }
-        }
-        Err(e) => {
-            warn!("stop_and_on_failure: Could not stop services: {}", e);
-            on_failure(&name, &res.on_stop_failure); // loops until success
+        Runner::Systemd => {
+            let target = format!("drbd-services@{}.target", name);
+            info!("stop_actions: stopping '{}'", target);
+            persist_journal();
+            action(&target, State::Stop, how)
         }
     }
 }
@@ -308,7 +288,7 @@ const SYSTEMD_CONF: &str = "reactor.conf";
 fn generate_systemd_templates(
     name: &str,
     actions: &[String],
-    strictness: &SystemdDependencies,
+    systemd_settings: &SystemdSettings,
 ) -> Result<()> {
     let devices = get_backing_devices(name)?
         .into_iter()
@@ -316,7 +296,24 @@ fn generate_systemd_templates(
         .collect();
 
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", name));
-    systemd_write_unit(prefix, SYSTEMD_CONF, systemd_devices(devices, strictness)?)?;
+    systemd_write_unit(
+        prefix,
+        SYSTEMD_CONF,
+        drbd_promote(devices, systemd_settings)?,
+    )?;
+
+    if systemd_settings.failure_action != SystemdFailureAction::None {
+        let prefix =
+            Path::new(SYSTEMD_PREFIX).join(format!("drbd-demote-or-escalate@{}.service.d", name));
+        systemd_write_unit(
+            prefix,
+            SYSTEMD_CONF,
+            format!(
+                "[Unit]\nFailureAction={}\nConflicts=drbd-promote@%i.service\n",
+                systemd_settings.failure_action
+            ),
+        )?;
+    }
 
     let mut target_requires: Vec<String> = Vec::new();
 
@@ -340,7 +337,7 @@ fn generate_systemd_templates(
         systemd_write_unit(
             prefix,
             SYSTEMD_CONF,
-            systemd_unit(name, &deps, strictness, &env)?,
+            systemd_unit(name, &deps, systemd_settings, &env)?,
         )?;
 
         // we would not need to keep the order here, as it does not matter
@@ -359,7 +356,7 @@ fn generate_systemd_templates(
     systemd_write_unit(
         prefix,
         SYSTEMD_CONF,
-        systemd_target_requires(&target_requires, strictness)?,
+        systemd_target_requires(&target_requires, systemd_settings)?,
     )
 }
 
@@ -397,11 +394,15 @@ fn systemd_ocf_parse_to_env(
     Ok((service_name, env))
 }
 
-fn systemd_devices(devices: Vec<String>, strictness: &SystemdDependencies) -> Result<String> {
-    const DEVICE_TEMPLATE: &str = r"[Service]
+fn drbd_promote(devices: Vec<String>, systemd_settings: &SystemdSettings) -> Result<String> {
+    const PROMOTE_TEMPLATE: &str = r"[Service]
 ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
 ExecCondition=
 [Unit]
+{{ if needs_on_failure -}}
+OnFailure=drbd-demote-or-escalate@%i.service
+OnFailureJobMode=replace-irreversibly
+{{ endif -}}
 {{ for device in devices -}}
 ConditionPathExists = {device | unescaped}
 {strictness} = {device | systemd_path}.device
@@ -409,7 +410,7 @@ After = {device | systemd_path}.device
 {{ endfor -}}";
 
     let mut tt = TinyTemplate::new();
-    tt.add_template("devices", DEVICE_TEMPLATE)?;
+    tt.add_template("devices", PROMOTE_TEMPLATE)?;
     tt.add_formatter("systemd_path", |value, output| match value {
         Value::String(s) => {
             tinytemplate::format_unescaped(&Value::String(systemd_path(&s)), output)
@@ -421,13 +422,15 @@ After = {device | systemd_path}.device
     struct Context {
         devices: Vec<String>,
         strictness: String,
+        needs_on_failure: bool,
     }
     // filter diskless (== "none" devices)
     let result = tt.render(
         "devices",
         &Context {
             devices,
-            strictness: strictness.dependencies_as.to_string(),
+            strictness: systemd_settings.dependencies_as.to_string(),
+            needs_on_failure: systemd_settings.failure_action != SystemdFailureAction::None,
         },
     )?;
     Ok(result)
@@ -436,7 +439,7 @@ After = {device | systemd_path}.device
 fn systemd_unit(
     name: &str,
     deps: &[String],
-    strictness: &SystemdDependencies,
+    systemd_settings: &SystemdSettings,
     env: &[String],
 ) -> Result<String> {
     const UNIT_TEMPLATE: &str = r"[Unit]
@@ -469,7 +472,7 @@ Environment= {e | unescaped}
             name: name.to_string(),
             deps,
             env,
-            strictness: strictness.dependencies_as.to_string(),
+            strictness: systemd_settings.dependencies_as.to_string(),
         },
     )?;
     Ok(result)
@@ -477,7 +480,7 @@ Environment= {e | unescaped}
 
 fn systemd_target_requires(
     requires: &[String],
-    strictness: &SystemdDependencies,
+    systemd_settings: &SystemdSettings,
 ) -> Result<String> {
     const WANTS_TEMPLATE: &str = r"[Unit]
 Before=drbd-reactor.service
@@ -497,7 +500,7 @@ Before=drbd-reactor.service
         "requires",
         &Context {
             requires,
-            strictness: strictness.target_as.to_string(),
+            strictness: systemd_settings.target_as.to_string(),
         },
     )?;
     Ok(result)
@@ -552,9 +555,44 @@ impl fmt::Display for SystemdDependency {
     }
 }
 
-struct SystemdDependencies {
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum SystemdFailureAction {
+    None,
+    Reboot,
+    RebootForce,
+    RebootImmediate,
+    Poweroff,
+    PoweroffForce,
+    PoweroffImmediate,
+    Exit,
+    ExitForce,
+}
+impl Default for SystemdFailureAction {
+    fn default() -> Self {
+        Self::None
+    }
+}
+impl fmt::Display for SystemdFailureAction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::None => write!(f, "none"),
+            Self::Reboot => write!(f, "reboot"),
+            Self::RebootForce => write!(f, "reboot-force"),
+            Self::RebootImmediate => write!(f, "reboot-immediate"),
+            Self::Poweroff => write!(f, "poweroff"),
+            Self::PoweroffForce => write!(f, "poweroff-force"),
+            Self::PoweroffImmediate => write!(f, "poweroff-immediate"),
+            Self::Exit => write!(f, "exit"),
+            Self::ExitForce => write!(f, "exit-force"),
+        }
+    }
+}
+
+struct SystemdSettings {
     dependencies_as: SystemdDependency,
     target_as: SystemdDependency,
+    failure_action: SystemdFailureAction,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -598,7 +636,7 @@ fn get_sleep_before_promote_ms(resource: &Resource, factor: f32) -> u64 {
 
 // inlined copy from https://crates.io/crates/libsystemd
 // inlined because currently not packaged in Ubuntu Focal
-pub fn systemd_path(name: &str) -> String {
+fn systemd_path(name: &str) -> String {
     let trimmed = name.trim_matches('/');
     if trimmed.is_empty() {
         return "-".to_string();
@@ -686,12 +724,13 @@ mod tests {
     }
 
     #[test]
-    fn test_systemd_devices() {
-        let empty = systemd_devices(
+    fn test_drbd_promote() {
+        let empty = drbd_promote(
             Vec::new(),
-            &SystemdDependencies {
+            &SystemdSettings {
                 target_as: SystemdDependency::Wants,
                 dependencies_as: SystemdDependency::Wants,
+                failure_action: SystemdFailureAction::None,
             },
         )
         .expect("should work");
@@ -705,14 +744,15 @@ ExecCondition=
             empty
         );
 
-        let two_volumes = systemd_devices(
+        let two_volumes = drbd_promote(
             vec![
                 "/dev/vg0/backing0".to_string(),
                 "/dev/disk/by-uuid/1123-456".to_string(),
             ],
-            &SystemdDependencies {
+            &SystemdSettings {
                 target_as: SystemdDependency::Wants,
                 dependencies_as: SystemdDependency::Wants,
+                failure_action: SystemdFailureAction::Reboot,
             },
         )
         .expect("should work");
@@ -722,6 +762,8 @@ ExecCondition=
 ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
 ExecCondition=
 [Unit]
+OnFailure=drbd-demote-or-escalate@%i.service
+OnFailureJobMode=replace-irreversibly
 ConditionPathExists = /dev/vg0/backing0
 Wants = dev-vg0-backing0.device
 After = dev-vg0-backing0.device

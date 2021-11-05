@@ -246,12 +246,12 @@ If the resource might be promoted the
 .Dq foo.mount
 and
 .Dq foo.service
-units get started. On stop failes a sysrq gets triggered.
+units get started. On DRBD demote failures a systemd "reboot" is triggered.
 .Bd -literal -offset indent
 [promoter.resources.foo]
 start = ["foo.mount", "foo.service"]
-on-stop-failure =  "echo b > /proc/sysrq-trigger"
-stop-services-on-exit = true
+on-drbd-demote-failure =  "reboot"
+stop-services-on-exit = false
 .Ed
 .Sh SEE ALSO
 For furhter design notes and handled failure scenarios see
