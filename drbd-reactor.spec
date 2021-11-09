@@ -12,7 +12,7 @@ URL:		https://www.github.com/LINBIT/drbd-reactor
 Source0:	https://pkg.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
 
 BuildRequires:	systemd
-Requires:	drbd-utils >= 9.18.2
+Requires:	drbd-utils >= 9.19.1~rc.1
 Requires:	python3
 # python3{,6}-toml is for rhel7/8 only in epel, but we mirror that pkg
 %if 0%{?suse_version} >= 1500 || 0%{?rhel} >= 8

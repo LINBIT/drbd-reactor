@@ -11,7 +11,7 @@ Standards-Version: 3.9.6
 
 Package: drbd-reactor
 Architecture: any
-Depends: drbd-utils (>= 9.18.2),
+Depends: drbd-utils (>= 9.19.1~rc.1),
          python3-toml,
          ${shlibs:Depends},
          ${python3:Depends},
