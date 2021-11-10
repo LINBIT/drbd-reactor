@@ -1,3 +1,17 @@
+drbd-reactor (0.5.0~rc.1-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * promoter: persist on-failure-action
+  * containers: switch to ubi8
+  * drbd-reactor.service: use env
+  * promoter: deprecate on-stop-failure; introduce on-drbd-demote-failure
+  * deps: bump utils to 9.19.1
+
+  [ Christoph Böhmwalder ]
+  * doc: add separate paragraph about automatic reloading
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Wed, 10 Nov 2021 14:36:03 +0100
+
 drbd-reactor (0.4.4-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
