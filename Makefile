@@ -63,7 +63,7 @@ install:  # install binary and config
 	install -D -m 0750 $(PROG)ctl.py $(DESTDIR)/usr/sbin/$(PROG)ctl
 	install -D -m 0640 example/drbd-reactor.toml $(DESTDIR)/etc/drbd-reactor.toml
 	install -d -m 0750 $(DESTDIR)/etc/drbd-reactor.d
-	install -D -m 0640 example/drbd-reactor.service $(DESTDIR)/lib/systemd/system/drbd-reactor.service
+	install -D -m 0644 example/drbd-reactor.service $(DESTDIR)/lib/systemd/system/drbd-reactor.service
 	for f in $(MANPAGES); do \
 		sect=$$(echo $$f | sed -e 's/.*\.\([0-9]\)$$/\1/'); \
 		install -D -m 0640 $$f $(DESTDIR)/usr/share/man/man$${sect}/$$(basename $$f); \
