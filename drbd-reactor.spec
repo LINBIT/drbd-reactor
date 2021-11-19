@@ -1,7 +1,7 @@
 %define debug_package %{nil}
 
 Name:		drbd-reactor
-Version:	0.5.0~rc.1
+Version:	0.5.0
 Release:	1
 Summary:	React to DRBD events via plugins.
 %global	tarball_version %(echo "%{version}" | sed -e 's/~rc/-rc/' -e 's/~alpha/-alpha/')
@@ -12,7 +12,7 @@ URL:		https://www.github.com/LINBIT/drbd-reactor
 Source0:	https://pkg.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
 
 BuildRequires:	systemd
-Requires:	drbd-utils >= 9.19.1~rc.1
+Requires:	drbd-utils >= 9.19.1
 Requires:	python3
 # python3{,6}-toml is for rhel7/8 only in epel, but we mirror that pkg
 %if 0%{?suse_version} >= 1500 || 0%{?rhel} >= 8
@@ -61,6 +61,9 @@ make install DESTDIR=%{buildroot}
 
 
 %changelog
+* Fri Nov 19 2021 Roland Kammerer <roland.kammerer@linbit.com> - 0.5.0-1
+-  New upstream release
+
 * Wed Nov 10 2021 Roland Kammerer <roland.kammerer@linbit.com> - 0.5.0~rc.1-1
 -  New upstream release
 

@@ -1,3 +1,10 @@
+drbd-reactor (0.5.0-1) experimental; urgency=medium
+
+  * build,systemd: fix "is world-inaccessible."
+  * core: dump config on debug level
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 19 Nov 2021 09:10:39 +0100
+
 drbd-reactor (0.5.0~rc.1-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
