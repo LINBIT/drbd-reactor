@@ -289,6 +289,7 @@ fn main() -> Result<()> {
                 );
             }
         };
+        debug!("main: configuration: {:#?}", cfg);
 
         started = plugin::start_from_config(cfg.plugins.clone(), started)?;
         debug!("main: started.len()={}", started.len());
