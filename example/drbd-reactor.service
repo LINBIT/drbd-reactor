@@ -5,6 +5,14 @@ ConditionKernelCommandLine=!nocluster
 Requires=network-online.target
 After=network-online.target
 
+# Managing systemd service units requires DBus
+Wants=dbus.service
+After=dbus.service
+
+# Managing systemd socket units needs polkit as well
+Wants=polkit.service
+After=polkit.service
+
 [Service]
 Type=notify
 ExecStart=/usr/sbin/drbd-reactor
