@@ -97,14 +97,18 @@ impl super::Plugin for Promoter {
                             thread::sleep(Duration::from_millis(sleep_millis));
                         }
                         if start_actions(&name, &res.start, &res.runner).is_err() {
-                            let _ = stop_actions(&name, &res.stop, &res.runner);
+                            if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                                warn!("Stopping '{}' failed: {}", name, e);
+                            }
                         }
                     }
                 }
                 PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
                         info!("run: resource '{}' lost quorum", name);
-                        let _ = stop_actions(&name, &res.stop, &res.runner);
+                        if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                            warn!("Stopping '{}' failed: {}", name, e);
+                        }
                     }
                 }
                 _ => (),
@@ -114,7 +118,14 @@ impl super::Plugin for Promoter {
         // stop services if configured
         for (name, res) in cfg.resources {
             if res.stop_services_on_exit {
-                let _ = stop_actions(&name, &res.stop, &res.runner);
+                let shutdown = || -> Result<()> {
+                    fs::remove_file(services_target_dir(&name).join(SYSTEMD_BEFORE_CONF))?;
+                    systemd_daemon_reload()?;
+                    stop_actions(&name, &res.stop, &res.runner)
+                };
+                if let Err(e) = shutdown() {
+                    warn!("Stopping '{}' failed: {}", name, e);
+                }
             }
         }
 
@@ -284,6 +295,7 @@ fn drbd_backing_device_ready(dev: &str) -> bool {
 
 const SYSTEMD_PREFIX: &str = "/run/systemd/system";
 const SYSTEMD_CONF: &str = "reactor.conf";
+const SYSTEMD_BEFORE_CONF: &str = "reactor-50-before.conf";
 
 fn generate_systemd_templates(
     name: &str,
@@ -334,6 +346,13 @@ fn generate_systemd_templates(
         };
 
         let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", service_name));
+        if service_name.ends_with(".mount") {
+            systemd_write_unit(
+                prefix.clone(),
+                "reactor-50-mount.conf",
+                format!("[Unit]\nDefaultDependencies=no\n"),
+            )?;
+        }
         systemd_write_unit(
             prefix,
             SYSTEMD_CONF,
@@ -352,11 +371,16 @@ fn generate_systemd_templates(
         target_requires.push(service_name.clone());
     }
 
-    let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", name));
+    // target and the extra Before= override
     systemd_write_unit(
-        prefix,
+        services_target_dir(name),
         SYSTEMD_CONF,
         systemd_target_requires(&target_requires, systemd_settings)?,
+    )?;
+    systemd_write_unit(
+        services_target_dir(name),
+        SYSTEMD_BEFORE_CONF,
+        format!("[Unit]\nBefore=drbd-reactor.service\n"),
     )
 }
 
@@ -483,7 +507,6 @@ fn systemd_target_requires(
     systemd_settings: &SystemdSettings,
 ) -> Result<String> {
     const WANTS_TEMPLATE: &str = r"[Unit]
-Before=drbd-reactor.service
 {{- for require in requires }}
 {strictness} = {require | unescaped}
 {{- endfor -}}";
@@ -632,6 +655,10 @@ fn get_sleep_before_promote_ms(resource: &Resource, factor: f32) -> u64 {
 
     // convert to ms and scale by factor
     (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
+}
+
+fn services_target_dir(name: &str) -> PathBuf {
+    Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", name))
 }
 
 // inlined copy from https://crates.io/crates/libsystemd
