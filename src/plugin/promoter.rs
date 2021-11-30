@@ -467,6 +467,7 @@ fn systemd_unit(
     env: &[String],
 ) -> Result<String> {
     const UNIT_TEMPLATE: &str = r"[Unit]
+Description=drbd-reactor controlled %p
 PartOf = drbd-services@{name}.target
 {{ for dep in deps }}
 {strictness} = {dep | unescaped}
