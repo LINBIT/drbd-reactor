@@ -292,9 +292,10 @@ def fenable(name):
 
 
 def systemctl(*args):
-    what = 'systemctl {}'.format(' '.join(args))
+    what = ['systemctl'] + list(args)
     # eprint(what)
-    os.system(what)
+    env = {'SYSTEMD_COLORS': '1'} if has_colors(sys.stdout) else {}
+    print(subprocess.run(what, env=env, stdout=subprocess.PIPE).stdout.decode())
 
 
 def reload_service():
