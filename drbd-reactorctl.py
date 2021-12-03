@@ -294,7 +294,8 @@ def fenable(name):
 def systemctl(*args):
     what = ['systemctl'] + list(args)
     # eprint(what)
-    env = {'SYSTEMD_COLORS': '1'} if has_colors(sys.stdout) else {}
+    env = os.environ.copy()
+    env['SYSTEMD_COLORS'] = str(int(has_colors(sys.stdout)))
     print(subprocess.run(what, env=env, stdout=subprocess.PIPE).stdout.decode())
 
 
