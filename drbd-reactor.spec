@@ -58,6 +58,7 @@ make install DESTDIR=%{buildroot}
 %doc example/drbd-reactor-reload.path
 %doc example/drbd-reactor-reload.service
 %doc example/drbd-reactor.toml
+%doc example/on-no-quorum-io-error.sh
 
 
 %changelog
