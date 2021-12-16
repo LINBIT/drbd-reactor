@@ -28,6 +28,10 @@ impl Promoter {
     pub fn new(cfg: PromoterConfig) -> Result<Self> {
         let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
         adjust_resources(&names)?;
+        info!("Checking DRBD options for {:?}", names);
+        if let Err(e) = check_resources(&names) {
+            warn!("Could not execute DRBD options check: {}", e);
+        }
 
         for (name, res) in &cfg.resources {
             // deprecated settings
@@ -661,6 +665,78 @@ fn get_sleep_before_promote_ms(resource: &Resource, factor: f32) -> u64 {
 
 fn services_target_dir(name: &str) -> PathBuf {
     Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", name))
+}
+
+fn check_resources(to_start: &[String]) -> Result<()> {
+    #[derive(Serialize, Deserialize)]
+    struct Resource {
+        resource: String,
+        options: Options,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct Options {
+        auto_promote: bool,
+        quorum: String,
+        on_no_quorum: String,
+    }
+
+    let check_for = |res: &str, what: &str, expected: &str, is: &str| {
+        if expected != is {
+            warn!(
+                "resource '{}': DRBD option '{}' should be '{}', but is '{}'",
+                res, what, expected, is
+            );
+        }
+    };
+
+    for res in to_start {
+        let output = Command::new("drbdsetup")
+            .arg("show")
+            .arg("--show-defaults")
+            .arg("--json")
+            .arg(res)
+            .output()?;
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "'drbdsetup show' not executed successfully"
+            ));
+        }
+
+        let stdout = String::from_utf8(output.stdout)?;
+        let resources: Vec<Resource> = serde_json::from_str(&stdout)?;
+        if resources.len() != 1 {
+            return Err(anyhow::anyhow!(
+                "resources lenght from drbdsetup show not exactly 1"
+            ));
+        }
+        if &resources[0].resource != res {
+            return Err(anyhow::anyhow!(
+                "res name to check ('{}') and drbdsetup show output ('{}') did not match",
+                res,
+                resources[0].resource
+            ));
+        }
+
+        check_for(
+            res,
+            "auto-promote",
+            "no",
+            match resources[0].options.auto_promote {
+                true => "yes",
+                false => "no",
+            },
+        );
+        check_for(res, "quorum", "majority", &resources[0].options.quorum);
+        check_for(
+            res,
+            "on-no-quorum",
+            "io-error",
+            &resources[0].options.on_no_quorum,
+        );
+    }
+    Ok(())
 }
 
 // inlined copy from https://crates.io/crates/libsystemd
