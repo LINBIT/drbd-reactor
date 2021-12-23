@@ -56,6 +56,10 @@ make debcontainer # only execute this once
 make deb # as often as needed
 ```
 
+The "deb" and "rpm" targets should be called from a git checkout of the repository, not a release tarball.
+Starting from a release tarball rpm building should be done via the shipped `drbd-reactor.spec` file as usual
+via `rpmbuild`.
+
 # Architecture
 
 ## Core
