@@ -123,7 +123,7 @@ impl super::Plugin for Promoter {
         for (name, res) in cfg.resources {
             if res.stop_services_on_exit {
                 let shutdown = || -> Result<()> {
-                    fs::remove_file(services_target_dir(&name).join(SYSTEMD_BEFORE_CONF))?;
+                    fs::remove_file(escaped_services_target_dir(&name).join(SYSTEMD_BEFORE_CONF))?;
                     systemd_daemon_reload()?;
                     stop_actions(&name, &res.stop, &res.runner)
                 };
@@ -219,7 +219,11 @@ fn start_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
             }
             Ok(())
         }
-        Runner::Systemd => action(&format!("drbd-services@{}.target", name), State::Start, how),
+        Runner::Systemd => action(
+            &format!("drbd-services@{}.target", escape_name(name)),
+            State::Start,
+            how,
+        ),
     }
 }
 
@@ -311,7 +315,8 @@ fn generate_systemd_templates(
         .filter(|d| d != "none")
         .collect();
 
-    let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", name));
+    let escaped_name = escape_name(name);
+    let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", escaped_name));
     systemd_write_unit(
         prefix,
         SYSTEMD_CONF,
@@ -319,8 +324,10 @@ fn generate_systemd_templates(
     )?;
 
     if systemd_settings.failure_action != SystemdFailureAction::None {
-        let prefix =
-            Path::new(SYSTEMD_PREFIX).join(format!("drbd-demote-or-escalate@{}.service.d", name));
+        let prefix = Path::new(SYSTEMD_PREFIX).join(format!(
+            "drbd-demote-or-escalate@{}.service.d",
+            escaped_name
+        ));
         systemd_write_unit(
             prefix,
             SYSTEMD_CONF,
@@ -337,14 +344,17 @@ fn generate_systemd_templates(
 
     for action in actions {
         let deps = match target_requires.last() {
-            Some(prev) => vec![format!("drbd-promote@{}.service", name), prev.to_string()],
-            None => vec![format!("drbd-promote@{}.service", name)],
+            Some(prev) => vec![
+                format!("drbd-promote@{}.service", escaped_name),
+                prev.to_string(),
+            ],
+            None => vec![format!("drbd-promote@{}.service", escaped_name)],
         };
 
         let (service_name, env) = match ocf_pattern.captures(action) {
             Some(ocf) => {
                 let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-                systemd_ocf_parse_to_env(name, vendor, agent, args)?
+                escaped_systemd_ocf_parse_to_env(name, vendor, agent, args)?
             }
             _ => (action.to_string(), Vec::new()),
         };
@@ -360,7 +370,7 @@ fn generate_systemd_templates(
         systemd_write_unit(
             prefix,
             SYSTEMD_CONF,
-            systemd_unit(name, &deps, systemd_settings, &env)?,
+            systemd_unit(&escaped_name, &deps, systemd_settings, &env)?,
         )?;
 
         // we would not need to keep the order here, as it does not matter
@@ -377,18 +387,18 @@ fn generate_systemd_templates(
 
     // target and the extra Before= override
     systemd_write_unit(
-        services_target_dir(name),
+        escaped_services_target_dir(name),
         SYSTEMD_CONF,
         systemd_target_requires(&target_requires, systemd_settings)?,
     )?;
     systemd_write_unit(
-        services_target_dir(name),
+        escaped_services_target_dir(name),
         SYSTEMD_BEFORE_CONF,
         format!("[Unit]\nBefore=drbd-reactor.service\n"),
     )
 }
 
-fn systemd_ocf_parse_to_env(
+fn escaped_systemd_ocf_parse_to_env(
     name: &str,
     vendor: &str,
     agent: &str,
@@ -402,7 +412,8 @@ fn systemd_ocf_parse_to_env(
 
     let ra_name = &args[0];
     let ra_name = format!("{}_{}", ra_name, name);
-    let service_name = format!("ocf.ra@{}.service", ra_name);
+    let escaped_ra_name = escape_name(&ra_name);
+    let service_name = format!("ocf.ra@{}.service", escaped_ra_name);
     let mut env = Vec::with_capacity(args.len() - 1);
     for item in &args[1..] {
         let mut split = item.splitn(2, "=");
@@ -464,6 +475,7 @@ After = {device | systemd_path}.device
     Ok(result)
 }
 
+// does not do further escaping, caller needs to do it
 fn systemd_unit(
     name: &str,
     deps: &[String],
@@ -663,8 +675,8 @@ fn get_sleep_before_promote_ms(resource: &Resource, factor: f32) -> u64 {
     (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
 }
 
-fn services_target_dir(name: &str) -> PathBuf {
-    Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", name))
+fn escaped_services_target_dir(name: &str) -> PathBuf {
+    Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", escape_name(name)))
 }
 
 fn check_resources(to_start: &[String]) -> Result<()> {
@@ -764,6 +776,21 @@ fn systemd_path(name: &str) -> String {
 
 // inlined copy from https://crates.io/crates/libsystemd
 // inlined because currently not packaged in Ubuntu Focal
+pub fn escape_name(name: &str) -> String {
+    if name.is_empty() {
+        return "".to_string();
+    }
+
+    let parts: Vec<String> = name
+        .bytes()
+        .enumerate()
+        .map(|(n, b)| escape_byte(b, n))
+        .collect();
+    parts.join("")
+}
+
+// inlined copy from https://crates.io/crates/libsystemd
+// inlined because currently not packaged in Ubuntu Focal
 fn escape_byte(b: u8, index: usize) -> String {
     let c = char::from(b);
     match c {
@@ -806,7 +833,7 @@ mod tests {
 
     #[test]
     fn test_systemd_ocf_parse_to_env() {
-        let (name, env) = systemd_ocf_parse_to_env(
+        let (name, env) = escaped_systemd_ocf_parse_to_env(
             "res1",
             "vendor1",
             "agent1",
@@ -826,6 +853,13 @@ mod tests {
                 "AGENT=/usr/lib/ocf/resource.d/vendor1/agent1"
             ]
         );
+
+        // escaping
+        let (name, _env) =
+            escaped_systemd_ocf_parse_to_env("res-1", "vendor1", "agent1", "name-1 do not care")
+                .expect("should work");
+
+        assert_eq!(name, "ocf.ra@name\\x2d1_res\\x2d1.service");
     }
 
     #[test]

@@ -173,7 +173,7 @@ start = ["${service.mount}", "${service.service}"]
 
     @staticmethod
     def target_name(name):
-        return 'drbd-services@{}.target'.format(name)
+        return 'drbd-services@{}.target'.format(systemd_escape_name(name))
 
     def _get_names(self):
         return [name for (name, options) in
@@ -216,7 +216,7 @@ start = ["${service.mount}", "${service.service}"]
             target = Promoter.target_name(name)
             if verbose:
                 systemctl('status', '--no-pager', target)
-                systemctl('status', '--no-pager', 'drbd-promote@{}.service'.format(name))
+                systemctl('status', '--no-pager', 'drbd-promote@{}.service'.format(systemd_escape_name(name)))
                 for service in self._get_start(name):
                     service = service.strip()
                     if service.startswith('ocf:'):
@@ -224,7 +224,8 @@ start = ["${service.mount}", "${service.service}"]
                         if len(ra) < 2:
                             eprint("could not parse ocf service ('{}')".format(service))
                             continue
-                        service = 'ocf.ra@{}_{}.service'.format(ra[1], name)
+                        escaped_service_template = systemd_escape_name('{}_{}'.format(ra[1], name))
+                        service = 'ocf.ra@{}.service'.format(escaped_service_template)
                     systemctl('status', '--no-pager', service)
             else:
                 systemctl('list-dependencies', '--no-pager', target)
@@ -297,6 +298,11 @@ def systemctl(*args):
     env = os.environ.copy()
     env['SYSTEMD_COLORS'] = str(int(has_colors(sys.stdout)))
     print(subprocess.run(what, env=env, stdout=subprocess.PIPE).stdout.decode())
+
+
+def systemd_escape_name(name):
+    return subprocess.run(['systemd-escape', '--', name], check=True,
+                          stdout=subprocess.PIPE).stdout.decode().strip()
 
 
 def reload_service():
