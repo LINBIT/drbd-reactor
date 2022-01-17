@@ -3,7 +3,7 @@ Upstream-Name: drbd-reactor
 Source: https://github.com/LINBIT/drbd-reactor
 
 Files: *
-Copyright: Copyright (C) 2021, LINBIT HA-Solutions GmbH
+Copyright: Copyright (C) 2021-2022, LINBIT HA-Solutions GmbH
 License: Apache-2.0
  Licensed to the Apache Software Foundation (ASF) under one or more
  contributor license agreements.  See the NOTICE file distributed with
@@ -24,7 +24,7 @@ License: Apache-2.0
  be found in the file `/usr/share/common-licenses/Apache-2.0'.
 
 Files: debian/*
-Copyright: Copyright (C) 2021, LINBIT HA-Solutions GmbH
+Copyright: Copyright (C) 2021-2022, LINBIT HA-Solutions GmbH
 License: GPL-2+
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public

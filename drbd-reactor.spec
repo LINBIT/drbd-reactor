@@ -1,7 +1,7 @@
 %define debug_package %{nil}
 
 Name:		drbd-reactor
-Version:	0.5.1
+Version:	0.5.2
 Release:	1
 Summary:	React to DRBD events via plugins.
 %global	tarball_version %(echo "%{version}" | sed -e 's/~rc/-rc/' -e 's/~alpha/-alpha/')
@@ -62,6 +62,9 @@ make install DESTDIR=%{buildroot}
 
 
 %changelog
+* Mon Jan 17 2022 Roland Kammerer <roland.kammerer@linbit.com> - 0.5.2-1
+-  New upstream release
+
 * Tue Nov 30 2021 Roland Kammerer <roland.kammerer@linbit.com> - 0.5.1-1
 -  New upstream release
 
