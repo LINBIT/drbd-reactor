@@ -165,7 +165,10 @@ start = ["${service.mount}", "${service.service}"]
 ## if runner is sytemd it just stops the implicitly generated systemd.target
 # stop = []
 # on-drbd-demote-failure = "reboot"
-# stop-services-on-exit = false"""
+# stop-services-on-exit = false
+#
+# for more complex setups like HA iSCSI targets, NFS exports, or NVMe-oF targets consider
+# https://github.com/LINBIT/linstor-gateway which uses LINSTOR and drbd-reactor"""
 
     @property
     def header(self):
