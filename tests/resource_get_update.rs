@@ -69,10 +69,17 @@ fn get_device_update() {
 #[test]
 fn get_connection_update() {
     let mut r = Resource::with_name("foo");
-    let c = Connection {
+    let mut c = Connection {
         peer_node_id: 1,
         ..Default::default()
     };
+
+    let pd = PeerDevice {
+        peer_node_id: 1,
+        volume: 1,
+        ..Default::default()
+    };
+    c.peerdevices.push(pd);
     let cs = c.clone();
     r.connections.push(c);
 
@@ -91,6 +98,8 @@ fn get_connection_update() {
         }
         _ => panic!("not a connection update"),
     }
+    //check that updated did not delete existing pd
+    assert!(r.connections[0].peerdevices.len() == 1);
 
     // destroy still needs to be an update
     assert!(r.get_connection_update(&EventType::Destroy, &u).is_some());

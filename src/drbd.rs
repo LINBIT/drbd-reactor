@@ -876,7 +876,14 @@ impl Resource {
                     peer_role: existing.peer_role.clone(),
                 };
 
-                self.update_or_delete_connection(et, conn);
+                // existing connection and we know that the conn we get here
+                // does not contain any peerdevices or paths
+                // we want to preserve the existing pds/paths in the existing connection
+                // conn is just an update for the rest of the struct fields.
+                let mut conn = conn.clone();
+                conn.peerdevices = existing.peerdevices.to_vec();
+                conn.paths = existing.paths.to_vec();
+                self.update_or_delete_connection(et, &conn);
                 if old == new && *et != EventType::Destroy {
                     return None;
                 }
