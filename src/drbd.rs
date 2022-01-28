@@ -573,11 +573,11 @@ impl PeerDevicePluginUpdate {
         );
 
         env.insert(
-            "DRBD_OLD_REPLICATION_STATE".to_string(),
+            "DRBD_OLD_PEER_REPLICATION_STATE".to_string(),
             self.old.replication_state.to_string(),
         );
         env.insert(
-            "DRBD_NEW_REPLICATION_STATE".to_string(),
+            "DRBD_NEW_PEER_REPLICATION_STATE".to_string(),
             self.new.replication_state.to_string(),
         );
 
