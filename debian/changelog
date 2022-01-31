@@ -1,3 +1,11 @@
+drbd-reactor (0.5.3-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * core: preserve pds/paths on conn updates
+  * umh: fix env for peerdevice state
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 31 Jan 2022 08:22:12 +0100
+
 drbd-reactor (0.5.2-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
