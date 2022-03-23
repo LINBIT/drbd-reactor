@@ -20,6 +20,10 @@
 .Nm status
 .Op Fl -verbose
 .Op Ar
+.Nm evict
+.Op Fl -delay
+.Op Fl -force
+.Op Ar
 .Nm cat
 .Op Ar
 .Nm restart
@@ -81,12 +85,23 @@ disable a currently disabled plugin.
 .Bl -tag -width Ds
 .It Fl -now
 In case of a promoter plugin also disable the target unit.
+You might want to use
+.Sy evict
+instead.
 .El
 .Ss status
 print the status of a plugin.
 .Bl -tag -width Ds
 .It Fl -verbose
 verbose output depending on the plugin type.
+.El
+.Ss evict
+Evicts a promoter resource from the currently active node.
+.Bl -tag -width Ds
+.It Fl -delay
+Positive number of seconds to wait for peer takeover.
+.It Fl -force
+Override sanity checks (multiple plugins per snippet/multiple resources per promoter).
 .El
 .Ss cat
 cat the toml configuration of a plugin. Tries to use a pretty printer (e.g.,

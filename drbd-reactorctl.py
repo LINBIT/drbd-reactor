@@ -8,6 +8,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 
 DEFAULT_SNIPPETS = '/etc/drbd-reactor.d'
@@ -151,6 +152,8 @@ enums = true
 
 
 class Promoter(Plugin):
+    UNKNOWN = '<unknown>'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -178,7 +181,7 @@ start = ["${service.mount}", "${service.service}"]
     def target_name(name):
         return 'drbd-services@{}.target'.format(systemd_escape_name(name))
 
-    def _get_names(self):
+    def _get_res_names(self):
         return [name for (name, options) in
                 self._config.get('resources', {}).items() if
                 options.get('runner', 'systemd') == 'systemd']
@@ -187,13 +190,12 @@ start = ["${service.mount}", "${service.service}"]
         return self._config.get('resources', {}).get(name, {}).get('start', [])
 
     def _get_primary_on(self, name):
-        UNKNOWN = '<unknown>'
         try:
             out = subprocess.run(['drbdsetup', 'status', '--json', name],
                                  check=True, stdout=subprocess.PIPE).stdout
             out = json.loads(out)[0]  # always a single res
         except Exception:
-            return UNKNOWN
+            return self.UNKNOWN
 
         # is it me?
         if out.get('role') == 'Primary':
@@ -201,14 +203,14 @@ start = ["${service.mount}", "${service.service}"]
         # one of the peers?
         for con in out.get('connections', []):
             if con.get('peer-role') == 'Primary':
-                return con.get('name', UNKNOWN)
-        return UNKNOWN
+                return con.get('name', self.UNKNOWN)
+        return self.UNKNOWN
 
     def show_status(self, verbose=False):
         super().show_status(verbose)
         print(color_string(self.header, color=GREEN))
 
-        for name in self._get_names():
+        for name in self._get_res_names():
             primary = self._get_primary_on(name)
             if primary == socket.gethostname():
                 primary = 'this node'
@@ -235,7 +237,7 @@ start = ["${service.mount}", "${service.service}"]
 
     @property
     def targets(self):
-        return [Promoter.target_name(name) for name in self._get_names()]
+        return [Promoter.target_name(name) for name in self._get_res_names()]
 
 
 class UMH(Plugin):
@@ -300,7 +302,9 @@ def systemctl(*args):
     # eprint(what)
     env = os.environ.copy()
     env['SYSTEMD_COLORS'] = str(int(has_colors(sys.stdout)))
-    print(subprocess.run(what, env=env, stdout=subprocess.PIPE).stdout.decode())
+    out = subprocess.run(what, env=env, stdout=subprocess.PIPE).stdout.decode()
+    if out:
+        print(out)
 
 
 def systemd_escape_name(name):
@@ -372,8 +376,7 @@ def cat(args):
         os.system('{} {}'.format(catter, pf))
 
 
-def disable(args):
-    plugin_files = get_plugin_files(args.config, args.configs)
+def _disable_files(plugin_files, now):
     for pf in plugin_files:
         os.rename(pf, fdisable(pf))
 
@@ -382,7 +385,7 @@ def disable(args):
     if len(plugin_files) > 0 and not has_autoload():
         reload_service()
 
-    if args.now:
+    if now:
         for pf in plugin_files:
             content = toml.load(fdisable(pf))
             for plugin in Plugin.new(content):
@@ -392,14 +395,23 @@ def disable(args):
     return len(plugin_files)
 
 
-def enable(args):
-    plugin_files = get_plugin_files(args.config, args.configs, ext='.toml.disabled')
+def disable(args):
+    plugin_files = get_plugin_files(args.config, args.configs)
+    return _disable_files(plugin_files, args.now)
+
+
+def _enable_files(plugin_files):
     for pf in plugin_files:
         os.rename(pf, fenable(pf))
     nr_plugins = len(plugin_files)
     if nr_plugins > 0 and not has_autoload():
         reload_service()
     return nr_plugins
+
+
+def enable(args):
+    plugin_files = get_plugin_files(args.config, args.configs, ext='.toml.disabled')
+    return _enable_files(plugin_files)
 
 
 def restart_files(plugin_files):
@@ -518,6 +530,66 @@ def edit(args):
           'and execute "systemctl reload drbd-reactor.service"'.format(final_file))
 
 
+def evict(args):
+    files = get_plugin_files(args.config, args.configs)
+    if not args.force:  # sanity checks
+        for f in files:
+            ps = Plugin.from_files([f])
+            if len(ps) != 1:
+                die('Config file {} contains multiple plugins'.format(f))
+            for p in ps:
+                if isinstance(p, Promoter) and len(p._get_res_names()) != 1:
+                    die('Promoter in config file {} responsible for multiple resources'.format(f))
+
+    me = socket.gethostname()
+    for p in Plugin.from_files(files):
+        if not isinstance(p, Promoter):
+            continue
+        for name in p._get_res_names():
+            print(color_string('Evicting {}'.format(name), color=GREEN))
+            primary = p._get_primary_on(name)
+            if primary == Promoter.UNKNOWN:
+                print('Sorry, resource state for "{}" unknown, ignoring'.format(name))
+                continue
+            if primary != me:
+                print('Active on {}, nothing to do on this node, ignoring'.format(primary))
+                continue
+            cfg_file = p.cfg_file
+            if not cfg_file:
+                raise Exception('Promoter for {} has no config file'.format(name))
+
+            try:
+                _disable_files([cfg_file], now=True)
+
+                needs_newline = False
+                for i in range(args.delay, -1, -1):  # -1 to really give it the full time
+                    primary = p._get_primary_on(name)
+                    if primary != Promoter.UNKNOWN and primary != me:  # a know host/peer
+                        break
+
+                    s = str(i) + '..' if i != 0 else str(i)
+                    print(s, sep='', end='')
+                    sys.stdout.flush()
+                    needs_newline = True
+                    if i != 0:  # no need to sleep on last iteration
+                        time.sleep(1)
+
+                if needs_newline:  # finish with newline
+                    print()
+
+                if primary == Promoter.UNKNOWN:
+                    print('Unfortunately no other node took over, resource in unknown state')
+                elif primary == me:
+                    print('Unfortunately no other node took over, local node still DRBD Primary')
+                else:
+                    print('Node {} took over'.format(primary))
+            except KeyboardInterrupt:
+                print('\ninterrupted')
+            finally:
+                print('Re-enabling the config')
+                _enable_files([fdisable(cfg_file)])
+
+
 def main():
     parser = argparse.ArgumentParser(prog='drbd-reactorctl')
     parser.add_argument('-c', '--config', default='/etc/drbd-reactor.toml',
@@ -568,6 +640,22 @@ def main():
     parser_remove.add_argument('--disabled', action='store_true',
                                help='remove a disabled file.')
     parser_remove.add_argument('configs', nargs='+', help='configs to remove')
+
+    def positive_int(arg):
+        arg = int(arg)
+        if arg <= 0:
+            raise ValueError('must be positive')
+        return arg
+
+    parser_evict = subparsers.add_parser('evict', help='Evict promoter resource by given config files')
+    parser_evict.set_defaults(func=evict)
+    default_evict_delay = 20
+    evict_help = 'Positive number of seconds to wait for peer takeover (default {})'.format(default_evict_delay)
+    parser_evict.add_argument('-d', '--delay', type=positive_int, default=default_evict_delay,
+                              help=evict_help)
+    parser_evict.add_argument('-f', '--force', action='store_true',
+                              help='Override checks (multiple plugins per snippet/multiple resources per promoter)')
+    parser_evict.add_argument('configs', nargs='*', help='configs to evict')
 
     parser_cat = subparsers.add_parser('cat', help='cat given plugin config files')
     parser_cat.set_defaults(func=cat)
