@@ -189,6 +189,9 @@ start = ["${service.mount}", "${service.service}"]
     def _get_start(self, name):
         return self._config.get('resources', {}).get(name, {}).get('start', [])
 
+    def _get_drbd_demote_failure_action(self, name):
+        return self._config.get('resources', {}).get(name, {}).get('on-drbd-demote-failure', '')
+
     def _get_primary_on(self, name):
         try:
             out = subprocess.run(['drbdsetup', 'status', '--json', name],
@@ -532,19 +535,29 @@ def edit(args):
 
 def evict(args):
     files = get_plugin_files(args.config, args.configs)
-    if not args.force:  # sanity checks
-        for f in files:
-            ps = Plugin.from_files([f])
-            if len(ps) != 1:
-                die('Config file {} contains multiple plugins'.format(f))
-            for p in ps:
-                if isinstance(p, Promoter) and len(p._get_res_names()) != 1:
+    promoters = []
+
+    for f in files:
+        ps = Plugin.from_files([f])
+        nr_plugins = len(ps)
+        if nr_plugins == 0:
+            continue
+
+        nr_promoters = 0
+        for p in ps:
+            if isinstance(p, Promoter):
+                nr_promoters += 1
+                promoters.append(p)
+                if len(p._get_res_names()) != 1 and not args.force:
                     die('Promoter in config file {} responsible for multiple resources'.format(f))
 
+        if nr_plugins != nr_promoters and nr_promoters > 0 and not args.force:
+            die('Config file {} contains mixed promoter and other plugins'.format(f))
+
+    promoters.sort(key=lambda p: any(p._get_drbd_demote_failure_action(name) for name in p._get_res_names()))
+
     me = socket.gethostname()
-    for p in Plugin.from_files(files):
-        if not isinstance(p, Promoter):
-            continue
+    for p in promoters:
         for name in p._get_res_names():
             print(color_string('Evicting {}'.format(name), color=GREEN))
             primary = p._get_primary_on(name)
