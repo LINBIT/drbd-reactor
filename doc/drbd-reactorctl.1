@@ -23,6 +23,8 @@
 .Nm evict
 .Op Fl -delay
 .Op Fl -force
+.Op Fl -keep-masked
+.Op Fl -unmask
 .Op Ar
 .Nm cat
 .Op Ar
@@ -102,6 +104,21 @@ Evicts a promoter resource from the currently active node.
 Positive number of seconds to wait for peer takeover.
 .It Fl -force
 Override sanity checks (multiple plugins per snippet/multiple resources per promoter).
+.It Fl -keep-masked
+Usually
+.Sy evict
+tries to evict the resource from the node but does not take further actions to
+avoid that the resource becomes active on that node again (e.g., fail-back).
+With this option the target unit is temporarily masked via
+.Sy systemd
+This makes it impossible to start the unit on the local node, which might be
+beneficial for maintenance. Masking is cleared after reboot, or after
+.Sy evict --unmask .
+.It Fl -unmask
+Unmasks all target units and tries to start them. It does not run any
+evictions on its own, it is used to clear previous
+.Sy evict --keep-masked
+operations.
 .El
 .Ss cat
 cat the toml configuration of a plugin. Tries to use a pretty printer (e.g.,
@@ -132,6 +149,8 @@ drbd-reactorctl restart myprometheus.toml
 drbd-reactorctl restart myprometheus
 drbd-reactorctl status /etc/drbd-reactor.d/myprometheus.toml
 drbd-reactorctl disable --now mylinstorpromoter
+drbd-reactorctl evict --keep-masked
+drbd-reactorctl evict --unmask mylinstorpromoter
 .Ed
 .Sh AUTHORS
 .An -nosplit

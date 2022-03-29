@@ -300,14 +300,18 @@ def fenable(name):
     return name[:-len('.disabled')]
 
 
-def systemctl(*args):
+def systemctl(*args, stdout=True, stderr=True):
     what = ['systemctl'] + list(args)
     # eprint(what)
     env = os.environ.copy()
     env['SYSTEMD_COLORS'] = str(int(has_colors(sys.stdout)))
-    out = subprocess.run(what, env=env, stdout=subprocess.PIPE).stdout.decode()
-    if out:
+    p = subprocess.run(what, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out = p.stdout.decode().strip()
+    err = p.stderr.decode().strip()
+    if out and stdout:
         print(out)
+    if err and stderr:
+        print(err)
 
 
 def systemd_escape_name(name):
@@ -533,6 +537,63 @@ def edit(args):
           'and execute "systemctl reload drbd-reactor.service"'.format(final_file))
 
 
+def _evict_unmask_and_start(name, target):
+    print('Re-enabling {}'.format(name))
+    systemctl('unmask', target)
+    systemctl('start', target, stderr=False)
+
+
+def _evict_unmask(p):
+    for name in p._get_res_names():
+        target = Promoter.target_name(name)
+        _evict_unmask_and_start(name, target)
+
+
+def _evict_resources(p, me, delay, keep_masked):
+    for name in p._get_res_names():
+        target = Promoter.target_name(name)
+        print(color_string('Evicting {}'.format(name), color=GREEN))
+        primary = p._get_primary_on(name)
+        if primary == Promoter.UNKNOWN:
+            print('Sorry, resource state for "{}" unknown, ignoring'.format(name))
+            continue
+        if primary != me:
+            print('Active on {}, nothing to do on this node, ignoring'.format(primary))
+            continue
+
+        try:
+            systemctl('mask', '--runtime', target)
+            systemctl('stop', target, stderr=False)
+
+            needs_newline = False
+            for i in range(delay, -1, -1):  # -1 to really give it the full time
+                primary = p._get_primary_on(name)
+                if primary != Promoter.UNKNOWN and primary != me:  # a know host/peer
+                    break
+
+                s = str(i) + '..' if i != 0 else str(i)
+                print(s, sep='', end='')
+                sys.stdout.flush()
+                needs_newline = True
+                if i != 0:  # no need to sleep on last iteration
+                    time.sleep(1)
+
+            if needs_newline:  # finish with newline
+                print()
+
+            if primary == Promoter.UNKNOWN:
+                print('Unfortunately no other node took over, resource in unknown state')
+            elif primary == me:
+                print('Unfortunately no other node took over, local node still DRBD Primary')
+            else:
+                print('Node {} took over'.format(primary))
+        except KeyboardInterrupt:
+            print('\ninterrupted')
+        finally:
+            if not keep_masked:
+                _evict_unmask_and_start(name, target)
+
+
 def evict(args):
     files = get_plugin_files(args.config, args.configs)
     promoters = []
@@ -558,49 +619,10 @@ def evict(args):
 
     me = socket.gethostname()
     for p in promoters:
-        for name in p._get_res_names():
-            print(color_string('Evicting {}'.format(name), color=GREEN))
-            primary = p._get_primary_on(name)
-            if primary == Promoter.UNKNOWN:
-                print('Sorry, resource state for "{}" unknown, ignoring'.format(name))
-                continue
-            if primary != me:
-                print('Active on {}, nothing to do on this node, ignoring'.format(primary))
-                continue
-            cfg_file = p.cfg_file
-            if not cfg_file:
-                raise Exception('Promoter for {} has no config file'.format(name))
-
-            try:
-                _disable_files([cfg_file], now=True)
-
-                needs_newline = False
-                for i in range(args.delay, -1, -1):  # -1 to really give it the full time
-                    primary = p._get_primary_on(name)
-                    if primary != Promoter.UNKNOWN and primary != me:  # a know host/peer
-                        break
-
-                    s = str(i) + '..' if i != 0 else str(i)
-                    print(s, sep='', end='')
-                    sys.stdout.flush()
-                    needs_newline = True
-                    if i != 0:  # no need to sleep on last iteration
-                        time.sleep(1)
-
-                if needs_newline:  # finish with newline
-                    print()
-
-                if primary == Promoter.UNKNOWN:
-                    print('Unfortunately no other node took over, resource in unknown state')
-                elif primary == me:
-                    print('Unfortunately no other node took over, local node still DRBD Primary')
-                else:
-                    print('Node {} took over'.format(primary))
-            except KeyboardInterrupt:
-                print('\ninterrupted')
-            finally:
-                print('Re-enabling the config')
-                _enable_files([fdisable(cfg_file)])
+        if args.unmask:
+            _evict_unmask(p)
+        else:
+            _evict_resources(p, me, args.delay, args.keep_masked)
 
 
 def main():
@@ -663,11 +685,18 @@ def main():
     parser_evict = subparsers.add_parser('evict', help='Evict promoter resource by given config files')
     parser_evict.set_defaults(func=evict)
     default_evict_delay = 20
-    evict_help = 'Positive number of seconds to wait for peer takeover (default {})'.format(default_evict_delay)
+    evict_delay_help = 'Positive number of seconds to wait for peer takeover (default {})'.format(default_evict_delay)
     parser_evict.add_argument('-d', '--delay', type=positive_int, default=default_evict_delay,
-                              help=evict_help)
+                              help=evict_delay_help)
     parser_evict.add_argument('-f', '--force', action='store_true',
                               help='Override checks (multiple plugins per snippet/multiple resources per promoter)')
+    evict_mutex_grp = parser_evict.add_mutually_exclusive_group()
+    evict_mutex_grp.add_argument('-k', '--keep-masked', action='store_true',
+                                 help='If set, the target units will stay masked (i.e., "systemctl mask --runtime")')
+    evict_mutex_grp.add_argument('-u', '--unmask', action='store_true',
+                                 help='If set, unmask targets (i.e., "systemctl unmask") '
+                                 'This does not run any evictions, it is used to clear previous '
+                                 '"--keep-masked" operations')
     parser_evict.add_argument('configs', nargs='*', help='configs to evict')
 
     parser_cat = subparsers.add_parser('cat', help='cat given plugin config files')
