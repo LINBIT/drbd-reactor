@@ -38,26 +38,41 @@ except Exception:
         )
 
 
-def has_colors(stream):
-    if not hasattr(stream, "isatty"):
-        return False
-    if not stream.isatty():
-        return False  # auto color only on TTYs
-    try:
-        import curses
-        curses.setupterm()
-        return curses.tigetnum("colors") > 2
-    except Exception:
-        # guess false in case of error
-        return False
+class Color(object):
+    AUTO, ALWAYS, NEVER = 'auto', 'always', 'never'
+    DEFAULT = AUTO
 
-    return True
+    def __init__(self, has_colors=DEFAULT):
+        self._has_colors = has_colors
+
+    def has_colors(self, stream):
+        if self._has_colors != Color.AUTO:
+            return self._has_colors == Color.ALWAYS
+
+        if not hasattr(stream, "isatty"):
+            return False
+        if not stream.isatty():
+            return False  # auto color only on TTYs
+        try:
+            import curses
+            curses.setupterm()
+            return curses.tigetnum("colors") > 2
+        except Exception:
+            # guess false in case of error
+            return False
+
+        return True
+
+    def color_string(self, text, color=WHITE, stream=sys.stdout):
+        if self.has_colors(stream):
+            return "\x1b[1;{0}m{1}\x1b[0m".format(30+color, text)
+        return text
 
 
-def color_string(text, color=WHITE, stream=sys.stdout):
-    if has_colors(stream):
-        return "\x1b[1;{0}m{1}\x1b[0m".format(30+color, text)
-    return text
+# one global color object that is used in the rest of the code
+# and can be overwritten by args from __main__
+# this is slightly ugly, but passing the color object to the static/classmethods of Plugin is as well.
+color = Color()
 
 
 class Plugin(object):
@@ -140,13 +155,13 @@ enums = true
         super().show_status(verbose)
         address = self._config.get('address', '0.0.0.0:9942')
         header = '{} listening on {}'.format(self.header, address)
-        print(color_string(header, color=GREEN))
+        print(color.color_string(header, color=GREEN))
         if verbose:
-            get = color_string('successful', color=GREEN)
+            get = color.color_string('successful', color=GREEN)
             try:
                 urllib.request.urlopen('http://' + address, timeout=2).read()
             except Exception:
-                get = color_string('failed', color=RED)
+                get = color.color_string('failed', color=RED)
 
             print('HTTP GET: {}'.format(get))
 
@@ -211,7 +226,7 @@ start = ["${service.mount}", "${service.service}"]
 
     def show_status(self, verbose=False):
         super().show_status(verbose)
-        print(color_string(self.header, color=GREEN))
+        print(color.color_string(self.header, color=GREEN))
 
         for name in self._get_res_names():
             primary = self._get_primary_on(name)
@@ -265,7 +280,7 @@ new.role = "Primary"
     def show_status(self, verbose=False):
         super().show_status(verbose)
         header = '{} {}'.format(self.header, 'started')
-        print(color_string(header, color=GREEN))
+        print(color.color_string(header, color=GREEN))
 
 
 class Debugger(Plugin):
@@ -286,7 +301,7 @@ id = "debugger"  # usually there is only one, id should be fine
         super().show_status(verbose)
         # TODO: check loggers for at least debug level
         header = '{} {}'.format(self.header, 'started')
-        print(color_string(header, color=GREEN))
+        print(color.color_string(header, color=GREEN))
 
 
 def fdisable(name):
@@ -304,7 +319,7 @@ def systemctl(*args, stdout=True, stderr=True):
     what = ['systemctl'] + list(args)
     # eprint(what)
     env = os.environ.copy()
-    env['SYSTEMD_COLORS'] = str(int(has_colors(sys.stdout)))
+    env['SYSTEMD_COLORS'] = str(int(color.has_colors(sys.stdout)))
     p = subprocess.run(what, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out = p.stdout.decode().strip()
     err = p.stderr.decode().strip()
@@ -364,10 +379,10 @@ def ls(args):
     else:
         files = get_plugin_files(args.config, args.configs) + [args.config]
 
-    color = RED if args.disabled else GREEN
+    col = RED if args.disabled else GREEN
     for p in Plugin.from_files(files):
         print(p.cfg_file)
-        print(color_string(p.header, color=color))
+        print(color.color_string(p.header, color=col))
 
 
 def cat(args):
@@ -522,7 +537,7 @@ def edit(args):
             sys.exit(1)
 
     if final_file.endswith('.disabled'):
-        print(color_string('NOTE:', color=YELLOW),
+        print(color.color_string('NOTE:', color=YELLOW),
               'Disabled file ({}) is not enabled automatically, use "enable" subcommand'.format(final_file))
         return 0
 
@@ -532,7 +547,7 @@ def edit(args):
         else:
             reload_service()
 
-    print(color_string('INFO:', color=GREEN),
+    print(color.color_string('INFO:', color=GREEN),
           'Please make sure to copy to {} to all other cluster nodes '
           'and execute "systemctl reload drbd-reactor.service"'.format(final_file))
 
@@ -552,7 +567,7 @@ def _evict_unmask(p):
 def _evict_resources(p, me, delay, keep_masked):
     for name in p._get_res_names():
         target = Promoter.target_name(name)
-        print(color_string('Evicting {}'.format(name), color=GREEN))
+        print(color.color_string('Evicting {}'.format(name), color=GREEN))
         primary = p._get_primary_on(name)
         if primary == Promoter.UNKNOWN:
             print('Sorry, resource state for "{}" unknown, ignoring'.format(name))
@@ -625,11 +640,11 @@ def evict(args):
             _evict_resources(p, me, args.delay, args.keep_masked)
 
 
-def main():
+def get_main_parser():
     parser = argparse.ArgumentParser(prog='drbd-reactorctl')
     parser.add_argument('-c', '--config', default='/etc/drbd-reactor.toml',
                         help='path to the toml config file')
-    parser.add_argument('--color', default='auto', choices=('auto', 'always', 'never'),
+    parser.add_argument('--color', default=Color.DEFAULT, choices=(Color.AUTO, Color.ALWAYS, Color.NEVER),
                         help='color output')
     parser.set_defaults(func=status)
     parser.set_defaults(configs=[])
@@ -708,6 +723,11 @@ def main():
     parser_ls.add_argument('--disabled', action='store_true', help='show disabled plugins')
     parser_ls.add_argument('configs', nargs='*', help='configs to list')
 
+    return parser
+
+
+if __name__ == "__main__":
+    parser = get_main_parser()
     args = parser.parse_args()
 
     if not os.path.isfile(args.config):
@@ -731,14 +751,5 @@ def main():
             cfg = cfg[:-len('.toml')]
         args.configs[i] = cfg
 
-    if args.color != 'auto':
-        global has_colors
-
-        def has_colors(stream):
-            return args.color == 'always'
-
+    color = Color(args.color)
     args.func(args)
-
-
-if __name__ == "__main__":
-    main()

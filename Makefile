@@ -58,6 +58,12 @@ rpm: ## Build a rpm package
 	docker run -it --rm -v $$PWD:/src:ro -v $$tmpdir:/out --entrypoint=/src/docker/entry.sh $(RPMCONTAINER) rpm && \
 	mv $$tmpdir/*.rpm . && echo "rm -rf $$tmpdir"
 
+.PHONY: tabcompletion
+tabcompletion: ## Build tab completions in drbd-reactor:deb
+	tmpdir=$$(mktemp -d) && \
+	docker run -it --rm -v $$PWD:/src:ro -v $$tmpdir:/out --entrypoint=/src/docker/entry.sh $(DEBCONTAINER) tabcompletion && \
+	mv $$tmpdir/*.completion.* ./example/ && echo "rm -rf $$tmpdir"
+
 install:  # install binary and config
 	install -D -m 0750 target/$(TARGET)/$(PROG) $(DESTDIR)/usr/sbin/$(PROG)
 	install -D -m 0750 $(PROG)ctl.py $(DESTDIR)/usr/sbin/$(PROG)ctl

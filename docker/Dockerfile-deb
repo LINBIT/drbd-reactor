@@ -2,5 +2,6 @@ FROM debian:buster
 MAINTAINER Roland Kammerer <roland.kammerer@linbit.com>
 
 RUN apt-get update && \
-	apt-get install -y gcc curl dh-systemd dh-python devscripts cargo rustc && \
+	apt-get install -y gcc curl dh-systemd dh-python bash-completion devscripts cargo rustc && \
+	apt-get install -y python3-pip python3-toml && pip3 install -U shtab && \
 	apt-get clean -y

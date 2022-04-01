@@ -1,7 +1,7 @@
 FROM almalinux:8
 MAINTAINER Roland Kammerer <roland.kammerer@linbit.com>
 
-RUN yum install -y gcc git make rpm-build systemd && \
+RUN yum install -y gcc git make rpm-build systemd bash-completion && \
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal -y -q --no-modify-path && \
 	. "${HOME}/.cargo/env" && \
 	yum clean all

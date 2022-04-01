@@ -12,6 +12,7 @@ URL:		https://www.github.com/LINBIT/drbd-reactor
 Source0:	https://pkg.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
 
 BuildRequires:	systemd
+BuildRequires:	bash-completion
 Requires:	drbd-utils >= 9.19.1
 Requires:	python3
 # python3{,6}-toml is for rhel7/8 only in epel, but we mirror that pkg
@@ -38,6 +39,7 @@ make %{?_smp_mflags}
 
 %install
 make install DESTDIR=%{buildroot}
+install -D -m644 %{_builddir}/%{name}-%{tarball_version}/example/ctl.completion.bash %{buildroot}/%{_datadir}/bash-completion/completions/drbd-reactorctl
 
 
 %files
@@ -45,6 +47,7 @@ make install DESTDIR=%{buildroot}
 /lib/systemd/system/drbd-reactor.service
 /usr/sbin/drbd-reactor
 /usr/sbin/drbd-reactorctl
+%{_datadir}/bash-completion/completions/drbd-reactorctl
 %{_mandir}/man1/drbd-reactor.1*
 %{_mandir}/man1/drbd-reactorctl.1*
 %{_mandir}/man5/drbd-reactor.toml.5*
