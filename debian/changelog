@@ -1,3 +1,14 @@
+drbd-reactor (0.6.0-1) experimental; urgency=medium
+
+  * ctl: add evict command
+  * ctl,evict: order files by demote failure action
+  * ctl,evict: use systemd, allow maintenance
+  * drbd-reactorctl.1: fix ls --disabled
+  * drbd-reactorctl.1: fix disable
+  * ctl: add bash completion
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 04 Apr 2022 10:51:12 +0200
+
 drbd-reactor (0.5.3-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
