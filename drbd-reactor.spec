@@ -12,7 +12,9 @@ URL:		https://www.github.com/LINBIT/drbd-reactor
 Source0:	https://pkg.linbit.com/downloads/drbd/utils/%{name}-%{tarball_version}.tar.gz
 
 BuildRequires:	systemd
-BuildRequires:	bash-completion
+# While most pkgs I looked at have bash-completion as BuildRequires, I don't think we need it
+# looks like it would only help for cmake or pkgconfig projects.
+# BuildRequires:	bash-completion
 Requires:	drbd-utils >= 9.19.1
 Requires:	python3
 # python3{,6}-toml is for rhel7/8 only in epel, but we mirror that pkg
