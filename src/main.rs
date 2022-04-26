@@ -256,19 +256,14 @@ fn main() -> Result<()> {
 
     init_loggers(cfg.clone().log)?;
     thread::spawn(move || {
-        let signals = Signals::new(&[
-            signal_hook::SIGHUP,
-            signal_hook::SIGINT,
-            signal_hook::SIGTERM,
-        ])
-        .unwrap();
+        let mut signals = Signals::new(&[libc::SIGHUP, libc::SIGINT, libc::SIGTERM]).unwrap();
         for signal in signals.forever() {
             debug!("main: sighandler loop");
             match signal as libc::c_int {
-                signal_hook::SIGHUP => {
+                libc::SIGHUP => {
                     done.send(EventUpdate::Reload).unwrap();
                 }
-                signal_hook::SIGINT | signal_hook::SIGTERM => {
+                libc::SIGINT | libc::SIGTERM => {
                     done.send(EventUpdate::Stop).unwrap();
                 }
                 _ => unreachable!(),
