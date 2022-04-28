@@ -10,6 +10,7 @@ fn resource_update() {
         write_ordering: "foo".to_string(),
         may_promote: true,
         promotion_score: 23,
+        force_io_failures: false,
         devices: vec![],
         connections: vec![],
     };

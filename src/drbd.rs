@@ -14,6 +14,7 @@ make_matchable![
         pub role: Role,
         pub suspended: bool,
         pub write_ordering: String,
+        pub force_io_failures: bool,
         pub may_promote: bool,
         pub promotion_score: i32,
         pub devices: Vec<Device>,

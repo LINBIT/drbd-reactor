@@ -151,6 +151,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("role", v) => resource.role = Role::from_str(v)?,
                 ("suspended", v) => resource.suspended = str_to_bool(v),
                 ("write-ordering", v) => resource.write_ordering = v.to_string(),
+                ("force-io-failures", v) => resource.force_io_failures = str_to_bool(v),
                 ("may_promote", v) => resource.may_promote = str_to_bool(v),
                 ("promotion_score", v) => resource.promotion_score = v.parse::<_>()?,
                 _ => {
@@ -315,6 +316,7 @@ mod tests {
                 write_ordering: "foo".to_string(),
                 may_promote: true,
                 promotion_score: 23,
+                force_io_failures: false,
                 devices: vec![],
                 connections: vec![],
             },
