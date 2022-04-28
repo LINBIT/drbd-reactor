@@ -1,3 +1,10 @@
+drbd-reactor (0.6.1-1) experimental; urgency=medium
+
+  * build: allow signal-hook >= 0.1
+  * events2: add force-io-failures
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Thu, 28 Apr 2022 17:52:14 +0200
+
 drbd-reactor (0.6.0-1) experimental; urgency=medium
 
   * ctl: add evict command
