@@ -1,8 +1,10 @@
 use regex::Regex;
 use std::collections::HashMap;
+use std::ffi::CStr;
 use std::fmt;
 use std::fs;
 use std::fs::File;
+use std::io;
 use std::io::Write;
 use std::os::unix::fs::FileTypeExt;
 use std::path::{Path, PathBuf};
@@ -11,13 +13,14 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::Result;
-use log::{info, trace, warn};
+use libc::c_char;
+use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use shell_words;
 use tinytemplate::TinyTemplate;
 
-use crate::drbd::{DiskState, EventType, PluginUpdate, Resource};
+use crate::drbd::{DiskState, EventType, PluginUpdate, Resource, Role};
 use crate::plugin;
 
 pub struct Promoter {
@@ -91,6 +94,7 @@ impl super::Plugin for Promoter {
                     if !u.old.may_promote && u.new.may_promote {
                         let sleep_millis = get_sleep_before_promote_ms(
                             &u.resource,
+                            &res.preferred_nodes,
                             res.sleep_before_promote_factor,
                         );
                         info!(
@@ -110,6 +114,58 @@ impl super::Plugin for Promoter {
                 PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
                         info!("run: resource '{}' lost quorum", name);
+                        if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                            warn!("Stopping '{}' failed: {}", name, e);
+                        }
+                    }
+                }
+                PluginUpdate::PeerDevice(u) => {
+                    if res.preferred_nodes.len() == 0 {
+                        continue;
+                    } else if !(u.old.peer_disk_state != DiskState::UpToDate
+                        && u.new.peer_disk_state == DiskState::UpToDate)
+                    {
+                        continue;
+                    } else if u.resource.role != Role::Primary {
+                        continue;
+                    }
+
+                    let peer_name = match u.resource.get_peerdevice(u.peer_node_id, u.volume) {
+                        Some(pd) => pd.conn_name.clone(),
+                        None => {
+                            warn!("Could not find peer device for resource '{}'", name);
+                            continue;
+                        }
+                    };
+                    let peer_pos = match res.preferred_nodes.iter().position(|n| n == &peer_name) {
+                        Some(pos) => pos,
+                        None => {
+                            // not in the list, it can not be better
+                            debug!(
+                                "Peer '{}' was not found in preferred_nodes, continue",
+                                peer_name
+                            );
+                            continue;
+                        }
+                    };
+
+                    let node_name = match uname_n() {
+                        Ok(node_name) => node_name,
+                        Err(e) => {
+                            warn!("Could not determine 'uname -n': {}", e);
+                            continue;
+                        }
+                    };
+                    let node_pos = match res.preferred_nodes.iter().position(|n| n == &node_name) {
+                        Some(pos) => pos,
+                        None => res.preferred_nodes.len(),
+                    };
+
+                    if peer_pos < node_pos {
+                        info!(
+                            "run: resource '{}' has a new preferred node ('{}'), stopping services locally ('{}')",
+                            name, peer_name, node_name
+                        );
                         if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
                             warn!("Stopping '{}' failed: {}", name, e);
                         }
@@ -170,6 +226,8 @@ pub struct PromoterOptResource {
     pub on_drbd_demote_failure: SystemdFailureAction,
     #[serde(default = "default_promote_sleep")]
     pub sleep_before_promote_factor: f32,
+    #[serde(default)]
+    pub preferred_nodes: Vec<String>,
 }
 
 fn default_promote_sleep() -> f32 {
@@ -649,8 +707,12 @@ impl Default for Runner {
     }
 }
 
-fn get_sleep_before_promote_ms(resource: &Resource, factor: f32) -> u64 {
-    let max_sleep_s: i32 = resource
+fn get_sleep_before_promote_ms(
+    resource: &Resource,
+    preferred_nodes: &[String],
+    factor: f32,
+) -> u64 {
+    let mut max_sleep_s: usize = resource
         .devices
         .iter()
         .map(|d| match d.disk_state {
@@ -670,6 +732,16 @@ fn get_sleep_before_promote_ms(resource: &Resource, factor: f32) -> u64 {
             Ok(devices) if devices.contains(&"none".into()) => 6, // Diskless
             _ => 0,
         });
+
+    match uname_n() {
+        Ok(node_name) => {
+            max_sleep_s += match preferred_nodes.iter().position(|n| n == &node_name) {
+                Some(pos) => pos,
+                None => preferred_nodes.len(),
+            };
+        }
+        Err(e) => warn!("Could not determine 'uname -n': {}", e),
+    };
 
     // convert to ms and scale by factor
     (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
@@ -751,6 +823,22 @@ fn check_resources(to_start: &[String]) -> Result<()> {
     Ok(())
 }
 
+// inspired by https://crates.io/crates/uname
+// inlined because currently not packaged in Ubuntu Focal
+#[inline]
+fn to_cstr(buf: &[c_char]) -> &CStr {
+    unsafe { CStr::from_ptr(buf.as_ptr()) }
+}
+fn uname_n() -> Result<String> {
+    let mut n = unsafe { std::mem::zeroed() };
+    let r = unsafe { libc::uname(&mut n) };
+    if r == 0 {
+        Ok(to_cstr(&n.nodename[..]).to_string_lossy().into_owned())
+    } else {
+        Err(anyhow::anyhow!(io::Error::last_os_error()))
+    }
+}
+
 // inlined copy from https://crates.io/crates/libsystemd
 // inlined because currently not packaged in Ubuntu Focal
 fn systemd_path(name: &str) -> String {
@@ -827,8 +915,31 @@ mod tests {
             ],
             ..Default::default()
         };
-        assert_eq!(get_sleep_before_promote_ms(&r, 1.0), 6000);
-        assert_eq!(get_sleep_before_promote_ms(&r, 0.5), 3000);
+        assert_eq!(get_sleep_before_promote_ms(&r, &vec![], 1.0), 6000);
+        assert_eq!(get_sleep_before_promote_ms(&r, &vec![], 0.5), 3000);
+        if let Ok(node_name) = uname_n() {
+            assert_eq!(
+                get_sleep_before_promote_ms(
+                    &r,
+                    &vec![
+                        "".to_string(),
+                        "".to_string(),
+                        node_name.clone(),
+                        "".to_string()
+                    ],
+                    1.0
+                ),
+                6000 + 2000
+            );
+            assert_eq!(
+                get_sleep_before_promote_ms(
+                    &r,
+                    &vec!["".to_string(), "".to_string(), "".to_string()],
+                    1.0
+                ),
+                6000 + 3000
+            );
+        }
     }
 
     #[test]

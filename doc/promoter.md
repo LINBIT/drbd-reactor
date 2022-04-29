@@ -229,3 +229,11 @@ can be realized via:
 ```
 on-drbd-demote-failure =  "reboot-immediate"
 ```
+
+# Preferred Nodes
+While in a HA cluster that deserves the name every node needs to be able to run all services, some users like
+to add preferences for nodes. This can be done by setting a list of `preferred-nodes`.  On resource startup a
+delay based on the node's position in the list is added.  Nodes with a lower preference will sleep longer. If
+a node joins on DRBD level, and that peer's disk becomes `UpToDate`, and the peer has a higher preference, then
+the active node stops the services locally. As it will then have a higher sleep penalty as the preferred
+node, the preferred one will take over the service (if it can).

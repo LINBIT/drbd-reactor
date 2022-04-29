@@ -234,6 +234,18 @@ start = [
   "bar.service"
 ]
 .Ed
+.Sh PREFERRED NODES
+While in a HA cluster that deserves the name every node needs to be able to
+run all services, some users like to add preferences for nodes. This can be
+done by setting a list of 
+.Sy preferred-nodes .
+On resource startup a delay based on the node's position in the list is added.
+Nodes with a lower preference will sleep longer. If a node joins on DRBD
+level, and that peer's disk becomes
+.Sy UpToDate ,
+and the peer has a higher preference, then the active node stops the services
+locally. As it will then have a higher sleep penalty as the preferred node,
+the preferred one will take over the service (if it can).
 .Sh FILES
 .Bl -tag -compact
 .It Pa /usr/lib/ocf/resource.d/
@@ -252,6 +264,7 @@ units get started. On DRBD demote failures a systemd "reboot" is triggered.
 start = ["foo.mount", "foo.service"]
 on-drbd-demote-failure =  "reboot"
 stop-services-on-exit = false
+preferred-nodes = ["nodeA", "nodeB" ]
 .Ed
 .Sh SEE ALSO
 For furhter design notes and handled failure scenarios see
