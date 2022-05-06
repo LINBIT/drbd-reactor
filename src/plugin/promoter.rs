@@ -241,7 +241,7 @@ fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
             Ok(())
         }
         Runner::Systemd => {
-            let target = format!("drbd-services@{}.target", name);
+            let target = format!("drbd-services@{}.target", escape_name(name));
             info!("stop_actions: stopping '{}'", target);
             persist_journal();
             action(&target, State::Stop, how)
