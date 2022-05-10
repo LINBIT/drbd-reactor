@@ -16,7 +16,6 @@ use anyhow::Result;
 use libc::c_char;
 use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use shell_words;
 use tinytemplate::TinyTemplate;
 
@@ -30,8 +29,10 @@ pub struct Promoter {
 impl Promoter {
     pub fn new(cfg: PromoterConfig) -> Result<Self> {
         let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
-        adjust_resources(&names)?;
-        info!("Checking DRBD options for {:?}", names);
+        if let Err(e) = adjust_resources(&names) {
+            warn!("Could not adjust '{:?}': {}", names, e);
+        }
+        info!("Checking DRBD options for '{:?}'", names);
         if let Err(e) = check_resources(&names) {
             warn!("Could not execute DRBD options check: {}", e);
         }
@@ -339,14 +340,7 @@ fn adjust_resources(to_start: &[String]) -> Result<()> {
             info!("adjust_resources: backing device '{}' now ready", dev);
         }
 
-        let status = Command::new("drbdadm").arg("adjust").arg(res).status()?;
-        if !status.success() {
-            // for now let's keep it a warning, I don't think we should fail hard here.
-            warn!(
-                "adjust_resources: 'drbdadm adjust {}' did not return successfully",
-                res
-            );
-        }
+        plugin::map_status(Command::new("drbdadm").arg("adjust").arg(res).status())?;
     }
     Ok(())
 }
@@ -368,18 +362,9 @@ fn generate_systemd_templates(
     actions: &[String],
     systemd_settings: &SystemdSettings,
 ) -> Result<()> {
-    let devices = get_backing_devices(name)?
-        .into_iter()
-        .filter(|d| d != "none")
-        .collect();
-
     let escaped_name = escape_name(name);
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", escaped_name));
-    systemd_write_unit(
-        prefix,
-        SYSTEMD_CONF,
-        drbd_promote(devices, systemd_settings)?,
-    )?;
+    systemd_write_unit(prefix, SYSTEMD_CONF, drbd_promote(systemd_settings)?)?;
 
     if systemd_settings.failure_action != SystemdFailureAction::None {
         let prefix = Path::new(SYSTEMD_PREFIX).join(format!(
@@ -491,7 +476,7 @@ fn escaped_systemd_ocf_parse_to_env(
     Ok((service_name, env))
 }
 
-fn drbd_promote(devices: Vec<String>, systemd_settings: &SystemdSettings) -> Result<String> {
+fn drbd_promote(systemd_settings: &SystemdSettings) -> Result<String> {
     const PROMOTE_TEMPLATE: &str = r"[Service]
 ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
 ExecCondition=
@@ -499,25 +484,13 @@ ExecCondition=
 {{ if needs_on_failure -}}
 OnFailure=drbd-demote-or-escalate@%i.service
 OnFailureJobMode=replace-irreversibly
-{{ endif -}}
-{{ for device in devices -}}
-ConditionPathExists = {device | unescaped}
-{strictness} = {device | systemd_path}.device
-After = {device | systemd_path}.device
-{{ endfor -}}";
+{{ endif -}}";
 
     let mut tt = TinyTemplate::new();
     tt.add_template("devices", PROMOTE_TEMPLATE)?;
-    tt.add_formatter("systemd_path", |value, output| match value {
-        Value::String(s) => {
-            tinytemplate::format_unescaped(&Value::String(systemd_path(&s)), output)
-        }
-        _ => tinytemplate::format_unescaped(value, output),
-    });
 
     #[derive(Serialize)]
     struct Context {
-        devices: Vec<String>,
         strictness: String,
         needs_on_failure: bool,
     }
@@ -525,7 +498,6 @@ After = {device | systemd_path}.device
     let result = tt.render(
         "devices",
         &Context {
-            devices,
             strictness: systemd_settings.dependencies_as.to_string(),
             needs_on_failure: systemd_settings.failure_action != SystemdFailureAction::None,
         },
@@ -841,29 +813,6 @@ fn uname_n() -> Result<String> {
 
 // inlined copy from https://crates.io/crates/libsystemd
 // inlined because currently not packaged in Ubuntu Focal
-fn systemd_path(name: &str) -> String {
-    let trimmed = name.trim_matches('/');
-    if trimmed.is_empty() {
-        return "-".to_string();
-    }
-
-    let mut slash_seq = false;
-    let parts: Vec<String> = trimmed
-        .bytes()
-        .filter(|b| {
-            let is_slash = *b == b'/';
-            let res = !(is_slash && slash_seq);
-            slash_seq = is_slash;
-            res
-        })
-        .enumerate()
-        .map(|(n, b)| escape_byte(b, n))
-        .collect();
-    parts.join("")
-}
-
-// inlined copy from https://crates.io/crates/libsystemd
-// inlined because currently not packaged in Ubuntu Focal
 pub fn escape_name(name: &str) -> String {
     if name.is_empty() {
         return "".to_string();
@@ -975,14 +924,11 @@ mod tests {
 
     #[test]
     fn test_drbd_promote() {
-        let empty = drbd_promote(
-            Vec::new(),
-            &SystemdSettings {
-                target_as: SystemdDependency::Wants,
-                dependencies_as: SystemdDependency::Wants,
-                failure_action: SystemdFailureAction::None,
-            },
-        )
+        let empty = drbd_promote(&SystemdSettings {
+            target_as: SystemdDependency::Wants,
+            dependencies_as: SystemdDependency::Wants,
+            failure_action: SystemdFailureAction::None,
+        })
         .expect("should work");
 
         assert_eq!(
@@ -994,17 +940,11 @@ ExecCondition=
             empty
         );
 
-        let two_volumes = drbd_promote(
-            vec![
-                "/dev/vg0/backing0".to_string(),
-                "/dev/disk/by-uuid/1123-456".to_string(),
-            ],
-            &SystemdSettings {
-                target_as: SystemdDependency::Wants,
-                dependencies_as: SystemdDependency::Wants,
-                failure_action: SystemdFailureAction::Reboot,
-            },
-        )
+        let on_failure = drbd_promote(&SystemdSettings {
+            target_as: SystemdDependency::Wants,
+            dependencies_as: SystemdDependency::Wants,
+            failure_action: SystemdFailureAction::Reboot,
+        })
         .expect("should work");
 
         assert_eq!(
@@ -1014,14 +954,8 @@ ExecCondition=
 [Unit]
 OnFailure=drbd-demote-or-escalate@%i.service
 OnFailureJobMode=replace-irreversibly
-ConditionPathExists = /dev/vg0/backing0
-Wants = dev-vg0-backing0.device
-After = dev-vg0-backing0.device
-ConditionPathExists = /dev/disk/by-uuid/1123-456
-Wants = dev-disk-by\x2duuid-1123\x2d456.device
-After = dev-disk-by\x2duuid-1123\x2d456.device
 ",
-            two_volumes
+            on_failure
         );
     }
 }
