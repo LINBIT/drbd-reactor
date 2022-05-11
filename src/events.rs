@@ -155,10 +155,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("may_promote", v) => resource.may_promote = str_to_bool(v),
                 ("promotion_score", v) => resource.promotion_score = v.parse::<_>()?,
                 _ => {
-                    return Err(anyhow::anyhow!(
-                        "events: process_events2: resource: unknown keyword '{}'",
-                        k
-                    ))
+                    warn!("events: process_events2: resource: unknown keyword '{}'", k)
                 }
             };
         }
@@ -186,10 +183,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("al-suspended", v) => device.al_suspended = str_to_bool(v),
                 ("blocked", v) => device.blocked = v.into(),
                 _ => {
-                    return Err(anyhow::anyhow!(
-                        "events: process_events2: device: unknown keyword '{}'",
-                        k
-                    ))
+                    warn!("events: process_events2: device: unknown keyword '{}'", k)
                 }
             };
         }
@@ -209,10 +203,10 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("ap-in-flight", v) => conn.ap_in_flight = v.parse::<_>()?,
                 ("rs-in-flight", v) => conn.rs_in_flight = v.parse::<_>()?,
                 _ => {
-                    return Err(anyhow::anyhow!(
+                    warn!(
                         "events: process_events2: connection: unknown keyword '{}'",
                         k
-                    ))
+                    )
                 }
             };
         }
@@ -244,10 +238,10 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("eta", _) => (),
                 ("dbdt1", _) => (),
                 _ => {
-                    return Err(anyhow::anyhow!(
+                    warn!(
                         "events: process_events2: peer-device: unknown keyword '{}'",
                         k
-                    ))
+                    )
                 }
             };
         }
@@ -265,10 +259,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("peer", v) => path.peer = v.into(),
                 ("established", v) => path.established = str_to_bool(v),
                 _ => {
-                    return Err(anyhow::anyhow!(
-                        "events: process_events2: path: unknown keyword '{}'",
-                        k
-                    ))
+                    warn!("events: process_events2: path: unknown keyword '{}'", k)
                 }
             }
         }
@@ -322,6 +313,8 @@ mod tests {
             },
         );
         assert_eq!(up, expected);
+        let up = parse_events2_line("exists resource xxx:bla name:foo role:Primary suspended:yes write-ordering:foo may_promote:yes promotion_score:23").unwrap();
+        assert_eq!(up, expected);
     }
 
     #[test]
@@ -350,6 +343,8 @@ mod tests {
                 blocked: "upper".to_string(),
             },
         );
+        assert_eq!(up, expected);
+        let up = parse_events2_line("change device name:foo xxx:bla volume:1 minor:1 disk:Attaching backing_dev:/dev/sda1 client:no quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:upper").unwrap();
         assert_eq!(up, expected);
 
         // backing_dev as none
@@ -397,6 +392,8 @@ mod tests {
             },
         );
         assert_eq!(up, expected);
+        let up = parse_events2_line("exists connection name:foo xxx:bla peer-node-id:1 conn-name:bar connection:Connected role:Primary congested:yes ap-in-flight:1 rs-in-flight:1").unwrap();
+        assert_eq!(up, expected);
     }
 
     #[test]
@@ -423,6 +420,8 @@ mod tests {
             },
         );
         assert_eq!(up, expected);
+        let up = parse_events2_line("exists peer-device name:foo xxx:bla peer-node-id:1 conn-name:bar volume:1 replication:Established peer-disk:UpToDate peer-client:yes resync-suspended:yes received:1 sent:1 out-of-sync:1 pending:1 unacked:1").unwrap();
+        assert_eq!(up, expected);
     }
 
     #[test]
@@ -440,14 +439,6 @@ mod tests {
             },
         );
         assert_eq!(up, expected);
-    }
-
-    #[test]
-    fn wrong_keys() {
-        assert!(parse_events2_line("exists resource name:foo xxx:23").is_err());
-        assert!(parse_events2_line("exists peer-device name:foo xxx:23").is_err());
-        assert!(parse_events2_line("exists connection name:foo xxx:23").is_err());
-        assert!(parse_events2_line("exists device name:foo xxx:23").is_err());
     }
 
     #[test]
