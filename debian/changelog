@@ -1,3 +1,13 @@
+drbd-reactor (0.7.0~rc.1-1) experimental; urgency=medium
+
+  * promoter: escape target name on stop
+  * build: fix deb building
+  * promoter: implement preferred nodes
+  * promoter: rm path dep for promote service
+  * events2: make parser more robust
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Thu, 12 May 2022 07:54:29 +0200
+
 drbd-reactor (0.6.1-1) experimental; urgency=medium
 
   * build: allow signal-hook >= 0.1
