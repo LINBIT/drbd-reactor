@@ -1,3 +1,9 @@
+drbd-reactor (0.7.0-1) experimental; urgency=medium
+
+  * New upstream release
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Thu, 19 May 2022 10:14:18 +0200
+
 drbd-reactor (0.7.0~rc.1-1) experimental; urgency=medium
 
   * promoter: escape target name on stop
