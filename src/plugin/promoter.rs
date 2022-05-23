@@ -49,7 +49,12 @@ impl Promoter {
                     target_as: res.target_as.clone(),
                     failure_action: res.on_drbd_demote_failure.clone(),
                 };
-                generate_systemd_templates(name, &res.start, &systemd_settings)?;
+                generate_systemd_templates(
+                    name,
+                    &res.start,
+                    &systemd_settings,
+                    res.secondary_force,
+                )?;
                 systemd_daemon_reload()?;
             }
         }
@@ -229,10 +234,15 @@ pub struct PromoterOptResource {
     pub sleep_before_promote_factor: f32,
     #[serde(default)]
     pub preferred_nodes: Vec<String>,
+    #[serde(default = "default_secondary_force")]
+    pub secondary_force: bool,
 }
 
 fn default_promote_sleep() -> f32 {
     1.0
+}
+fn default_secondary_force() -> bool {
+    true
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
@@ -361,24 +371,29 @@ fn generate_systemd_templates(
     name: &str,
     actions: &[String],
     systemd_settings: &SystemdSettings,
+    secondary_force: bool,
 ) -> Result<()> {
     let escaped_name = escape_name(name);
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", escaped_name));
-    systemd_write_unit(prefix, SYSTEMD_CONF, drbd_promote(systemd_settings)?)?;
+    systemd_write_unit(
+        prefix,
+        SYSTEMD_CONF,
+        drbd_promote(systemd_settings, secondary_force)?,
+    )?;
 
     if systemd_settings.failure_action != SystemdFailureAction::None {
         let prefix = Path::new(SYSTEMD_PREFIX).join(format!(
             "drbd-demote-or-escalate@{}.service.d",
             escaped_name
         ));
-        systemd_write_unit(
-            prefix,
-            SYSTEMD_CONF,
-            format!(
-                "[Unit]\nFailureAction={}\nConflicts=drbd-promote@%i.service\n",
-                systemd_settings.failure_action
-            ),
-        )?;
+        let mut content = format!(
+            "[Unit]\nFailureAction={}\nConflicts=drbd-promote@%i.service\n",
+            systemd_settings.failure_action
+        );
+        if secondary_force {
+            content.push_str("\n[Service]\nExecStart=\nExecStart=/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force-or-escalate %I\n")
+        }
+        systemd_write_unit(prefix, SYSTEMD_CONF, content)?;
     }
 
     let mut target_requires: Vec<String> = Vec::new();
@@ -476,10 +491,14 @@ fn escaped_systemd_ocf_parse_to_env(
     Ok((service_name, env))
 }
 
-fn drbd_promote(systemd_settings: &SystemdSettings) -> Result<String> {
+fn drbd_promote(systemd_settings: &SystemdSettings, secondary_force: bool) -> Result<String> {
     const PROMOTE_TEMPLATE: &str = r"[Service]
 ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
 ExecCondition=
+{{ if secondary_force -}}
+ExecStop=
+ExecStop=/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force %I
+{{ endif -}}
 [Unit]
 {{ if needs_on_failure -}}
 OnFailure=drbd-demote-or-escalate@%i.service
@@ -493,6 +512,7 @@ OnFailureJobMode=replace-irreversibly
     struct Context {
         strictness: String,
         needs_on_failure: bool,
+        secondary_force: bool,
     }
     // filter diskless (== "none" devices)
     let result = tt.render(
@@ -500,6 +520,7 @@ OnFailureJobMode=replace-irreversibly
         &Context {
             strictness: systemd_settings.dependencies_as.to_string(),
             needs_on_failure: systemd_settings.failure_action != SystemdFailureAction::None,
+            secondary_force,
         },
     )?;
     Ok(result)
@@ -924,11 +945,14 @@ mod tests {
 
     #[test]
     fn test_drbd_promote() {
-        let empty = drbd_promote(&SystemdSettings {
-            target_as: SystemdDependency::Wants,
-            dependencies_as: SystemdDependency::Wants,
-            failure_action: SystemdFailureAction::None,
-        })
+        let empty = drbd_promote(
+            &SystemdSettings {
+                target_as: SystemdDependency::Wants,
+                dependencies_as: SystemdDependency::Wants,
+                failure_action: SystemdFailureAction::None,
+            },
+            false,
+        )
         .expect("should work");
 
         assert_eq!(
@@ -940,17 +964,22 @@ ExecCondition=
             empty
         );
 
-        let on_failure = drbd_promote(&SystemdSettings {
-            target_as: SystemdDependency::Wants,
-            dependencies_as: SystemdDependency::Wants,
-            failure_action: SystemdFailureAction::Reboot,
-        })
+        let on_failure = drbd_promote(
+            &SystemdSettings {
+                target_as: SystemdDependency::Wants,
+                dependencies_as: SystemdDependency::Wants,
+                failure_action: SystemdFailureAction::Reboot,
+            },
+            true,
+        )
         .expect("should work");
 
         assert_eq!(
             r"[Service]
 ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
 ExecCondition=
+ExecStop=
+ExecStop=/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force %I
 [Unit]
 OnFailure=drbd-demote-or-escalate@%i.service
 OnFailureJobMode=replace-irreversibly

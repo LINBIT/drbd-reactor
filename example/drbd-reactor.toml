@@ -55,7 +55,9 @@ statistics-poll-interval = 60
 # stop = []
 ## systemd OnFailure action that is executed on DRBD demote failures
 ## if unset, or set to "none", then no action is executed
-# on-stop-failure =  "reboot"
+# on-stop-failure = "reboot"
+## if set (the default), "secondary --force" is used for demotion
+# secondary-force = true
 ## if set, resources are started on preferred nodes if possible
 # preferred-nodes = ["nodeA", "nodeB"]
 

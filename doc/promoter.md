@@ -230,6 +230,41 @@ can be realized via:
 on-drbd-demote-failure =  "reboot-immediate"
 ```
 
+By default the promoter will try to demote the DRBD device first via `drbdsetup secondary`, and if that fails
+as fallback via `drbdsetup secondary --force`. This has the advantage that demote failures are handled more
+benign. For example imagine a mount unit that still has openers. A plain `secondary` would fail and eventually
+trigger the `OnFailure` action. By using `secondary --force` the operation will most likely succeed and not
+escalate to the `OnFailure` action because DRBD will be temporarily reconfigured to report errors on device
+access, causing suspended units to resume with shutdown. If your service can't handle temporary errors during
+service shutdown, you can set `secondary-force` to false. One major advantage of `secondary --force` and its
+benign behavior is that you don't need to reboot a node with maybe hundreds of active resources just because
+one (maybe even not so important) resource blocks.
+
+# HA involving File System Mount Points
+Almost all relevant scenarios include a file system mount. For example to realize a highly available LINSTOR
+controller, a file system containing LINSTOR's database would be mounted right before the LINSTOR controller
+service gets started. In these scenarios where another service is on top of a mount point, one should use
+systemd mount units (`sytemd.mount(5)`). On systemd target shutdown (e.g., quorum loss), systemd has all means
+to `SIGTERM/SIGKILL` all processes that use the mount point. For example systemd can stop the LINSTOR
+controller and all processes it has spawned that might use the file system cleanly.
+
+If the highly-available file system mount point is the end goal (i.e., the mount unit would be the last
+service that is started), one should *not*
+use a systemd mount unit. Why is that? If that mount point is then in use, per definition there are processes
+that have files opened systemd does not know about (e.g., your editor editing a file on the HA file system
+mount). On target stop the unmount will fail, which by itself would be fine, but the situation would never
+improve, not even after a `secondary --force`. There needs to be something that removes processes that "idle
+around" but keep the file system from being unmounted. Again, if the mount point would not have been the last
+service, but some other service, then systemd would have made sure that all users are terminated. In our case
+something else must make sure this happens. Fortunately that component already exists: The file system
+resource-agent, which does all kinds of magic tricks to get rid of processes blocking a file system from being
+unmounted. So, to conclude: if the mount point would be the last service to start, don't use a systemd mount
+unit, but use the file system resource-agent instead. In the most simple case this could look like this:
+
+```
+start = ["ocf:heartbeat:Filesystem fs_test device=/dev/drbd1000 directory=/mnt/test fstype=ext4 run_fsck=no"]
+```
+
 # Preferred Nodes
 While in a HA cluster that deserves the name every node needs to be able to run all services, some users like
 to add preferences for nodes. This can be done by setting a list of `preferred-nodes`.  On resource startup a
