@@ -15,7 +15,7 @@ BuildRequires:	systemd
 # While most pkgs I looked at have bash-completion as BuildRequires, I don't think we need it
 # looks like it would only help for cmake or pkgconfig projects.
 # BuildRequires:	bash-completion
-Requires:	drbd-utils >= 9.19.1
+Requires:	drbd-utils >= 9.21.2
 Requires:	python3
 # python3{,6}-toml is for rhel7/8 only in epel, but we mirror that pkg
 %if 0%{?suse_version} >= 1500 || 0%{?rhel} >= 8

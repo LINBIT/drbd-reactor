@@ -28,23 +28,22 @@ pub fn events2(tx: Sender<EventUpdate>, statistics_poll: Duration) -> Result<()>
     // check drbdsetup events2 version
     let pattern = Regex::new(r"^DRBDADM_VERSION_CODE=0x([[:xdigit:]]+)$")?;
     let (major, minor, patch) = split_version(pattern, version.stdout.clone())?;
-    if let Err(e) = min_version((major, minor, patch), (9, 19, 1)) {
+    if let Err(e) = min_version((major, minor, patch), (9, 21, 2)) {
         return Err(anyhow::anyhow!(
-            "drbdsetup minimum version ('9.19.1') not fulfilled: {}",
+            "drbdsetup minimum version ('9.21.2') not fulfilled: {}",
             e
         ));
     }
 
-    // minimal kernel version for backing_dev; utils since 9.17.0
+    // minimal kernel version for secondary --force
+    // this check should not be here, but for historic reasons version checks happend here
     let pattern = Regex::new(r"^DRBD_KERNEL_VERSION_CODE=0x([[:xdigit:]]+)$")?;
     let (major, minor, patch) = split_version(pattern, version.stdout)?;
-    let drbd90 = min_version((major, minor, patch), (9, 0, 28));
-    let drbd911plus = min_version((major, minor, patch), (9, 1, 1));
-
-    let has_backing_dev =
-        drbd911plus.is_ok() || (drbd90.is_ok() && !(major == 9 && minor == 1 && patch == 0));
-    if !has_backing_dev {
-        warn!("events2: backing device information will be missing!");
+    if let Err(e) = min_version((major, minor, patch), (9, 1, 7)) {
+        return Err(anyhow::anyhow!(
+            "kernel module minimum version ('9.1.7') not fulfilled: {}",
+            e
+        ));
     }
 
     // TODO(): add some duration, like if we failed 5 times in the last minute or so
