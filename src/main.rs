@@ -2,12 +2,14 @@ use glob::glob;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::Duration;
 use std::{io, sync, thread};
 
 use anyhow::{Context, Result};
 use fern;
 use log::{debug, error, warn};
+use regex::Regex;
 use signal_hook::iterator::Signals;
 use structopt::StructOpt;
 
@@ -242,6 +244,10 @@ fn init_loggers(log_cfgs: Vec<config::LogConfig>) -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    if let Err(e) = min_drbd_versions() {
+        error!("main: minimum DRBD version not fullfilled: {}", e);
+        std::process::exit(1);
+    }
     let mut cfg = read_config()?;
     let statistics_poll = Duration::from_secs(cfg.statistics_poll_interval);
 
@@ -301,4 +307,96 @@ fn main() -> Result<()> {
             return Ok(());
         }
     }
+}
+
+fn min_drbd_versions() -> Result<()> {
+    let version = Command::new("drbdadm").arg("--version").output()?;
+    if !version.status.success() {
+        return Err(anyhow::anyhow!(
+            "'drbdadm --version' not executed successfully, stdout: '{}', stderr: '{}'",
+            String::from_utf8(version.stdout).unwrap_or("<Could not convert stdout>".to_string()),
+            String::from_utf8(version.stderr).unwrap_or("<Could not convert stderr>".to_string())
+        ));
+    }
+
+    // check utils
+    // secondary --force
+    let pattern = Regex::new(r"^DRBDADM_VERSION_CODE=0x([[:xdigit:]]+)$")?;
+    let (major, minor, patch) = split_version(pattern, version.stdout.clone())?;
+    if let Err(e) = min_version((major, minor, patch), (9, 21, 2)) {
+        return Err(anyhow::anyhow!(
+            "drbdsetup minimum version ('9.21.2') not fulfilled: {}",
+            e
+        ));
+    }
+
+    // minimal kernel module version
+    // secondary --force
+    let pattern = Regex::new(r"^DRBD_KERNEL_VERSION_CODE=0x([[:xdigit:]]+)$")?;
+    let (major, minor, patch) = split_version(pattern, version.stdout)?;
+    if let Err(e) = min_version((major, minor, patch), (9, 1, 7)) {
+        return Err(anyhow::anyhow!(
+            "kernel module minimum version ('9.1.7') not fulfilled: {}",
+            e
+        ));
+    }
+
+    Ok(())
+}
+
+fn split_version(pattern: regex::Regex, stdout: Vec<u8>) -> Result<(u8, u8, u8)> {
+    let version = String::from_utf8(stdout)?;
+    let version = version
+        .lines()
+        .filter_map(|line| pattern.captures(line))
+        .next()
+        .ok_or(anyhow::anyhow!(
+            "Could not determine version from pattern '{}'",
+            pattern
+        ))?;
+
+    let version = u32::from_str_radix(&version[1], 16)?;
+
+    let major = ((version >> 16) & 0xff) as u8;
+    let minor = ((version >> 8) & 0xff) as u8;
+    let patch = (version & 0xff) as u8;
+
+    Ok((major, minor, patch))
+}
+
+fn min_version(have: (u8, u8, u8), want: (u8, u8, u8)) -> Result<()> {
+    if have.0 > want.0 {
+        return Ok(());
+    }
+    if have.0 < want.0 {
+        return Err(anyhow::anyhow!(
+            "Major version too small {} vs. {}",
+            have.0,
+            want.0
+        ));
+    }
+
+    if have.1 > want.1 {
+        return Ok(());
+    }
+    if have.1 < want.1 {
+        return Err(anyhow::anyhow!(
+            "Minor version too small {} vs. {}",
+            have.1,
+            want.1
+        ));
+    }
+
+    if have.2 > want.2 {
+        return Ok(());
+    }
+    if have.2 < want.2 {
+        return Err(anyhow::anyhow!(
+            "Patch version too small {} vs. {}",
+            have.2,
+            want.2
+        ));
+    }
+
+    Ok(())
 }
