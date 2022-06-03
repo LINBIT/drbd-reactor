@@ -206,6 +206,17 @@ impl Metrics {
             );
             write!(m, "{}{{name=\"{}\"}} {}\n", k, name, r.promotion_score)?;
 
+            let (k, m) = type_gauge(
+                "drbd_resource_forceiofailures",
+                "Boolean whether the resource is configured (could be temporarily) to force IO failures (e.g., during secondary --force)",
+                &mut metrics,
+            );
+            write!(
+                m,
+                "{}{{name=\"{}\"}} {}\n",
+                k, name, r.force_io_failures as i32
+            )?;
+
             // connection
             for c in &r.connections {
                 let mut common = String::new();
