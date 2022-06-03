@@ -15,7 +15,10 @@ test:cargo:
     reports:
       junit:
         - results.xml
-      cobertura: coverage.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  coverage: '/lines\.*: \d+\.\d+%/'
 
 test:rustfmt:
   script:
