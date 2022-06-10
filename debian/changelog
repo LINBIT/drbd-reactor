@@ -1,3 +1,14 @@
+drbd-reactor (0.8.0~rc.1-1) experimental; urgency=medium
+
+  * CI: update for gitlab 15.0
+  * prometheus: expose force-io-failures
+  * doc: typo fix
+  * promoter: implement secondary --force
+  * bump min versions for secondary --force
+  * core: mv version checks to main
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 10 Jun 2022 14:36:45 +0200
+
 drbd-reactor (0.7.0-1) experimental; urgency=medium
 
   * New upstream release
