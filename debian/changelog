@@ -1,3 +1,9 @@
+drbd-reactor (0.8.0-1) experimental; urgency=medium
+
+  * New upstream release
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 28 Jun 2022 09:01:56 +0200
+
 drbd-reactor (0.8.0~rc.1-1) experimental; urgency=medium
 
   * CI: update for gitlab 15.0
