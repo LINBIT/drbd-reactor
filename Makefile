@@ -72,7 +72,7 @@ install:  # install binary and config
 	install -D -m 0644 example/drbd-reactor.service $(DESTDIR)/lib/systemd/system/drbd-reactor.service
 	for f in $(MANPAGES); do \
 		sect=$$(echo $$f | sed -e 's/.*\.\([0-9]\)$$/\1/'); \
-		install -D -m 0640 $$f $(DESTDIR)/usr/share/man/man$${sect}/$$(basename $$f); \
+		install -D -m 0644 $$f $(DESTDIR)/usr/share/man/man$${sect}/$$(basename $$f); \
 	done
 
 clean: ## cargo clean
