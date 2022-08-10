@@ -60,6 +60,15 @@ statistics-poll-interval = 60
 # secondary-force = true
 ## if set, resources are started on preferred nodes if possible
 # preferred-nodes = ["nodeA", "nodeB"]
+## on-quorum-loss policy
+## what to do if a the currentl DRBD Primary node loses quorum
+## by default we shutdown the services (and maybe trigger a demote failure action).
+## if the DRBD resource has the DRBD option on-suspended-primary-outdated set to force-secondary
+## AND the DRBD option on-quorum-loss set to suspend-io
+## AND the DRBD net option rr-conflict set to retry-connect
+## AND you have a system with unified cgroups (i.e., the file /sys/fs/cgroup/cgroup.controllers exists)
+## AND your service can handle to be frozen, setting on-quorum-loss to "freeze" might be an option.
+# on-quorum-loss = "shutdown"
 
 # Configure a user mode helper filter
 # [[umh]]

@@ -32,15 +32,16 @@ impl Promoter {
         if let Err(e) = adjust_resources(&names) {
             warn!("Could not adjust '{:?}': {}", names, e);
         }
-        info!("Checking DRBD options for '{:?}'", names);
-        if let Err(e) = check_resources(&names) {
-            warn!("Could not execute DRBD options check: {}", e);
-        }
 
         for (name, res) in &cfg.resources {
             // deprecated settings
             if !res.on_stop_failure.is_empty() {
                 warn!("'on-stop-failure' is deprecated and ignored!; use 'on-drbd-demote-failure'");
+            }
+
+            info!("Checking DRBD options for resource '{}'", name);
+            if let Err(e) = check_resource(name, &res.on_quorum_loss) {
+                warn!("Could not execute DRBD options check: {}", e);
             }
 
             if res.runner == Runner::Systemd {
@@ -101,6 +102,7 @@ impl super::Plugin for Promoter {
                         let sleep_millis = get_sleep_before_promote_ms(
                             &u.resource,
                             &res.preferred_nodes,
+                            &res.on_quorum_loss,
                             res.sleep_before_promote_factor,
                         );
                         info!(
@@ -115,13 +117,44 @@ impl super::Plugin for Promoter {
                                 warn!("Stopping '{}' failed: {}", name, e);
                             }
                         }
+                    } else if u.old.role == Role::Primary && u.new.role == Role::Secondary {
+                        if res.on_quorum_loss == QuorumLossPolicy::Freeze {
+                            // might have been frozen, the other nodes formed a partition and a Primary
+                            // and now they are back and forced me to secondary because I was frozen and
+                            // on-suspended-primary-outdated = force-secondary
+                            //
+                            // we could send a stop in any case, but that would also send stops (which should not matter)
+                            // in case of a normal stop when quorum was lost but the policy was Shutdown
+                            info!("run: resource '{}' got forced to Secondary while frozen, stopping services", name);
+                            if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                                warn!("Stopping '{}' failed: {}", name, e);
+                            }
+                        }
                     }
                 }
                 PluginUpdate::Device(u) => {
                     if u.old.quorum && !u.new.quorum {
                         info!("run: resource '{}' lost quorum", name);
-                        if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                            warn!("Stopping '{}' failed: {}", name, e);
+                        match res.on_quorum_loss {
+                            QuorumLossPolicy::Freeze => {
+                                if let Err(e) = freeze_actions(&name, State::Freeze, &res.runner) {
+                                    warn!("Freezing '{}' failed: {}", name, e);
+                                }
+                            }
+                            QuorumLossPolicy::Shutdown => {
+                                if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                                    warn!("Stopping '{}' failed: {}", name, e);
+                                }
+                            }
+                        }
+                    } else if !u.old.quorum && u.new.quorum {
+                        if res.on_quorum_loss == QuorumLossPolicy::Freeze
+                            && u.resource.role == Role::Primary
+                        {
+                            info!("run: resource '{}' gained quorum, thawing Primary", name);
+                            if let Err(e) = freeze_actions(&name, State::Thaw, &res.runner) {
+                                warn!("Thawing '{}' failed: {}", name, e);
+                            }
                         }
                     }
                 }
@@ -236,6 +269,8 @@ pub struct PromoterOptResource {
     pub preferred_nodes: Vec<String>,
     #[serde(default = "default_secondary_force")]
     pub secondary_force: bool,
+    #[serde(default)]
+    pub on_quorum_loss: QuorumLossPolicy,
 }
 
 fn default_promote_sleep() -> f32 {
@@ -263,6 +298,31 @@ fn systemd_start(unit: &str) -> Result<()> {
     plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())
 }
 
+fn systemd_freeze_thaw(unit: &str, to: State) -> Result<()> {
+    let services = get_target_services(unit)?;
+    if services.is_empty() {
+        return Err(anyhow::anyhow!("services list empty"));
+    }
+    let action = match to {
+        State::Freeze => "freeze",
+        State::Thaw => "thaw",
+        _ => {
+            return Err(anyhow::anyhow!("expected 'freeze' or 'thaw'"));
+        }
+    };
+    info!(
+        "systemd_freeze_thaw: systemctl {} {}",
+        action,
+        services.join(" ")
+    );
+    plugin::map_status(
+        Command::new("systemctl")
+            .arg(action)
+            .args(services)
+            .status(),
+    )
+}
+
 fn persist_journal() {
     let _ = Command::new("journalctl")
         .arg("--flush")
@@ -276,6 +336,7 @@ fn action(what: &str, to: State, how: &Runner) -> Result<()> {
         Runner::Systemd => match to {
             State::Start => systemd_start(what),
             State::Stop => systemd_stop(what),
+            State::Freeze | State::Thaw => systemd_freeze_thaw(what, to),
         },
     }
 }
@@ -318,6 +379,22 @@ fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
     }
 }
 
+fn freeze_actions(name: &str, to: State, how: &Runner) -> Result<()> {
+    match how {
+        Runner::Shell => Err(anyhow::anyhow!(
+            "Shell runner can not not freeze/thaw services, use systemd"
+        )),
+        Runner::Systemd => {
+            let target = format!("drbd-services@{}.target", escape_name(name));
+            info!(
+                "freeze_actions: freezing/thawing services in target '{}'",
+                target
+            );
+            action(&target, to, how)
+        }
+    }
+}
+
 fn get_backing_devices(resname: &str) -> Result<Vec<String>> {
     let shlldev = Command::new("drbdadm")
         .arg("sh-ll-dev")
@@ -335,6 +412,32 @@ fn get_backing_devices(resname: &str) -> Result<Vec<String>> {
     let shlldev = String::from_utf8(shlldev.stdout)?;
     let devices: Vec<String> = shlldev.lines().map(|s| s.to_string()).collect();
     Ok(devices)
+}
+
+fn get_target_services(target: &str) -> Result<Vec<String>> {
+    let deps = Command::new("systemctl")
+        .arg("list-dependencies")
+        .arg("--no-pager")
+        .arg("--plain")
+        .arg(target)
+        .output()?;
+    if !deps.status.success() {
+        return Err(anyhow::anyhow!(
+            "'systemctl list-dependencies --no-pager --plain {}' not executed successfully, stdout: '{}', stderr: '{}'",
+            target,
+            String::from_utf8(deps.stdout).unwrap_or("<Could not convert stdout>".to_string()),
+            String::from_utf8(deps.stderr).unwrap_or("<Could not convert stderr>".to_string())
+        ));
+    }
+
+    let deps = String::from_utf8(deps.stdout)?;
+    let services: Vec<String> = deps
+        .lines()
+        .skip(2) // target itself is printed, + implicit promote unit (has no running process, freeze complains)
+        .map(str::trim)
+        .map(ToString::to_string)
+        .collect();
+    Ok(services)
 }
 
 fn adjust_resources(to_start: &[String]) -> Result<()> {
@@ -631,6 +734,8 @@ fn systemd_daemon_reload() -> Result<()> {
 enum State {
     Start,
     Stop,
+    Freeze,
+    Thaw,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -697,6 +802,19 @@ struct SystemdSettings {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum QuorumLossPolicy {
+    #[serde(rename = "shutdown")]
+    Shutdown,
+    #[serde(rename = "freeze")]
+    Freeze,
+}
+impl Default for QuorumLossPolicy {
+    fn default() -> Self {
+        Self::Shutdown
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum Runner {
     #[serde(rename = "systemd")]
     Systemd,
@@ -712,6 +830,7 @@ impl Default for Runner {
 fn get_sleep_before_promote_ms(
     resource: &Resource,
     preferred_nodes: &[String],
+    on_quorum_loss: &QuorumLossPolicy,
     factor: f32,
 ) -> u64 {
     let mut max_sleep_s: usize = resource
@@ -745,6 +864,15 @@ fn get_sleep_before_promote_ms(
         Err(e) => warn!("Could not determine 'uname -n': {}", e),
     };
 
+    if *on_quorum_loss == QuorumLossPolicy::Freeze && resource.role == Role::Secondary {
+        // nodes might have lost their replication network, and now they join in a random order
+        // some random Secondaries might have gained quorum, but we still have a frozen Primary
+        // we don't want to start the service immediately on one of those Secondaries, give the Primary an advantage
+        // the Secondaries might joint it, and it might thaw, and then
+        // promotion on these Secondaries fails intentionally
+        max_sleep_s += 2;
+    }
+
     // convert to ms and scale by factor
     (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
 }
@@ -753,11 +881,12 @@ fn escaped_services_target_dir(name: &str) -> PathBuf {
     Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", escape_name(name)))
 }
 
-fn check_resources(to_start: &[String]) -> Result<()> {
+fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
     #[derive(Serialize, Deserialize)]
     struct Resource {
         resource: String,
         options: Options,
+        connections: Vec<Connection>,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -766,6 +895,21 @@ fn check_resources(to_start: &[String]) -> Result<()> {
         auto_promote: bool,
         quorum: String,
         on_no_quorum: String,
+        on_suspended_primary_outdated: String,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct Connection {
+        // even if we expect the net options to be set globally, they are
+        // "inherited" downwards to the individual connections
+        net: Net,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct Net {
+        rr_conflict: String,
     }
 
     let check_for = |res: &str, what: &str, expected: &str, is: &str| {
@@ -777,51 +921,71 @@ fn check_resources(to_start: &[String]) -> Result<()> {
         }
     };
 
-    for res in to_start {
-        let output = Command::new("drbdsetup")
-            .arg("show")
-            .arg("--show-defaults")
-            .arg("--json")
-            .arg(res)
-            .output()?;
-        if !output.status.success() {
-            return Err(anyhow::anyhow!(
-                "'drbdsetup show' not executed successfully"
-            ));
-        }
-
-        let stdout = String::from_utf8(output.stdout)?;
-        let resources: Vec<Resource> = serde_json::from_str(&stdout)?;
-        if resources.len() != 1 {
-            return Err(anyhow::anyhow!(
-                "resources lenght from drbdsetup show not exactly 1"
-            ));
-        }
-        if &resources[0].resource != res {
-            return Err(anyhow::anyhow!(
-                "res name to check ('{}') and drbdsetup show output ('{}') did not match",
-                res,
-                resources[0].resource
-            ));
-        }
-
-        check_for(
-            res,
-            "auto-promote",
-            "no",
-            match resources[0].options.auto_promote {
-                true => "yes",
-                false => "no",
-            },
-        );
-        check_for(res, "quorum", "majority", &resources[0].options.quorum);
-        check_for(
-            res,
-            "on-no-quorum",
-            "io-error",
-            &resources[0].options.on_no_quorum,
-        );
+    let output = Command::new("drbdsetup")
+        .arg("show")
+        .arg("--show-defaults")
+        .arg("--json")
+        .arg(name)
+        .output()?;
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "'drbdsetup show' not executed successfully"
+        ));
     }
+
+    let stdout = String::from_utf8(output.stdout)?;
+    let resources: Vec<Resource> = serde_json::from_str(&stdout)?;
+    if resources.len() != 1 {
+        return Err(anyhow::anyhow!(
+            "resources lenght from drbdsetup show not exactly 1"
+        ));
+    }
+    if &resources[0].resource != name {
+        return Err(anyhow::anyhow!(
+            "res name to check ('{}') and drbdsetup show output ('{}') did not match",
+            name,
+            resources[0].resource
+        ));
+    }
+
+    check_for(
+        name,
+        "auto-promote",
+        "no",
+        match resources[0].options.auto_promote {
+            true => "yes",
+            false => "no",
+        },
+    );
+    check_for(name, "quorum", "majority", &resources[0].options.quorum);
+    check_for(
+        name,
+        "on-suspended-primary-outdated",
+        "force-secondary",
+        &resources[0].options.on_suspended_primary_outdated,
+    );
+
+    let on_no_quorum_policy = match on_quorum_loss {
+        QuorumLossPolicy::Shutdown => "io-error",
+        QuorumLossPolicy::Freeze => "suspend-io",
+    };
+    check_for(
+        name,
+        "on-no-quorum",
+        &on_no_quorum_policy,
+        &resources[0].options.on_no_quorum,
+    );
+
+    if *on_quorum_loss == QuorumLossPolicy::Freeze {
+        for conn in &resources[0].connections {
+            check_for(name, "rr-conflict", "retry-connect", &conn.net.rr_conflict);
+        }
+
+        if !Path::new("/sys/fs/cgroup/cgroup.controllers").exists() {
+            warn!("You don't have unified cgroups, the plugin will not work as intended");
+        }
+    }
+
     Ok(())
 }
 
@@ -876,7 +1040,7 @@ mod tests {
     #[test]
     fn sleep_before_promote_ms() {
         // be careful to only use a Resource *with* devices filter out the unwarp_or_else?
-        let r = Resource {
+        let mut r = Resource {
             name: "test".to_string(),
             devices: vec![
                 Device {
@@ -894,8 +1058,20 @@ mod tests {
             ],
             ..Default::default()
         };
-        assert_eq!(get_sleep_before_promote_ms(&r, &vec![], 1.0), 6000);
-        assert_eq!(get_sleep_before_promote_ms(&r, &vec![], 0.5), 3000);
+        assert_eq!(
+            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Shutdown, 1.0),
+            6000
+        );
+
+        r.role = Role::Secondary;
+        assert_eq!(
+            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Freeze, 1.0),
+            6000 + 2000
+        );
+        assert_eq!(
+            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Shutdown, 0.5),
+            3000
+        );
         if let Ok(node_name) = uname_n() {
             assert_eq!(
                 get_sleep_before_promote_ms(
@@ -906,6 +1082,7 @@ mod tests {
                         node_name.clone(),
                         "".to_string()
                     ],
+                    &QuorumLossPolicy::Shutdown,
                     1.0
                 ),
                 6000 + 2000
@@ -914,6 +1091,7 @@ mod tests {
                 get_sleep_before_promote_ms(
                     &r,
                     &vec!["".to_string(), "".to_string(), "".to_string()],
+                    &QuorumLossPolicy::Shutdown,
                     1.0
                 ),
                 6000 + 3000

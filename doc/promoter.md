@@ -52,6 +52,10 @@ start the generated systemd target (e.g., `drbd-resource@foo.target`). All will 
 others will fail intentionally.
 
 If a resource looses "quorum", it stops the systemd `drbd-services@` target and therefore all the dependencies.
+Stopping services on the node that lost quorum is the standard behavior one would expect from a cluster manger.
+There might be scenarios where it is preferable to freeze the started service until quorum is gained
+again. As this requires multiple prerequisites to hold true, freezing a resource on quorum loss is described
+in [its own section](promoter.md#freezing-resources).
 
 The plugin's configuration can contain an action that is executed if a stop action fails (e.g., triggering a
 reboot). Start actions in `start` are interpreted as systemd units and have to have an according postfix (i.e.
@@ -103,6 +107,33 @@ start = [
 OCF agents are expected in `/usr/lib/ocf/resource.d/`. Please make sure to check for `resource-agents`
 packages provided by your distribution or use the packages provided by LINBIT (customers only).
 
+## Freezing resources
+The default behavior when a DRBD Primary looses quorum is to immediately stop the generated target unit and
+hope that other nodes still having quorum will successfully start the service. This works well if
+services can be failed over/started on another node in reasonable time. Unfortunately there are services that
+take a very long time to start, for example huge data bases.
+
+When a DRBD Primary looses its quorum we basically have two possibilities:
+- the rest of the nodes, or at least parts of it still have quorum: Then these have to start the service, they
+are the only ones with quorum, but still we could keep the old Primary in a frozen state. And then, when the
+nodes with quorum come into contact with the old Primary, then it should stop the service and its storage
+should become in sync with the other nodes.
+- the rest of the nodes are not able to form a partition with quorum. In such a scenario there are no
+alternatives anyways, we would need to keep the Primary frozen. But if the nodes eventually join the old
+Primary again, and quorum would be restored, we could just unfreeze/thaw the old Primary (which is also the
+new Primary).
+
+There are several requirements for this to work properly:
+- A system with unified cgroups. If the file `/sys/fs/cgroup/cgroup.controllers` exists you should be fine.
+That requires a relatively "new" kernel. Note that "even" RHEL8 for example needs the addition of
+`systemd.unified_cgroup_hierarchy` on the kernel command line.
+- a service that can tolerate to be frozen
+- DRBD option `on-suspended-primary-outdated` set to `force-secondary`
+- DRBD option `on-quorum-loss` set to `suspend-io`
+- DRBD net option `rr-conflict` set to `retry-connect`
+
+If these requirements are fulfilled, then one can set the promoter option `on-quorum-loss` to `freeze`.
+
 ## DRBD resource configuration
 
 Make sure the resource has the following options set:
@@ -111,9 +142,16 @@ Make sure the resource has the following options set:
 options {
    auto-promote no;
    quorum majority;
-   on-no-quorum io-error;
+   on-suspended-primary-outdated force-secondary;
+   on-no-quorum io-error; # for the default drbd-reactor on-quorum-loss policy (i.e., Shutdown)
+   # on-no-quorum suspend-io; # for freezing resources
 }
+# net { rr-conflict retry-connect; } # for freezing resources
 ```
+
+`drbd-reactor` itself is pretty relaxed about these settings, don't expect too much hand holding or even
+auto-configuration, you as the admin are the one that should understand your system, but it checks properties
+and writes warnings to the log (file/journal) if misconfiguration is detected.
 
 # Handled (failure-) scenarios
 

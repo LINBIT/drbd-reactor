@@ -115,6 +115,12 @@ If a resource looses
 it stops the systemd
 .Sy drbd-services@
 target and all the dependencies.
+Stopping services on the node that lost quorum is the standard behavior one
+would expect from a cluster manger. There might be scenarios where it is
+preferable to freeze the started service until quorum is gained again. As this
+requires multiple prerequisites to hold true, freezing a resource on quorum
+loss is described in
+.Sx FREEZING RESOURCES .
 .Pp
 The plugin's configuration can contain an action that is executed if a stop
 action fails (e.g., triggering a reboot). Start actions in
@@ -156,9 +162,17 @@ default for LINSTOR, but your resources needs to qualify for quorum).
 options {
    auto-promote no;
    quorum majority;
-   on-no-quorum io-error;
+   on-suspended-primary-outdated force-secondary;
+   on-no-quorum io-error; # for the default drbd-reactor on-quorum-loss policy (i.e., Shutdown)
+   # on-no-quorum suspend-io; # for freezing resources
 }
+# net { rr-conflict retry-connect; } # for freezing resources
 .Ed
+.Sy drbd-reactor
+itself is pretty relaxed about these settings, don't expect too much hand
+holding or even auto-configuration, you as the admin are the one that should
+understand your system, but it checks properties and writes warnings to the
+log (file/journal) if misconfiguration is detected.
 .Sh SERVICE DEPENDENCIES
 Let's get back to our simple example:
 .Bd -literal -offset indent
@@ -234,6 +248,63 @@ start = [
   "bar.service"
 ]
 .Ed
+.Sh FREEZING RESOURCES
+The default behavior when a DRBD Primary looses quorum is to immediately stop
+the generated target unit and hope that other nodes still having quorum will
+successfully start the service. This works well if services can be failed
+over/started on another node in reasonable time. Unfortunately there are
+services that take a very long time to start, for example huge data bases.
+.Pp
+When a DRBD Primary looses its quorum we basically have two possibilities:
+.Bl -bullet -compact
+.It
+the rest of the nodes, or at least parts of it still have quorum: Then these
+have to start the service, they are the only ones with quorum, but still we
+could keep the old Primary in a frozen state. And then, when the nodes with
+quorum come into contact with the old Primary, then it should stop the service
+and its storage should become in sync with the other nodes.
+.It
+the rest of the nodes are not able to form a partition with quorum. In such a
+scenario there are no alternatives anyways, we would need to keep the Primary
+frozen. But if the nodes eventually join the old Primary again, and quorum
+would be restored, we could just unfreeze/thaw the old Primary (which is also
+the new Primary).
+.El
+.Pp
+There are several requirements for this to work properly:
+.Bl -bullet -compact
+.It
+A system with unified cgroups. If the file
+.Pa /sys/fs/cgroup/cgroup.controllers
+exists you should be fine. That requires a relatively
+.Dq new
+kernel. Note that
+.Dq even
+RHEL8 for example needs the addition of
+.Sy systemd.unified_cgroup_hierarchy
+on the kernel command line.
+.It
+a service that can tolerate to be frozen
+.It
+DRBD option
+.Sy on-suspended-primary-outdated
+set to
+.Sy force-secondary
+.It
+DRBD option
+.Sy on-quorum-loss
+set to
+.Sy suspend-io
+.It
+DRBD net option
+.Sy rr-conflict
+set to
+.Sy retry-connect
+.El
+If these requirements are fulfilled, then one can set the promoter option
+.Sy on-quorum-loss
+to
+.Sy freeze .
 .Sh PREFERRED NODES
 While in a HA cluster that deserves the name every node needs to be able to
 run all services, some users like to add preferences for nodes. This can be
