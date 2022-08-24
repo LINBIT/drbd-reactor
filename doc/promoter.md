@@ -100,7 +100,8 @@ start = [
 ]
 ```
 
-OCF agents are expected in `/usr/lib/ocf/resource.d/`
+OCF agents are expected in `/usr/lib/ocf/resource.d/`. Please make sure to check for `resource-agents`
+packages provided by your distribution or use the packages provided by LINBIT (customers only).
 
 ## DRBD resource configuration
 
