@@ -10,6 +10,7 @@
 .Op Fl -color Ar auto | always | never
 .Ar subcommand
 .Nm edit
+.Op Fl -force
 .Op Fl -type Ar TYPE
 .Ar file
 .Nm enable
@@ -76,6 +77,8 @@ The subcommands and their arguments are as follows:
 .Ss edit
 edit an existing plugin configuration or create a new one from a template.
 .Bl -tag -width Ds
+.It Fl -force
+Override sanity checks (e.g., topmost unit not a mount unit).
 .It Fl t, -type Ar promoter | prometheus | debugger | umh
 Type of the plugin to create from template. The default is
 .Sy promoter .

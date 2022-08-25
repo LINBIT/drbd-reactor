@@ -434,6 +434,7 @@ fn generate_systemd_templates(
         // we would not need to keep the order here, as it does not matter
         // what matters is After=, but IMO it would confuse unexperienced users
         // just keep the order, so no HashSet, the Vecs are short, does not matter.
+        // and we use .last() below
         if target_requires.contains(&service_name) {
             return Err(anyhow::anyhow!(
                 "generate_systemd_templates: Service name '{}' already used",
@@ -441,6 +442,14 @@ fn generate_systemd_templates(
             ));
         }
         target_requires.push(service_name.clone());
+    }
+
+    if let Some(unit) = target_requires.last() {
+        if unit.ends_with(".mount") {
+            warn!(
+                "Mount unit should not be the topmost unit, consider using an OCF file system RA"
+            );
+        }
     }
 
     // target and the extra Before= override

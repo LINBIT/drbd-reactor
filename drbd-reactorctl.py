@@ -178,7 +178,7 @@ class Promoter(Plugin):
 id = "${id}"
 [promoter.resources.${resname}]
 start = ["${service.mount}", "${service.service}"]
-# runner = systemd
+# runner = "systemd"
 ## if unset/empty, services from 'start' will be stopped in reverse order if runner is shell
 ## if runner is sytemd it just stops the implicitly generated systemd.target
 # stop = []
@@ -525,11 +525,23 @@ def edit(args):
 
     toml_valid = True
     try:
-        toml.load(tmp_file.name)
+        cfg = toml.load(tmp_file.name)
     except Exception as e:
         toml_valid = False
         eprint('toml snippet not valid ({}), bye'.format(e))
     finally:
+        if toml_valid and args.type == 'promoter':
+            for promoter in cfg.get('promoter', []):
+                for resource in promoter.get('resources', {}).values():
+                    if resource.get('start', ['dummy.service'])[-1].endswith('.mount'):
+                        col = YELLOW
+                        what = 'WARN:'
+                        if not args.force:
+                            toml_valid = False
+                            col = RED
+                            what = 'ERR:'
+                        print(color.color_string(what, color=col),
+                              'Mount unit should not be the topmost unit, consider using an OCF file system RA')
         if toml_valid:
             shutil.copy(tmp_file.name, final_file)
         tmp_file.close()
@@ -682,6 +694,7 @@ def get_main_parser():
     parser_edit.set_defaults(func=edit)
     parser_edit.add_argument('-t', '--type', help='plugin type',
                              choices=('promoter', 'prometheus', 'umh', 'debugger'), default='promoter')
+    parser_edit.add_argument('-f', '--force', action='store_true', help='force dangerous edits')
     parser_edit.add_argument('configs', nargs=1, help='config to edit')
 
     parser_remove = subparsers.add_parser('rm', help='remove given config files')
