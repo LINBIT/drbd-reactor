@@ -501,9 +501,10 @@ fn generate_systemd_templates(
 
     let mut target_requires: Vec<String> = Vec::new();
 
-    let ocf_pattern = Regex::new(r"^ocf:(\S+):(\S+) (.*)$")?;
+    let ocf_pattern = Regex::new(r"^ocf:(\S+):(\S+)\s+((?s).*)$")?;
 
     for action in actions {
+        let action = action.trim();
         let deps = match target_requires.last() {
             Some(prev) => vec![
                 format!("drbd-promote@{}.service", escaped_name),
@@ -1105,7 +1106,7 @@ mod tests {
             "res1",
             "vendor1",
             "agent1",
-            "name1 k1=v1 k2=\"with whitespace\" k3=with\\ different\\ whitespace foo empty=''",
+            "name1\nk1=v1 \nk2=\"with whitespace\" k3=with\\ different\\ whitespace foo empty=''",
         )
         .expect("should work");
 
