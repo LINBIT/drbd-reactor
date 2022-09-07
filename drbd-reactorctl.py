@@ -366,9 +366,17 @@ def get_plugin_files(config, plugins, ext='.toml'):
 
 def status(args):
     files = get_plugin_files(args.config, args.configs) + [args.config]
+    # status is the default func and might not have all the args set as if called via 'drbd-reactorctl status'
     verbose = getattr(args, 'verbose', False)
+    resources = getattr(args, 'resource', [])
 
     for p in Plugin.from_files(files):
+        if len(resources) > 0:
+            if not isinstance(p, Promoter):
+                continue
+            elif not (set(resources) & set(p._get_res_names())):
+                continue
+
         p.show_status(verbose)
 
 
@@ -679,6 +687,8 @@ def get_main_parser():
     parser_status.set_defaults(func=status)
     parser_status.add_argument('-v', '--verbose', action='store_true',
                                help='verbose output')
+    parser_status.add_argument('-r', '--resource', nargs='*',
+                               help='in case of a promoter plugin limit to these DRBD resources')
     parser_status.add_argument('configs', nargs='*',
                                help='configs to print status for')
 
