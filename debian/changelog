@@ -1,3 +1,10 @@
+drbd-reactor (0.9.0~rc.2-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * ctl: fix status without res filter
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 09 Sep 2022 09:17:20 +0200
+
 drbd-reactor (0.9.0~rc.1-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
