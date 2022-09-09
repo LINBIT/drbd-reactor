@@ -687,7 +687,7 @@ def get_main_parser():
     parser_status.set_defaults(func=status)
     parser_status.add_argument('-v', '--verbose', action='store_true',
                                help='verbose output')
-    parser_status.add_argument('-r', '--resource', nargs='*',
+    parser_status.add_argument('-r', '--resource', nargs='*', default=[],
                                help='in case of a promoter plugin limit to these DRBD resources')
     parser_status.add_argument('configs', nargs='*',
                                help='configs to print status for')
