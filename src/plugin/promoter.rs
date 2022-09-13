@@ -315,12 +315,19 @@ fn systemd_freeze_thaw(unit: &str, to: State) -> Result<()> {
         action,
         services.join(" ")
     );
-    plugin::map_status(
-        Command::new("systemctl")
-            .arg(action)
-            .args(services)
-            .status(),
-    )
+
+    for service_name in services.iter().filter(|x| !x.ends_with(".mount")) {
+        if let Err(e) = plugin::map_status(
+            Command::new("systemctl")
+                .arg(action)
+                .arg(service_name.clone())
+                .status(),
+        ) {
+            warn!("systemd_freeze_thaw: 'systemctl {} {}' failed ('{}'), this might be fine if there is no process in that unit", action, service_name, e);
+        }
+    }
+
+    Ok(())
 }
 
 fn persist_journal() {
