@@ -7,9 +7,9 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl -config Ar CONFIG
-.Op Fl -color Ar auto | always | never
 .Ar subcommand
 .Nm edit
+.Op Fl -disabled
 .Op Fl -force
 .Op Fl -type Ar TYPE
 .Ar file
@@ -19,6 +19,7 @@
 .Op Fl -now
 .Op Ar
 .Nm status
+.Op Fl -resource
 .Op Fl -verbose
 .Op Ar
 .Nm evict
@@ -30,6 +31,7 @@
 .Nm cat
 .Op Ar
 .Nm restart
+.Op Fl -with-targets
 .Op Ar
 .Nm rm
 .Op Fl -force
@@ -38,6 +40,8 @@
 .Nm ls
 .Op Fl -disabled
 .Op Ar
+.Nm generate-completion
+.Ar SHELL
 .Sh DESCRIPTION
 The
 .Nm
@@ -68,16 +72,15 @@ Global arguments are:
 .It Fl c, -config Ar CONFIG
 Main configuration file, defaults to
 .Pa /etc/drbd-reactor.toml
-.It Fl -color Ar auto | always | never
-Use colorized output, the defautl is
-.Sy auto
 .El
 .Pp
 The subcommands and their arguments are as follows:
 .Ss edit
 edit an existing plugin configuration or create a new one from a template.
 .Bl -tag -width Ds
-.It Fl -force
+.It Fl -disabled
+Edit a disabled file
+.It Fl f, -force
 Override sanity checks (e.g., topmost unit not a mount unit).
 .It Fl t, -type Ar promoter | prometheus | debugger | umh
 Type of the plugin to create from template. The default is
@@ -97,17 +100,19 @@ instead.
 .Ss status
 print the status of a plugin.
 .Bl -tag -width Ds
+.It Fl r, -resource Ar resource...
+In case of a promoter plugin limit to these DRBD resources.
 .It Fl -verbose
 verbose output depending on the plugin type.
 .El
 .Ss evict
 Evicts a promoter resource from the currently active node.
 .Bl -tag -width Ds
-.It Fl -delay
+.It Fl d, -delay
 Positive number of seconds to wait for peer takeover.
-.It Fl -force
+.It Fl f, -force
 Override sanity checks (multiple plugins per snippet/multiple resources per promoter).
-.It Fl -keep-masked
+.It Fl k, -keep-masked
 Usually
 .Sy evict
 tries to evict the resource from the node but does not take further actions to
@@ -117,7 +122,7 @@ With this option the target unit is temporarily masked via
 This makes it impossible to start the unit on the local node, which might be
 beneficial for maintenance. Masking is cleared after reboot, or after
 .Sy evict --unmask .
-.It Fl -unmask
+.It Fl u, -unmask
 Unmasks all target units and tries to start them. It does not run any
 evictions on its own, it is used to clear previous
 .Sy evict --keep-masked
@@ -131,6 +136,11 @@ if available.
 restarts the given plugins or the daemon itself if no
 .Ar files
 are given.
+.Bl -tag -width Ds
+.It Fl -with-targets
+also stop the drbd-service@.target for promoter plugins,
+might get started on different node.
+.El
 .Ss rm
 removes the given plugins and reloads the daemon.
 .Bl -tag -width Ds
@@ -145,6 +155,13 @@ lists activated plugins.
 .It Fl -disabled
 Also list disabled plugins.
 .El
+.Ss generate-completion
+Generate tab completion script for
+.Ar SHELL
+and write it to
+.Sy stdout .
+Supported shells are
+.Ar zsh | bash | fish | powershell | elvish
 .Sh EXAMPLES
 .Bd -literal -offset indent
 drbd-reactorctl edit -t prometheus myprometheus

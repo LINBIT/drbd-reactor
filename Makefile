@@ -31,7 +31,7 @@ else
 	TARGET := release
 endif
 
-build: ## cargo build binary
+build: ## cargo build binaries
 	cargo build $(OFFLINE) $(RELEASE)
 
 .PHONY: help
@@ -59,14 +59,14 @@ rpm: ## Build a rpm package
 	mv $$tmpdir/*.rpm . && echo "rm -rf $$tmpdir"
 
 .PHONY: tabcompletion
-tabcompletion: ## Build tab completions in drbd-reactor:deb
-	tmpdir=$$(mktemp -d) && \
-	docker run -it --rm -v $$PWD:/src:ro -v $$tmpdir:/out --entrypoint=/src/docker/entry.sh $(DEBCONTAINER) tabcompletion && \
-	mv $$tmpdir/*.completion.* ./example/ && echo "rm -rf $$tmpdir"
+tabcompletion: ## Build tab completions
+	for shell in zsh bash; \
+		do cargo run --bin drbd-reactorctl generate-completion $$shell > ./example/ctl.completion.$$shell; \
+	done
 
 install:  # install binary and config
 	install -D -m 0750 target/$(TARGET)/$(PROG) $(DESTDIR)/usr/sbin/$(PROG)
-	install -D -m 0750 $(PROG)ctl.py $(DESTDIR)/usr/sbin/$(PROG)ctl
+	install -D -m 0750 target/$(TARGET)/$(PROG)ctl $(DESTDIR)/usr/sbin/$(PROG)ctl
 	install -D -m 0640 example/drbd-reactor.toml $(DESTDIR)/etc/drbd-reactor.toml
 	install -d -m 0750 $(DESTDIR)/etc/drbd-reactor.d
 	install -D -m 0644 example/drbd-reactor.service $(DESTDIR)/lib/systemd/system/drbd-reactor.service

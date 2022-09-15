@@ -16,7 +16,7 @@ RUN cd /tmp && wget https://pkg.linbit.com/downloads/drbd/utils/${DRBD_REACTOR_T
 # =lbbuild USER makepkg
 RUN test -f $HOME/.cargo/env || install -D /dev/null $HOME/.cargo/env
 RUN cd /tmp && tar xvf ${DRBD_REACTOR_TGZ} && cd ${DRBD_REACTOR_TGZNAME}-${DRBD_REACTOR_VERSION} && \
-	. $HOME/.cargo/env && cargo install --path . && \
+	. $HOME/.cargo/env && cargo install --path . --bin drbd-reactor && \
 	cp $HOME/.cargo/bin/drbd-reactor /tmp && \
 	cp ./example/drbd-reactor.toml /tmp
 

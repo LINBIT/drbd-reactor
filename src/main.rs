@@ -1,4 +1,3 @@
-use glob::glob;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -16,72 +15,6 @@ use structopt::StructOpt;
 use drbd_reactor::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
 use drbd_reactor::events::events2;
 use drbd_reactor::{config, plugin};
-
-#[derive(Debug, StructOpt)]
-struct CliOpt {
-    #[structopt(
-        short,
-        long,
-        parse(from_os_str),
-        default_value = "/etc/drbd-reactor.toml"
-    )]
-    config: PathBuf,
-}
-
-fn read_snippets(path: &PathBuf) -> Result<String> {
-    if !path.exists() || !path.is_dir() || !path.is_absolute() {
-        return Ok("".to_string());
-    }
-
-    let mut path = PathBuf::from(path);
-    path.push("*.toml");
-    let path = path
-        .to_str()
-        .ok_or(anyhow::anyhow!("Path not a valid string"))?;
-
-    let mut snippets: Vec<PathBuf> = glob(path)?.filter_map(Result::ok).collect();
-    snippets.sort();
-
-    let mut s = String::new();
-    for snippet in snippets {
-        s.push_str(&read_to_string(snippet)?);
-        s.push('\n');
-    }
-
-    Ok(s)
-}
-
-pub fn read_config() -> Result<config::Config> {
-    let cli_opt = CliOpt::from_args();
-
-    let mut content = read_to_string(&cli_opt.config)
-        .with_context(|| format!("Could not read config file: {}", cli_opt.config.display()))?;
-
-    let mut config: config::Config = toml::from_str(&content).with_context(|| {
-        format!(
-            "Could not parse main config file; content: {}",
-            cli_opt.config.display()
-        )
-    })?;
-
-    let snippets_path = match config.snippets {
-        None => return Ok(config),
-        Some(path) => path,
-    };
-
-    let snippets =
-        read_snippets(&snippets_path).with_context(|| format!("Could not read config snippets"))?;
-    content.push_str("# Content from snippets:\n");
-    content.push_str(&snippets);
-    config = toml::from_str(&content).with_context(|| {
-        format!(
-            "Could not parse config files including snippets; content: {}",
-            content
-        )
-    })?;
-
-    Ok(config)
-}
 
 /// Core handles DRBD events based on the provided configuration
 ///
@@ -399,4 +332,49 @@ fn min_version(have: (u8, u8, u8), want: (u8, u8, u8)) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Debug, StructOpt)]
+struct CliOpt {
+    #[structopt(
+        short,
+        long,
+        parse(from_os_str),
+        default_value = "/etc/drbd-reactor.toml"
+    )]
+    config: PathBuf,
+}
+
+fn read_config() -> Result<config::Config> {
+    let cli_opt = CliOpt::from_args();
+
+    // as we also need the content of the main config in the daemon config, we don't use config::get_snippets_path
+    let mut content = read_to_string(&cli_opt.config)
+        .with_context(|| format!("Could not read config file: {}", cli_opt.config.display()))?;
+
+    let mut config: config::Config = toml::from_str(&content).with_context(|| {
+        format!(
+            "Could not parse main config file; content: {}",
+            cli_opt.config.display()
+        )
+    })?;
+
+    let snippets_path = match config.snippets {
+        None => return Ok(config),
+        Some(path) => path,
+    };
+
+    let snippets_paths = config::files_with_extension_in(&snippets_path, "toml")?;
+    let snippets = config::read_snippets(&snippets_paths)
+        .with_context(|| format!("Could not read config snippets"))?;
+    content.push_str("\n# Content from snippets:\n");
+    content.push_str(&snippets);
+    config = toml::from_str(&content).with_context(|| {
+        format!(
+            "Could not parse config files including snippets; content: {}",
+            content
+        )
+    })?;
+
+    Ok(config)
 }

@@ -16,15 +16,6 @@ BuildRequires:	systemd
 # looks like it would only help for cmake or pkgconfig projects.
 # BuildRequires:	bash-completion
 Requires:	drbd-utils >= 9.21.2
-Requires:	python3
-# python3{,6}-toml is for rhel7/8 only in epel, but we mirror that pkg
-%if 0%{?suse_version} >= 1500 || 0%{?rhel} >= 8
-Requires:	python3-toml
-%else
-%if 0%{?rhel} == 7
-Requires:	python36-toml
-%endif
-%endif
 
 %description
 Daemon monitoring the state of DRBD resources, and executing plugins

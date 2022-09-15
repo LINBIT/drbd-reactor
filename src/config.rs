@@ -1,5 +1,7 @@
+use std::fs;
 use std::path::PathBuf;
 
+use anyhow::Result;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +44,41 @@ fn default_log() -> Vec<LogConfig> {
         level: default_level(),
         file: None,
     }];
+}
+
+pub fn read_snippets(path: &Vec<PathBuf>) -> Result<String> {
+    let mut s = "\n".to_string();
+    for snippet in path {
+        s.push_str(&fs::read_to_string(snippet)?);
+        s.push('\n');
+    }
+
+    Ok(s)
+}
+
+pub fn files_with_extension_in(path: &PathBuf, extension: &str) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    let extension = ".".to_owned() + extension;
+    for entry in fs::read_dir(path)? {
+        let path = match entry {
+            Ok(e) => e.path(),
+            _ => continue,
+        };
+        if !path.is_file() {
+            continue;
+        }
+        let path_str = path.to_str().ok_or(anyhow::anyhow!(
+            "Could not convert '{}' to str",
+            path.display()
+        ))?;
+        if !path_str.ends_with(&extension) {
+            continue;
+        }
+        files.push(path);
+    }
+
+    files.sort();
+    Ok(files)
 }
 
 #[cfg(test)]

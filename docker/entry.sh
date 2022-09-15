@@ -34,9 +34,4 @@ case $1 in
 		debuild -us -uc -i -b
 		find /tmp/build -name "*.deb" -exec cp {} /out \;
 		;;
-	tabcompletion)
-		export PYTHONPATH=$PWD:$PYTHONPATH
-		cp drbd-reactorctl.py drctl.py
-		for shell in zsh bash; do shtab -u --shell="$shell" drctl.get_main_parser > "/out/ctl.completion.$shell"; done
-		;;
 esac

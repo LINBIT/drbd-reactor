@@ -1,4 +1,4 @@
 #!/usr/bin/make -f
 
 %:
-	dh $@ --with systemd --with python3 --with bash-completion
+	dh $@ --with systemd --with bash-completion

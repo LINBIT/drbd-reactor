@@ -1,4 +1,3 @@
-use regex::Regex;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::fmt;
@@ -15,6 +14,7 @@ use std::time::Duration;
 use anyhow::Result;
 use libc::c_char;
 use log::{debug, info, trace, warn};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use shell_words;
 use tinytemplate::TinyTemplate;
@@ -356,11 +356,7 @@ fn start_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
             }
             Ok(())
         }
-        Runner::Systemd => action(
-            &format!("drbd-services@{}.target", escape_name(name)),
-            State::Start,
-            how,
-        ),
+        Runner::Systemd => action(&escaped_services_target(name), State::Start, how),
     }
 }
 
@@ -378,7 +374,7 @@ fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
             Ok(())
         }
         Runner::Systemd => {
-            let target = format!("drbd-services@{}.target", escape_name(name));
+            let target = escaped_services_target(name);
             info!("stop_actions: stopping '{}'", target);
             persist_journal();
             action(&target, State::Stop, how)
@@ -392,7 +388,7 @@ fn freeze_actions(name: &str, to: State, how: &Runner) -> Result<()> {
             "Shell runner can not not freeze/thaw services, use systemd"
         )),
         Runner::Systemd => {
-            let target = format!("drbd-services@{}.target", escape_name(name));
+            let target = escaped_services_target(name);
             info!(
                 "freeze_actions: freezing/thawing services in target '{}'",
                 target
@@ -476,6 +472,7 @@ fn drbd_backing_device_ready(dev: &str) -> bool {
 const SYSTEMD_PREFIX: &str = "/run/systemd/system";
 const SYSTEMD_CONF: &str = "reactor.conf";
 const SYSTEMD_BEFORE_CONF: &str = "reactor-50-before.conf";
+pub const OCF_PATTERN: &str = r"^ocf:(\S+):(\S+)\s+((?s).*)$";
 
 fn generate_systemd_templates(
     name: &str,
@@ -508,7 +505,7 @@ fn generate_systemd_templates(
 
     let mut target_requires: Vec<String> = Vec::new();
 
-    let ocf_pattern = Regex::new(r"^ocf:(\S+):(\S+)\s+((?s).*)$")?;
+    let ocf_pattern = Regex::new(OCF_PATTERN)?;
 
     for action in actions {
         let action = action.trim();
@@ -576,7 +573,7 @@ fn generate_systemd_templates(
     )
 }
 
-fn escaped_systemd_ocf_parse_to_env(
+pub fn escaped_systemd_ocf_parse_to_env(
     name: &str,
     vendor: &str,
     agent: &str,
@@ -885,8 +882,12 @@ fn get_sleep_before_promote_ms(
     (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
 }
 
+pub fn escaped_services_target(name: &str) -> String {
+    format!("drbd-services@{}.target", escape_name(name))
+}
+
 fn escaped_services_target_dir(name: &str) -> PathBuf {
-    Path::new(SYSTEMD_PREFIX).join(format!("drbd-services@{}.target.d", escape_name(name)))
+    Path::new(SYSTEMD_PREFIX).join(format!("{}.d", escaped_services_target(name)))
 }
 
 fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
@@ -1010,7 +1011,7 @@ fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
 fn to_cstr(buf: &[c_char]) -> &CStr {
     unsafe { CStr::from_ptr(buf.as_ptr()) }
 }
-fn uname_n() -> Result<String> {
+pub fn uname_n() -> Result<String> {
     let mut n = unsafe { std::mem::zeroed() };
     let r = unsafe { libc::uname(&mut n) };
     if r == 0 {

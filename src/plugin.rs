@@ -63,13 +63,13 @@ pub fn system(action: &str) -> Result<()> {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PluginConfig {
     #[serde(default)]
-    promoter: Vec<promoter::PromoterConfig>,
+    pub promoter: Vec<promoter::PromoterConfig>,
     #[serde(default)]
-    debugger: Vec<debugger::DebuggerConfig>,
+    pub debugger: Vec<debugger::DebuggerConfig>,
     #[serde(default)]
-    umh: Vec<umh::UMHConfig>,
+    pub umh: Vec<umh::UMHConfig>,
     #[serde(default)]
-    prometheus: Vec<prometheus::PrometheusConfig>,
+    pub prometheus: Vec<prometheus::PrometheusConfig>,
 }
 
 pub struct PluginStarted {
