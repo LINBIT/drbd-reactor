@@ -1,3 +1,9 @@
+drbd-reactor (0.9.0-1) experimental; urgency=medium
+
+  * New upstream release
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 03 Oct 2022 10:38:16 +0200
+
 drbd-reactor (0.9.0~rc.3-1) experimental; urgency=medium
 
   * promoter: call systemctl freeze/thaw for every unit
