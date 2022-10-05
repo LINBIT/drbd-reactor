@@ -165,6 +165,8 @@ options {
    on-suspended-primary-outdated force-secondary;
    on-no-quorum io-error; # for the default drbd-reactor on-quorum-loss policy (i.e., Shutdown)
    # on-no-quorum suspend-io; # for freezing resources
+   on-no-data-accessible io-error # always set this to the value of on-no-quorum!
+   # on-no-data-accessible suspend-io # for freezing, always set this to the value of on-no-quorum!
 }
 # net { rr-conflict retry-connect; } # for freezing resources
 .Ed

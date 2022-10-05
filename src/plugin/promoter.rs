@@ -904,6 +904,7 @@ fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
         quorum: String,
         on_no_quorum: String,
         on_suspended_primary_outdated: String,
+        on_no_data_accessible: String,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -982,6 +983,12 @@ fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
         "on-no-quorum",
         &on_no_quorum_policy,
         &resources[0].options.on_no_quorum,
+    );
+    check_for(
+        name,
+        "on-no-data-accessible",
+        &on_no_quorum_policy,
+        &resources[0].options.on_no_data_accessible,
     );
 
     if *on_quorum_loss == QuorumLossPolicy::Freeze {
