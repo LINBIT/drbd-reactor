@@ -129,7 +129,8 @@ That requires a relatively "new" kernel. Note that "even" RHEL8 for example need
 `systemd.unified_cgroup_hierarchy` on the kernel command line.
 - a service that can tolerate to be frozen
 - DRBD option `on-suspended-primary-outdated` set to `force-secondary`
-- DRBD option `on-quorum-loss` set to `suspend-io`
+- DRBD option `on-no-quorum` set to `suspend-io`
+- DRBD option `on-no-data-accessible` set to `suspend-io`
 - DRBD net option `rr-conflict` set to `retry-connect`
 
 If these requirements are fulfilled, then one can set the promoter option `on-quorum-loss` to `freeze`.

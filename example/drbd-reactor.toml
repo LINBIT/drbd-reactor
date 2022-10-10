@@ -64,7 +64,8 @@ statistics-poll-interval = 60
 ## what to do if a the currentl DRBD Primary node loses quorum
 ## by default we shutdown the services (and maybe trigger a demote failure action).
 ## if the DRBD resource has the DRBD option on-suspended-primary-outdated set to force-secondary
-## AND the DRBD option on-quorum-loss set to suspend-io
+## AND the DRBD option on-no-quorum set to suspend-io
+## AND the DRBD option on-no-data-accessible set to suspend-io
 ## AND the DRBD net option rr-conflict set to retry-connect
 ## AND you have a system with unified cgroups (i.e., the file /sys/fs/cgroup/cgroup.controllers exists)
 ## AND your service can handle to be frozen, setting on-quorum-loss to "freeze" might be an option.
