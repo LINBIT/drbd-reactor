@@ -145,7 +145,7 @@ class Prometheus(Plugin):
         return """[[prometheus]]
 id = "prometheus"  # usually there is only one, this id should be fine
 enums = true
-# address = "0.0.0.0:9942" """
+# address = "[::]:9942" """
 
     @property
     def header(self):
@@ -153,7 +153,7 @@ enums = true
 
     def show_status(self, verbose=False):
         super().show_status(verbose)
-        address = self._config.get('address', '0.0.0.0:9942')
+        address = self._config.get('address', '[::]:9942')
         header = '{} listening on {}'.format(self.header, address)
         print(color.color_string(header, color=GREEN))
         if verbose:

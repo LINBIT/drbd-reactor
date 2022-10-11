@@ -444,5 +444,5 @@ pub struct PrometheusConfig {
     pub id: Option<String>,
 }
 fn default_address() -> String {
-    "0.0.0.0:9942".to_string()
+    "[::]:9942".to_string()
 }

@@ -86,4 +86,4 @@ statistics-poll-interval = 60
 ## generate enum types which generates considerably more data, defaults to false
 # enums = false
 ## address and port combination, 9942 is the registered port for that exporter
-# address = "0.0.0.0:9942"
+# address = "[::]:9942"
