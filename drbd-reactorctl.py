@@ -681,7 +681,7 @@ def get_main_parser():
     parser_enable = subparsers.add_parser('enable', help='enable drbd-reactor configs')
     parser_enable.set_defaults(func=enable)
     parser_enable.add_argument('configs', nargs='*',
-                               help='configs to disable')
+                               help='configs to enable')
 
     parser_status = subparsers.add_parser('status', help='plugin status')
     parser_status.set_defaults(func=status)
