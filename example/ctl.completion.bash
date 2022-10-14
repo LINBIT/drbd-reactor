@@ -5,7 +5,7 @@ _shtab_drctl_subparsers=('disable' 'enable' 'status' 'restart' 'edit' 'rm' 'evic
 _shtab_drctl_option_strings=('-h' '--help' '-c' '--config' '--color')
 _shtab_drctl_disable_option_strings=('-h' '--help' '--now')
 _shtab_drctl_enable_option_strings=('-h' '--help')
-_shtab_drctl_status_option_strings=('-h' '--help' '-v' '--verbose')
+_shtab_drctl_status_option_strings=('-h' '--help' '-v' '--verbose' '-r' '--resource')
 _shtab_drctl_restart_option_strings=('-h' '--help' '--with-targets')
 _shtab_drctl_edit_option_strings=('-h' '--help' '-t' '--type' '-f' '--force')
 _shtab_drctl_rm_option_strings=('-h' '--help' '-f' '--force' '--disabled')
@@ -15,10 +15,10 @@ _shtab_drctl_ls_option_strings=('-h' '--help' '--disabled')
 
 
 
-_shtab_drctl_pos_0_choices='disable enable status restart edit rm evict cat ls'
-_shtab_drctl___color_choices='auto always never'
-_shtab_drctl_edit__t_choices='promoter prometheus umh debugger'
-_shtab_drctl_edit___type_choices='promoter prometheus umh debugger'
+_shtab_drctl_pos_0_choices=('disable' 'enable' 'status' 'restart' 'edit' 'rm' 'evict' 'cat' 'ls')
+_shtab_drctl___color_choices=('auto' 'always' 'never')
+_shtab_drctl_edit__t_choices=('promoter' 'prometheus' 'umh' 'debugger')
+_shtab_drctl_edit___type_choices=('promoter' 'prometheus' 'umh' 'debugger')
 
 _shtab_drctl_pos_0_nargs=A...
 _shtab_drctl__h_nargs=0
@@ -35,6 +35,8 @@ _shtab_drctl_status__h_nargs=0
 _shtab_drctl_status___help_nargs=0
 _shtab_drctl_status__v_nargs=0
 _shtab_drctl_status___verbose_nargs=0
+_shtab_drctl_status__r_nargs=*
+_shtab_drctl_status___resource_nargs=*
 _shtab_drctl_restart_pos_0_nargs=*
 _shtab_drctl_restart__h_nargs=0
 _shtab_drctl_restart___help_nargs=0
@@ -173,8 +175,9 @@ _shtab_drctl() {
     COMPREPLY=( $(compgen -W "${current_option_strings[*]}" -- "${completing_word}") )
   else
     # use choices & compgen
-    COMPREPLY=( $(compgen -W "${current_action_choices}" -- "${completing_word}"; \
-                  [ -n "${current_action_compgen}" ] \
+    local IFS=$'\n'
+    COMPREPLY=( $(compgen -W "${current_action_choices}" -- "${completing_word}") \
+                $([ -n "${current_action_compgen}" ] \
                   && "${current_action_compgen}" "${completing_word}") )
   fi
 
