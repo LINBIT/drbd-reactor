@@ -51,7 +51,7 @@ start the generated systemd target (e.g., `drbd-resource@foo.target`). All will 
 `drbd-promote@` unit first, but only one will succeed and continue to start the rest of the services. All the
 others will fail intentionally.
 
-If a resource looses "quorum", it stops the systemd `drbd-services@` target and therefore all the dependencies.
+If a resource loses "quorum", it stops the systemd `drbd-services@` target and therefore all the dependencies.
 Stopping services on the node that lost quorum is the standard behavior one would expect from a cluster manger.
 There might be scenarios where it is preferable to freeze the started service until quorum is gained
 again. As this requires multiple prerequisites to hold true, freezing a resource on quorum loss is described
@@ -108,12 +108,12 @@ OCF agents are expected in `/usr/lib/ocf/resource.d/`. Please make sure to check
 packages provided by your distribution or use the packages provided by LINBIT (customers only).
 
 ## Freezing resources
-The default behavior when a DRBD Primary looses quorum is to immediately stop the generated target unit and
+The default behavior when a DRBD Primary loses quorum is to immediately stop the generated target unit and
 hope that other nodes still having quorum will successfully start the service. This works well if
 services can be failed over/started on another node in reasonable time. Unfortunately there are services that
 take a very long time to start, for example huge data bases.
 
-When a DRBD Primary looses its quorum we basically have two possibilities:
+When a DRBD Primary loses its quorum we basically have two possibilities:
 - the rest of the nodes, or at least parts of it still have quorum: Then these have to start the service, they
 are the only ones with quorum, but still we could keep the old Primary in a frozen state. And then, when the
 nodes with quorum come into contact with the old Primary, then it should stop the service and its storage

@@ -110,7 +110,7 @@ The actual sleep time is calculated as the worst case of all the volumes in a
 resource and can be scaled by setting
 .Sy sleep-before-promote-factor .
 .Pp
-If a resource looses
+If a resource loses
 .Dq quorum ,
 it stops the systemd
 .Sy drbd-services@
@@ -251,13 +251,13 @@ start = [
 ]
 .Ed
 .Sh FREEZING RESOURCES
-The default behavior when a DRBD Primary looses quorum is to immediately stop
+The default behavior when a DRBD Primary loses quorum is to immediately stop
 the generated target unit and hope that other nodes still having quorum will
 successfully start the service. This works well if services can be failed
 over/started on another node in reasonable time. Unfortunately there are
 services that take a very long time to start, for example huge data bases.
 .Pp
-When a DRBD Primary looses its quorum we basically have two possibilities:
+When a DRBD Primary loses its quorum we basically have two possibilities:
 .Bl -bullet -compact
 .It
 the rest of the nodes, or at least parts of it still have quorum: Then these
