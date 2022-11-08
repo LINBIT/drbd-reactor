@@ -1,6 +1,8 @@
 use std::env;
+use std::fmt;
 use std::fs;
 use std::io::{self, Write};
+use std::io::{Error, ErrorKind};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -421,26 +423,21 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                     format!("node '{}'", primary)
                 };
                 println!("Currently active on {}", primary);
-                if !verbose {
-                    systemctl(vec![
-                        "list-dependencies".into(),
-                        "--no-pager".into(),
-                        target,
-                    ])?;
-                    continue;
+                // target itself and the implicit one
+                let promote_service = format!(
+                    "drbd-promote@{}.service",
+                    plugin::promoter::escape_name(&drbd_res)
+                );
+                if verbose {
+                    systemctl(vec!["status".into(), "--no-pager".into(), target])?;
+                    systemctl(vec!["status".into(), "--no-pager".into(), promote_service])?;
+                } else {
+                    println!("{} {}", status_dot(&target)?, target);
+                    println!("{} ├─ {}", status_dot(&promote_service)?, promote_service);
                 }
-                //verbose
-                systemctl(vec!["status".into(), "--no-pager".into(), target])?;
-                systemctl(vec![
-                    "status".into(),
-                    "--no-pager".into(),
-                    format!(
-                        "drbd-promote@{}.service",
-                        plugin::promoter::escape_name(&drbd_res)
-                    ),
-                ])?;
+                // the implicit one
                 let ocf_pattern = Regex::new(plugin::promoter::OCF_PATTERN)?;
-                for start in config.start {
+                for (i, start) in config.start.iter().enumerate() {
                     let start = start.trim();
                     let (service_name, _) = match ocf_pattern.captures(start) {
                         Some(ocf) => {
@@ -451,7 +448,22 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                         }
                         _ => (start.to_string(), Vec::new()),
                     };
-                    systemctl(vec!["status".into(), "--no-pager".into(), service_name])?;
+                    if verbose {
+                        systemctl(vec!["status".into(), "--no-pager".into(), service_name])?;
+                    } else {
+                        let sep = if i == config.start.len() - 1 {
+                            "└─"
+                        } else {
+                            "├─"
+                        };
+                        println!(
+                            "{} {} {} {}",
+                            status_dot(&service_name)?,
+                            sep,
+                            service_name,
+                            freezer_state(&service_name)?
+                        );
+                    }
                 }
             }
         }
@@ -1055,6 +1067,114 @@ fn systemctl_out_err(args: Vec<String>, stdout: Stdio, stderr: Stdio) -> Result<
 
 fn systemctl(args: Vec<String>) -> Result<()> {
     systemctl_out_err(args, Stdio::inherit(), Stdio::inherit())
+}
+
+fn show_property(unit: &str, property: &str) -> Result<String> {
+    let output = Command::new("systemctl")
+        .arg("show")
+        .arg(format!("--property={}", property))
+        .arg(unit)
+        .output()?;
+    let output = std::string::String::from_utf8(output.stdout)?;
+    match output.split("=").last() {
+        Some(x) => Ok(x.trim().to_string()),
+        None => Err(anyhow::anyhow!("Could not get property '{}'", property)),
+    }
+}
+
+fn status_dot(unit: &str) -> Result<String> {
+    let prop = show_property(unit, "ActiveState")?;
+    let state = UnitActiveState::from_str(&prop)?;
+    Ok(format!("{}", state))
+}
+
+fn freezer_state(unit: &str) -> Result<String> {
+    // not entirely sure if we can always expect a value on older systemd that did not have freeze support
+    // we could unwarp_or("running"), but just discarding here looks also fine
+    let prop = match show_property(unit, "FreezerState") {
+        Ok(x) => x,
+        Err(_) => return Ok("".into()),
+    };
+    let state = UnitFreezerState::from_str(&prop)?;
+    Ok(format!("{}", state))
+}
+
+// most of that inspired by systemc/src/basic/unit-def.c
+enum UnitFreezerState {
+    Running,
+    Freezing,
+    Frozen,
+    Thawing,
+}
+impl FromStr for UnitFreezerState {
+    type Err = Error;
+
+    fn from_str(input: &str) -> Result<Self, Error> {
+        match input {
+            "running" => Ok(Self::Running),
+            "freezing" => Ok(Self::Freezing),
+            "frozen" => Ok(Self::Frozen),
+            "thawing" => Ok(Self::Thawing),
+            _ => Err(Error::new(
+                ErrorKind::InvalidData,
+                "unknow systemd FreezerState",
+            )),
+        }
+    }
+}
+//  this is the opinonated version already discarding running
+impl fmt::Display for UnitFreezerState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Running => write!(f, ""),
+            Self::Freezing => write!(f, "({})", "freezing".blue()),
+            Self::Frozen => write!(f, "({})", "frozen".blue()),
+            Self::Thawing => write!(f, "(thawing)"),
+        }
+    }
+}
+
+// most of that inspired by systemc/src/basic/unit-def.c
+enum UnitActiveState {
+    Active,
+    Reloading,
+    Inactive,
+    Failed,
+    Activating,
+    Deactivating,
+    Maintenance,
+}
+impl FromStr for UnitActiveState {
+    type Err = Error;
+
+    fn from_str(input: &str) -> Result<Self, Error> {
+        match input {
+            "active" => Ok(Self::Active),
+            "reloading" => Ok(Self::Reloading),
+            "inactive" => Ok(Self::Inactive),
+            "failed" => Ok(Self::Failed),
+            "activating" => Ok(Self::Activating),
+            "deactivating" => Ok(Self::Deactivating),
+            "maintenance" => Ok(Self::Maintenance),
+            _ => Err(Error::new(
+                ErrorKind::InvalidData,
+                "unknow systemd ActiveState",
+            )),
+        }
+    }
+}
+impl fmt::Display for UnitActiveState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Active => write!(f, "{}", "●".bold().green()),
+            Self::Reloading => write!(f, "{}", "↻".bold().green()),
+            Self::Inactive => write!(f, "{}", "○"),
+            Self::Failed => write!(f, "{}", "×".bold().red()),
+            Self::Activating => write!(f, "{}", "●".bold()),
+            Self::Deactivating => write!(f, "{}", "●".bold()),
+            Self::Maintenance => write!(f, "{}", "○"),
+        }
+    }
 }
 
 fn print_promoter_id(promoter: &plugin::promoter::PromoterConfig) {
