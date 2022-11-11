@@ -675,7 +675,6 @@ fn evict(
 ) -> Result<()> {
     let mut drbd_resources = Vec::new();
     for snippet in snippets_paths {
-        println!("{}:", snippet.display());
         if !snippet.exists() {
             warn(&format!(
                 "'{}' does not exist, doing nothing",
@@ -687,9 +686,12 @@ fn evict(
         let plugins = conf.plugins;
 
         let nr_promoters = plugins.promoter.len();
-        let nr_plugins = nr_plugins(&plugins);
+        if nr_promoters == 0 {
+            continue;
+        }
+        println!("{}:", snippet.display());
 
-        if nr_plugins != nr_promoters && nr_promoters > 0 && !force {
+        if nr_plugins(&plugins) != nr_promoters && !force {
             return Err(anyhow::anyhow!(
                 "Config file '{}' contains mixed promoter and other plugins",
                 snippet.display()
