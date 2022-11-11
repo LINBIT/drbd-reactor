@@ -1234,7 +1234,7 @@ start = ["$service.mount", "$service.service"]
 const PROMETHEUS_TEMPLATE: &str = r###"[[prometheus]]
 id = "prometheus"  # usually there is only one, this id should be fine
 enums = true
-# address = "[::]:9942"###;
+# address = "[::]:9942""###;
 
 const UMH_TEMPLATE: &str = r###"[[umh]]
 id = "{id}"
