@@ -17,7 +17,7 @@ use colored::Colorize;
 use regex::Regex;
 use serde::Deserialize;
 use serde::Serialize;
-use signal_hook::{consts::SIGINT, consts::SIGTERM, iterator::Signals};
+use signal_hook::iterator::Signals;
 use tempfile::NamedTempFile;
 use tinytemplate::TinyTemplate;
 
@@ -32,7 +32,7 @@ const REACTOR_RELOAD_PATH: &str = "drbd-reactor-reload.path";
 const REACTOR_SERVICE: &str = "drbd-reactor.service";
 
 fn main() -> Result<()> {
-    let mut signals = Signals::new(&[SIGINT, SIGTERM])?;
+    let mut signals = Signals::new(&[libc::SIGINT, libc::SIGTERM])?;
     thread::spawn(move || {
         for _ in signals.forever() {
             TERMINATE.store(true, Ordering::Relaxed);
