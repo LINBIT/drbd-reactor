@@ -3,7 +3,7 @@ use std::fmt;
 use std::fs;
 use std::io::{self, Write};
 use std::io::{Error, ErrorKind};
-use std::net::{SocketAddr, TcpStream};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
@@ -471,10 +471,12 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
             print_prometheus_id(&prometheus);
             green(&format!("listening on {}", prometheus.address));
             if verbose {
-                let server: SocketAddr = prometheus.address.parse()?;
-                let status = match TcpStream::connect_timeout(&server, Duration::from_secs(2)) {
-                    Ok(_) => "success".bold().green(),
-                    Err(_) => "failed".bold().red(),
+                let addr: SocketAddr = prometheus.address.parse()?;
+                let status = match prometheus_connect(&addr) {
+                    Ok(_) => format!("{}", "success".bold().green()),
+                    Err(e) => {
+                        format!("{} ({})", "failed".bold().red(), e)
+                    }
                 };
                 println!("TCP Connect: {}", status);
             }
@@ -1067,6 +1069,23 @@ fn systemctl_out_err(args: Vec<String>, stdout: Stdio, stderr: Stdio) -> Result<
 
 fn systemctl(args: Vec<String>) -> Result<()> {
     systemctl_out_err(args, Stdio::inherit(), Stdio::inherit())
+}
+
+fn prometheus_connect(addr: &SocketAddr) -> Result<()> {
+    let mut status = TcpStream::connect_timeout(&addr, Duration::from_secs(2));
+    if status.is_ok() {
+        return Ok(());
+    }
+
+    if addr.is_ipv6() && addr.ip().is_unspecified() {
+        let addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, addr.port()));
+        status = TcpStream::connect_timeout(&addr, Duration::from_secs(2));
+    }
+
+    match status {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!("{}", e)),
+    }
 }
 
 fn show_property(unit: &str, property: &str) -> Result<String> {
