@@ -30,10 +30,10 @@ snippets.
 
 In very dynamic environments it might be favorable to automatically reload the daemon whenever a configuration
 snippet is added or removed. This can be done by using the `drbd-reactor-reload` systemd path unit that is shipped
-in the `examples` directory:
+in the `example` directory:
 
 ```
-cp examples/drbd-reactor-reload.{path,service} /etc/systemd/system/
+cp example/drbd-reactor-reload.{path,service} /etc/systemd/system/
 systemctl enable --now drbd-reactor-reload.path
 ```
 
