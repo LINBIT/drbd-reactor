@@ -1,3 +1,20 @@
+drbd-reactor (0.10.0-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * ctl: use libc signal defs
+  * ctl,prometheus: fix template
+  * clt,prometheus: try ipv4 in case of anylocal
+  * rm .flake8
+  * clt,evict: only print name if promoter
+
+  [ Lars Ellenberg ]
+  * add systemd dependencies on dbus and polkit
+
+  [ Amir ]
+  * Update README.md
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 21 Nov 2022 09:59:17 +0100
+
 drbd-reactor (0.10.0~rc.1-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
