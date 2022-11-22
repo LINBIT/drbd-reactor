@@ -1096,10 +1096,16 @@ fn show_property(unit: &str, property: &str) -> Result<String> {
         .arg(format!("--property={}", property))
         .arg(unit)
         .output()?;
-    let output = std::string::String::from_utf8(output.stdout)?;
-    match output.split("=").last() {
-        Some(x) => Ok(x.trim().to_string()),
-        None => Err(anyhow::anyhow!("Could not get property '{}'", property)),
+    let output = std::str::from_utf8(&output.stdout)?;
+    // split_once('=') would be more elegant, but we want to support old rustc (e.g., bullseye)
+    let mut split = output.splitn(2, '=');
+    match (split.next(), split.next()) {
+        (Some(k), Some(v)) if k == property => Ok(v.trim().to_string()),
+        (Some(_), Some(_)) => Err(anyhow::anyhow!(
+            "Property did not start with '{}='",
+            property
+        )),
+        _ => Err(anyhow::anyhow!("Could not get property '{}'", property)),
     }
 }
 
@@ -1110,8 +1116,8 @@ fn status_dot(unit: &str) -> Result<String> {
 }
 
 fn freezer_state(unit: &str) -> Result<String> {
-    // not entirely sure if we can always expect a value on older systemd that did not have freeze support
-    // we could unwarp_or("running"), but just discarding here looks also fine
+    // we can not always expect a value on older systemd that did not have freeze support
+    // in that case we get an Err() which we discard.
     let prop = match show_property(unit, "FreezerState") {
         Ok(x) => x,
         Err(_) => return Ok("".into()),
