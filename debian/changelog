@@ -1,3 +1,10 @@
+drbd-reactor (0.10.1-1) experimental; urgency=medium
+
+  * ctl,status: fix freezer state on old systemd
+  * clt: fix typo in systemd states
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Wed, 23 Nov 2022 11:09:45 +0100
+
 drbd-reactor (0.10.0-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
