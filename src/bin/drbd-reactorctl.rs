@@ -1144,7 +1144,7 @@ impl FromStr for UnitFreezerState {
             "thawing" => Ok(Self::Thawing),
             _ => Err(Error::new(
                 ErrorKind::InvalidData,
-                "unknow systemd FreezerState",
+                "unknown systemd FreezerState",
             )),
         }
     }
@@ -1185,7 +1185,7 @@ impl FromStr for UnitActiveState {
             "maintenance" => Ok(Self::Maintenance),
             _ => Err(Error::new(
                 ErrorKind::InvalidData,
-                "unknow systemd ActiveState",
+                "unknown systemd ActiveState",
             )),
         }
     }
