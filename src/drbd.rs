@@ -138,7 +138,7 @@ impl FromStr for Role {
             "Unknown" => Ok(Self::Unknown),
             "Primary" => Ok(Self::Primary),
             "Secondary" => Ok(Self::Secondary),
-            _ => Err(Error::new(ErrorKind::InvalidData, "unknow role state")),
+            _ => Err(Error::new(ErrorKind::InvalidData, "unknown role state")),
         }
     }
 }
@@ -207,7 +207,7 @@ impl FromStr for DiskState {
             "DUnknown" => Ok(Self::DUnknown),
             "Consistent" => Ok(Self::Consistent),
             "UpToDate" => Ok(Self::UpToDate),
-            _ => Err(Error::new(ErrorKind::InvalidData, "unknow disk state")),
+            _ => Err(Error::new(ErrorKind::InvalidData, "unknown disk state")),
         }
     }
 }
@@ -285,7 +285,7 @@ impl FromStr for ConnectionState {
             "Connected" => Ok(Self::Connected),
             _ => Err(Error::new(
                 ErrorKind::InvalidData,
-                "unknow connection state",
+                "unknown connection state",
             )),
         }
     }
@@ -355,7 +355,7 @@ impl FromStr for ReplicationState {
             "Behind" => Ok(Self::Behind),
             _ => Err(Error::new(
                 ErrorKind::InvalidData,
-                "unknow replication state",
+                "unknown replication state",
             )),
         }
     }
@@ -1195,7 +1195,7 @@ impl FromStr for EventType {
             "create" => Ok(Self::Create),
             "destroy" => Ok(Self::Destroy),
             "change" => Ok(Self::Change),
-            _ => Err(Error::new(ErrorKind::InvalidData, "unknow event")),
+            _ => Err(Error::new(ErrorKind::InvalidData, "unknown event")),
         }
     }
 }
