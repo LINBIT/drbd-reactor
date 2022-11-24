@@ -2,6 +2,7 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::io::{self, Write};
+use std::io::{BufRead, BufReader};
 use std::io::{Error, ErrorKind};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::path::{Path, PathBuf};
@@ -163,6 +164,90 @@ fn ask(question: &str, default: bool) -> Result<bool> {
     }
 }
 
+fn edit_editor(tmppath: &Path, editor: &str, type_opt: &str, force: bool) -> Result<()> {
+    let len_err =
+        || -> Result<()> { Err(anyhow::anyhow!("Expected excactly one {} plugin", type_opt)) };
+
+    plugin::map_status(Command::new(&editor).arg(tmppath).status())?;
+
+    let content = fs::read_to_string(tmppath)?;
+    let config: config::Config = toml::from_str(&content)?;
+    let plugins = config.plugins;
+    if nr_plugins(&plugins) != 1 {
+        // don't even want that to be force-able
+        return Err(anyhow::anyhow!("Expected exactly 1 plugin configuration"));
+    }
+
+    if type_opt == "promoter" {
+        if plugins.promoter.len() != 1 {
+            return len_err();
+        }
+        for promoter in plugins.promoter {
+            for config in promoter.resources.values() {
+                if let Some(last) = config.start.last() {
+                    if last.ends_with(".mount") {
+                        let err = "Mount unit should not be the topmost unit, consider using an OCF file system RA";
+                        if force {
+                            warn(err);
+                        } else {
+                            return Err(anyhow::anyhow!(err));
+                        }
+                    }
+                }
+            }
+        }
+    } else if type_opt == "prometheus" {
+        if plugins.prometheus.len() != 1 {
+            return len_err();
+        }
+    } else if type_opt == "umh" {
+        if plugins.umh.len() != 1 {
+            return len_err();
+        }
+    } else if type_opt == "debugger" {
+        if plugins.debugger.len() != 1 {
+            return len_err();
+        }
+    } else {
+        return Err(anyhow::anyhow!("Unknown type ('{}') to edit", type_opt));
+    }
+
+    Ok(())
+}
+
+fn add_header(tmppath: &Path, last_result: &Result<()>) -> Result<()> {
+    let was = fs::read_to_string(tmppath)?;
+    let mut f = fs::File::create(tmppath)?;
+    writeln!(
+        &mut f,
+        "#| Please edit the snippet below. Lines beginning with a '#|' will be ignored,"
+    )?;
+    writeln!(&mut f, "#| and an empty file will abort the edit. If an error occurs while saving this file will be")?;
+    writeln!(&mut f, "#| reopened with the relevant failures.")?;
+    writeln!(&mut f, "#|")?;
+    if let Err(e) = last_result {
+        writeln!(&mut f, "#| Error: {}", e)?;
+    } else {
+        writeln!(&mut f, "#| Happy editing:")?;
+    }
+    write!(&mut f, "{}", was)?;
+    Ok(())
+}
+
+fn rm_header(tmppath: &Path) -> Result<()> {
+    let lines: Vec<String> = BufReader::new(fs::File::open(tmppath)?)
+        .lines()
+        .collect::<std::result::Result<_, _>>()?;
+
+    let mut file = fs::File::create(tmppath)?;
+    for line in lines.into_iter().filter(|l| !l.starts_with("#|")) {
+        file.write_all(line.as_bytes())?;
+        file.write_all("\n".as_bytes())?;
+    }
+
+    Ok(())
+}
+
 fn edit(
     snippets_paths: Vec<PathBuf>,
     snippets_path: &PathBuf,
@@ -171,14 +256,13 @@ fn edit(
 ) -> Result<()> {
     let editor = env::var("EDITOR").unwrap_or("vi".to_string());
 
-    let len_err =
-        || -> Result<()> { Err(anyhow::anyhow!("Expected excactly one {} plugin", type_opt)) };
-
     let mut persisted = 0;
     for snippet in &snippets_paths {
         // use new_in() to avoid $TMPDIR being on a different mount point than snippets_path
         // as this would result in an error on .persist()
+        // also we can avoid using special methods and can just use the path as there won't be any TMPDIR cleaners
         let mut tmpfile = NamedTempFile::new_in(&snippets_path)?;
+        let mut from_template = false;
         if snippet.exists() {
             fs::copy(snippet, tmpfile.path())?;
         } else {
@@ -195,53 +279,45 @@ fn edit(
             };
             tmpfile.write_all(template.as_bytes())?;
             tmpfile.flush()?;
-        }
-        plugin::map_status(Command::new(&editor).arg(tmpfile.path()).status())?;
-
-        let content = fs::read_to_string(tmpfile.path())?;
-        let config: config::Config = toml::from_str(&content)?;
-        let plugins = config.plugins;
-        if nr_plugins(&plugins) != 1 {
-            // don't even want that to be force-able
-            return Err(anyhow::anyhow!("Expected exactly 1 plugin configuration"));
+            from_template = true;
         }
 
-        if type_opt == "promoter" {
-            if plugins.promoter.len() != 1 {
-                return len_err();
+        let mut aborted = false;
+        let mut result: Result<()> = Ok(());
+        loop {
+            // be careful on first iteration, consider it to be empty
+            let was = if from_template {
+                from_template = false;
+                "".to_string()
+            } else {
+                fs::read_to_string(tmpfile.path())?
+            };
+            let was = was.trim();
+            add_header(tmpfile.path(), &result)?;
+            result = edit_editor(tmpfile.path(), &editor, type_opt, force);
+            rm_header(tmpfile.path())?;
+            let is = fs::read_to_string(tmpfile.path())?;
+            let is = is.trim();
+
+            if is.is_empty() {
+                warn("Edit aborted, empty file saved");
+                aborted = true;
+                break;
+            } else if was == is {
+                warn("Edit aborted, no new changes have been made");
+                aborted = true;
+                break;
             }
-            for promoter in plugins.promoter {
-                for config in promoter.resources.values() {
-                    if let Some(last) = config.start.last() {
-                        if last.ends_with(".mount") {
-                            let err = "Mount unit should not be the topmost unit, consider using an OCF file system RA";
-                            if force {
-                                warn(err);
-                            } else {
-                                return Err(anyhow::anyhow!(err));
-                            }
-                        }
-                    }
-                }
+
+            if result.is_ok() {
+                break;
             }
-        } else if type_opt == "prometheus" {
-            if plugins.prometheus.len() != 1 {
-                return len_err();
-            }
-        } else if type_opt == "umh" {
-            if plugins.umh.len() != 1 {
-                return len_err();
-            }
-        } else if type_opt == "debugger" {
-            if plugins.debugger.len() != 1 {
-                return len_err();
-            }
-        } else {
-            return Err(anyhow::anyhow!("Unknown type ('{}') to edit", type_opt));
         }
 
-        tmpfile.persist(snippet)?;
-        persisted += 1;
+        if !aborted {
+            tmpfile.persist(snippet)?;
+            persisted += 1;
+        }
     }
 
     if persisted > 0 && !has_autoload()? {
