@@ -177,36 +177,20 @@ fn init_loggers(log_cfgs: Vec<config::LogConfig>) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    if let Err(e) = min_drbd_versions() {
-        error!("main: minimum DRBD version not fullfilled: {}", e);
-        std::process::exit(1);
-    }
     let mut cfg = read_config()?;
-    let statistics_poll = Duration::from_secs(cfg.statistics_poll_interval);
+    init_loggers(cfg.clone().log)?;
+
+    let _ = min_drbd_versions()?;
 
     let (e2tx, e2rx) = sync::mpsc::channel();
-    let done = e2tx.clone();
+
+    let _ = setup_signals(e2tx.clone())?;
+
+    let statistics_poll = Duration::from_secs(cfg.statistics_poll_interval);
     thread::spawn(move || {
         if let Err(e) = events2(e2tx, statistics_poll) {
             error!("main: events2 processing failed: {}", e);
             std::process::exit(1);
-        }
-    });
-
-    init_loggers(cfg.clone().log)?;
-    thread::spawn(move || {
-        let mut signals = Signals::new(&[libc::SIGHUP, libc::SIGINT, libc::SIGTERM]).unwrap();
-        for signal in signals.forever() {
-            debug!("main: sighandler loop");
-            match signal as libc::c_int {
-                libc::SIGHUP => {
-                    done.send(EventUpdate::Reload).unwrap();
-                }
-                libc::SIGINT | libc::SIGTERM => {
-                    done.send(EventUpdate::Stop).unwrap();
-                }
-                _ => unreachable!(),
-            }
         }
     });
 
@@ -242,8 +226,34 @@ fn main() -> Result<()> {
     }
 }
 
+fn setup_signals(events: sync::mpsc::Sender<EventUpdate>) -> Result<()> {
+    let mut signals = Signals::new(&[libc::SIGHUP, libc::SIGINT, libc::SIGTERM])?;
+    debug!("signal-handler: set up done");
+
+    thread::spawn(move || {
+        debug!("signal-handler: waiting for signals");
+        for signal in signals.forever() {
+            let event = match signal as libc::c_int {
+                libc::SIGHUP => EventUpdate::Reload,
+                libc::SIGINT | libc::SIGTERM => EventUpdate::Stop,
+                _ => unreachable!(),
+            };
+
+            if let Err(e) = events.send(event) {
+                error!("signal-handler: failed to send events: {}", e);
+                std::process::exit(1);
+            }
+        }
+    });
+
+    Ok(())
+}
+
 fn min_drbd_versions() -> Result<()> {
-    let version = Command::new("drbdadm").arg("--version").output()?;
+    let version = Command::new("drbdadm")
+        .arg("--version")
+        .output()
+        .with_context(|| "running drbdadm --version")?;
     if !version.status.success() {
         return Err(anyhow::anyhow!(
             "'drbdadm --version' not executed successfully, stdout: '{}', stderr: '{}'",
