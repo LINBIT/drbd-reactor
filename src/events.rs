@@ -2,7 +2,7 @@ use crate::drbd::{
     BackingDevice, Connection, ConnectionState, Device, DiskState, EventType, EventUpdate, Path,
     PeerDevice, ReplicationState, Resource, Role,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::{debug, warn};
 use std::io::BufRead;
 use std::io::BufReader;
@@ -48,15 +48,17 @@ fn process_events2(tx: &Sender<EventUpdate>, statistics_poll: Duration) -> Resul
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("events: process_events2: could not spawn 'drbdsetup events2 --full --poll'");
+        .with_context(|| {
+            "events: process_events2: could not spawn 'drbdsetup events2 --full --poll'"
+        })?;
 
     let mut stdin = cmd
         .stdin
         .take()
         .expect("events:: process_events2: stdin set to Stdio::piped()");
     thread::spawn(move || loop {
-        if stdin.write_all("n\n".as_bytes()).is_err() {
-            warn!("process_events2: could not update statistics");
+        if let Err(e) = stdin.write_all("n\n".as_bytes()) {
+            warn!("process_events2: could not update statistics: {}", e);
         }
         thread::sleep(statistics_poll);
     });
