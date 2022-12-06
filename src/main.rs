@@ -177,10 +177,8 @@ fn init_loggers(log_cfgs: Vec<config::LogConfig>) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let mut cfg = read_config()?;
+    let mut cfg = get_config()?;
     init_loggers(cfg.clone().log)?;
-
-    let _ = min_drbd_versions()?;
 
     let (e2tx, e2rx) = sync::mpsc::channel();
 
@@ -198,14 +196,9 @@ fn main() -> Result<()> {
 
     let mut started = vec![];
     loop {
-        match read_config() {
+        match get_config() {
             Ok(new) => cfg = new,
-            Err(e) => {
-                warn!(
-                    "main: new configuration has an error ('{}'), reusing old config",
-                    e
-                );
-            }
+            Err(e) => warn!("main: failed to reload config, reusing old: {}", e),
         };
         debug!("main: configuration: {:#?}", cfg);
 
@@ -247,6 +240,16 @@ fn setup_signals(events: sync::mpsc::Sender<EventUpdate>) -> Result<()> {
     });
 
     Ok(())
+}
+
+fn get_config() -> Result<config::Config> {
+    match read_config() {
+        Ok(new) if new.plugins.promoter.len() > 0 => {
+            min_drbd_versions()?;
+            Ok(new)
+        }
+        x => x,
+    }
 }
 
 fn min_drbd_versions() -> Result<()> {
