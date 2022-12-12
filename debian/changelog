@@ -1,3 +1,17 @@
+drbd-reactor (0.10.2-1) experimental; urgency=medium
+
+  [ Moritz "WanzenBug" Wanzenböck ]
+  * ci: test compatibility with different rust version
+  * daemon: ensure logging is available early
+  * events: do not panic on missing drbdsetup
+
+  [ Roland Kammerer ]
+  * fix rest of unknow -> unknown typos
+  * ctl,edit: add k8s style editor reopen
+  * core: drbd checks only if we have promoters
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 12 Dec 2022 14:33:29 +0100
+
 drbd-reactor (0.10.1-1) experimental; urgency=medium
 
   * ctl,status: fix freezer state on old systemd
