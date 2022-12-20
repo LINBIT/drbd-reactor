@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::os::unix::net::UnixDatagram;
 use std::process::{Command, ExitStatus};
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use std::{any, env, thread};
 
 use anyhow::Result;
@@ -15,8 +15,8 @@ pub mod prometheus;
 pub mod promoter;
 pub mod umh;
 
-pub type PluginSender = mpsc::Sender<Arc<PluginUpdate>>;
-pub type PluginReceiver = mpsc::Receiver<Arc<PluginUpdate>>;
+pub type PluginSender = crossbeam_channel::Sender<Arc<PluginUpdate>>;
+pub type PluginReceiver = crossbeam_channel::Receiver<Arc<PluginUpdate>>;
 
 trait Plugin: Send {
     fn run(&self, rx: PluginReceiver) -> anyhow::Result<()>;
@@ -228,7 +228,7 @@ pub fn start_from_config(
 
     for d in change_plugins {
         let id = d.get_id();
-        let (ptx, prx) = mpsc::channel();
+        let (ptx, prx) = crossbeam_channel::unbounded();
         let handle = thread::spawn(move || d.run(prx));
         started.push(PluginStarted {
             id,
@@ -241,7 +241,7 @@ pub fn start_from_config(
 
     for d in event_plugins {
         let id = d.get_id();
-        let (ptx, prx) = mpsc::channel();
+        let (ptx, prx) = crossbeam_channel::unbounded();
         let handle = thread::spawn(move || d.run(prx));
         started.push(PluginStarted {
             id,

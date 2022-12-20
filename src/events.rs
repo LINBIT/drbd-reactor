@@ -3,13 +3,13 @@ use crate::drbd::{
     PeerDevice, ReplicationState, Resource, Role,
 };
 use anyhow::{Context, Result};
+use crossbeam_channel::{SendError, Sender};
 use log::{debug, warn};
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
-use std::sync::mpsc::{SendError, Sender};
 use std::thread;
 use std::time::Duration;
 

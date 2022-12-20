@@ -26,6 +26,8 @@ use drbd_reactor::config;
 use drbd_reactor::drbd;
 use drbd_reactor::plugin;
 use drbd_reactor::plugin::promoter;
+use drbd_reactor::systemd;
+use drbd_reactor::systemd::UnitActiveState;
 
 static TERMINATE: AtomicBool = AtomicBool::new(false);
 
@@ -384,7 +386,7 @@ fn stop_targets(snippets_paths: Vec<PathBuf>) -> Result<()> {
         let conf = read_config(&snippet)?;
         for promoter in conf.plugins.promoter {
             for drbd_res in promoter.resources.keys() {
-                let target = promoter::escaped_services_target(&drbd_res);
+                let target = systemd::escaped_services_target(&drbd_res);
                 systemctl(vec!["stop".into(), target])?;
             }
         }
@@ -491,7 +493,7 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                 if !resources.is_empty() && !resources.contains(&drbd_res) {
                     continue;
                 }
-                let target = promoter::escaped_services_target(&drbd_res);
+                let target = systemd::escaped_services_target(&drbd_res);
                 let primary = get_primary(&drbd_res).unwrap_or(UNKNOWN.to_string());
                 let primary = if primary == me {
                     "this node".to_string()
@@ -500,10 +502,8 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                 };
                 println!("Currently active on {}", primary);
                 // target itself and the implicit one
-                let promote_service = format!(
-                    "drbd-promote@{}.service",
-                    plugin::promoter::escape_name(&drbd_res)
-                );
+                let promote_service =
+                    format!("drbd-promote@{}.service", systemd::escape_name(&drbd_res));
                 if verbose {
                     systemctl(vec!["status".into(), "--no-pager".into(), target])?;
                     systemctl(vec!["status".into(), "--no-pager".into(), promote_service])?;
@@ -518,9 +518,7 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                     let (service_name, _) = match ocf_pattern.captures(start) {
                         Some(ocf) => {
                             let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-                            plugin::promoter::escaped_systemd_ocf_parse_to_env(
-                                &drbd_res, vendor, agent, args,
-                            )?
+                            systemd::escaped_ocf_parse_to_env(&drbd_res, vendor, agent, args)?
                         }
                         _ => (start.to_string(), Vec::new()),
                     };
@@ -590,7 +588,7 @@ fn cat(snippets_paths: Vec<PathBuf>) -> Result<()> {
 
 fn evict_unmask_and_start(drbd_resources: &Vec<String>) -> Result<()> {
     for drbd_res in drbd_resources {
-        let target = promoter::escaped_services_target(drbd_res);
+        let target = systemd::escaped_services_target(drbd_res);
         println!("Re-enabling {}", drbd_res);
 
         // old (at least RHEL8) systemctl allows you to mask --runtime, but does not allow unmask --runtime
@@ -676,7 +674,7 @@ fn evict_resource(drbd_resource: &str, delay: u32, me: &str) -> Result<()> {
         return Ok(());
     }
 
-    let target = promoter::escaped_services_target(drbd_resource);
+    let target = systemd::escaped_services_target(drbd_resource);
     systemctl(vec!["mask".into(), "--runtime".into(), target.clone()])?;
     systemctl(vec!["daemon-reload".into()])?;
     systemctl_out_err(vec!["stop".into(), target], Stdio::inherit(), Stdio::null())?;
@@ -1166,27 +1164,8 @@ fn prometheus_connect(addr: &SocketAddr) -> Result<()> {
     }
 }
 
-fn show_property(unit: &str, property: &str) -> Result<String> {
-    let output = Command::new("systemctl")
-        .arg("show")
-        .arg(format!("--property={}", property))
-        .arg(unit)
-        .output()?;
-    let output = std::str::from_utf8(&output.stdout)?;
-    // split_once('=') would be more elegant, but we want to support old rustc (e.g., bullseye)
-    let mut split = output.splitn(2, '=');
-    match (split.next(), split.next()) {
-        (Some(k), Some(v)) if k == property => Ok(v.trim().to_string()),
-        (Some(_), Some(_)) => Err(anyhow::anyhow!(
-            "Property did not start with '{}='",
-            property
-        )),
-        _ => Err(anyhow::anyhow!("Could not get property '{}'", property)),
-    }
-}
-
 fn status_dot(unit: &str) -> Result<String> {
-    let prop = show_property(unit, "ActiveState")?;
+    let prop = systemd::show_property(unit, "ActiveState")?;
     let state = UnitActiveState::from_str(&prop)?;
     Ok(format!("{}", state))
 }
@@ -1194,7 +1173,7 @@ fn status_dot(unit: &str) -> Result<String> {
 fn freezer_state(unit: &str) -> Result<String> {
     // we can not always expect a value on older systemd that did not have freeze support
     // in that case we get an Err() which we discard.
-    let prop = match show_property(unit, "FreezerState") {
+    let prop = match systemd::show_property(unit, "FreezerState") {
         Ok(x) => x,
         Err(_) => return Ok("".into()),
     };
@@ -1233,49 +1212,6 @@ impl fmt::Display for UnitFreezerState {
             Self::Freezing => write!(f, "({})", "freezing".blue()),
             Self::Frozen => write!(f, "({})", "frozen".blue()),
             Self::Thawing => write!(f, "(thawing)"),
-        }
-    }
-}
-
-// most of that inspired by systemc/src/basic/unit-def.c
-enum UnitActiveState {
-    Active,
-    Reloading,
-    Inactive,
-    Failed,
-    Activating,
-    Deactivating,
-    Maintenance,
-}
-impl FromStr for UnitActiveState {
-    type Err = Error;
-
-    fn from_str(input: &str) -> Result<Self, Error> {
-        match input {
-            "active" => Ok(Self::Active),
-            "reloading" => Ok(Self::Reloading),
-            "inactive" => Ok(Self::Inactive),
-            "failed" => Ok(Self::Failed),
-            "activating" => Ok(Self::Activating),
-            "deactivating" => Ok(Self::Deactivating),
-            "maintenance" => Ok(Self::Maintenance),
-            _ => Err(Error::new(
-                ErrorKind::InvalidData,
-                "unknown systemd ActiveState",
-            )),
-        }
-    }
-}
-impl fmt::Display for UnitActiveState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Active => write!(f, "{}", "●".bold().green()),
-            Self::Reloading => write!(f, "{}", "↻".bold().green()),
-            Self::Inactive => write!(f, "{}", "○"),
-            Self::Failed => write!(f, "{}", "×".bold().red()),
-            Self::Activating => write!(f, "{}", "●".bold()),
-            Self::Deactivating => write!(f, "{}", "●".bold()),
-            Self::Maintenance => write!(f, "{}", "○"),
         }
     }
 }

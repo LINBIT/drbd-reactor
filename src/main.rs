@@ -58,7 +58,7 @@ impl Core {
     /// state of the world and forwarding this information to all plugins.
     fn run(
         &mut self,
-        e2rx: &sync::mpsc::Receiver<EventUpdate>,
+        e2rx: &crossbeam_channel::Receiver<EventUpdate>,
         started: &Vec<plugin::PluginStarted>,
     ) -> Result<CoreExit> {
         let _send_updates = |up: Option<PluginUpdate>,
@@ -180,7 +180,7 @@ fn main() -> Result<()> {
     let mut cfg = get_config()?;
     init_loggers(cfg.clone().log)?;
 
-    let (e2tx, e2rx) = sync::mpsc::channel();
+    let (e2tx, e2rx) = crossbeam_channel::unbounded();
 
     let _ = setup_signals(e2tx.clone())?;
 
@@ -219,7 +219,7 @@ fn main() -> Result<()> {
     }
 }
 
-fn setup_signals(events: sync::mpsc::Sender<EventUpdate>) -> Result<()> {
+fn setup_signals(events: crossbeam_channel::Sender<EventUpdate>) -> Result<()> {
     let mut signals = Signals::new(&[libc::SIGHUP, libc::SIGINT, libc::SIGTERM])?;
     debug!("signal-handler: set up done");
 

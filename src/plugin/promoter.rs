@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
 use std::fmt;
 use std::fs;
@@ -8,19 +8,20 @@ use std::io::Write;
 use std::os::unix::fs::FileTypeExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use libc::c_char;
 use log::{debug, info, trace, warn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use shell_words;
 use tinytemplate::TinyTemplate;
 
 use crate::drbd::{DiskState, EventType, PluginUpdate, Resource, Role};
 use crate::plugin;
+use crate::systemd;
 
 pub struct Promoter {
     cfg: PromoterConfig,
@@ -64,6 +65,8 @@ impl Promoter {
     }
 }
 
+const MIN_SECS_PROMOTE: u64 = 20;
+
 impl super::Plugin for Promoter {
     fn run(&self, rx: super::PluginReceiver) -> Result<()> {
         trace!("run: start");
@@ -71,7 +74,7 @@ impl super::Plugin for Promoter {
         let type_exists = plugin::typefilter(&EventType::Exists);
         let type_change = plugin::typefilter(&EventType::Change);
         let names = self.cfg.resources.keys().cloned().collect::<Vec<String>>();
-        let names = plugin::namefilter(&names);
+        let names_filter = plugin::namefilter(&names);
 
         // set default stop actions (i.e., reversed start)
         let cfg = {
@@ -85,132 +88,40 @@ impl super::Plugin for Promoter {
             cfg
         };
 
-        for r in rx
-            .into_iter()
-            .filter(names)
-            .filter(|x| type_exists(x) || type_change(x))
-        {
-            let name = r.get_name();
-            let res = cfg
-                .resources
-                .get(&name)
-                .expect("Can not happen, name filter is built from the cfg");
+        let ticker = crossbeam_channel::tick(Duration::from_secs(MIN_SECS_PROMOTE));
 
-            match r.as_ref() {
-                PluginUpdate::Resource(u) => {
-                    if !u.old.may_promote && u.new.may_promote {
-                        let sleep_millis = get_sleep_before_promote_ms(
-                            &u.resource,
-                            &res.preferred_nodes,
-                            &res.on_quorum_loss,
-                            res.sleep_before_promote_factor,
-                        );
-                        info!(
-                            "run: resource '{}' may promote after {}ms",
-                            name, sleep_millis
-                        );
-                        if sleep_millis > 0 {
-                            thread::sleep(Duration::from_millis(sleep_millis));
-                        }
-                        if start_actions(&name, &res.start, &res.runner).is_err() {
-                            if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                                warn!("Stopping '{}' failed: {}", name, e);
-                            }
-                        }
-                    } else if u.old.role == Role::Primary && u.new.role == Role::Secondary {
-                        if res.on_quorum_loss == QuorumLossPolicy::Freeze {
-                            // might have been frozen, the other nodes formed a partition and a Primary
-                            // and now they are back and forced me to secondary because I was frozen and
-                            // on-suspended-primary-outdated = force-secondary
-                            //
-                            // we could send a stop in any case, but that would also send stops (which should not matter)
-                            // in case of a normal stop when quorum was lost but the policy was Shutdown
-                            info!("run: resource '{}' got forced to Secondary while frozen, stopping services", name);
-                            if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                                warn!("Stopping '{}' failed: {}", name, e);
-                            }
-                        }
-                    }
-                }
-                PluginUpdate::Device(u) => {
-                    if u.old.quorum && !u.new.quorum {
-                        info!("run: resource '{}' lost quorum", name);
-                        match res.on_quorum_loss {
-                            QuorumLossPolicy::Freeze => {
-                                if let Err(e) = freeze_actions(&name, State::Freeze, &res.runner) {
-                                    warn!("Freezing '{}' failed: {}", name, e);
-                                }
-                            }
-                            QuorumLossPolicy::Shutdown => {
+        let mut last_start = Instant::now() - Duration::from_secs(MIN_SECS_PROMOTE + 1);
+        let mut may_promote: HashSet<String> = HashSet::new();
+
+        loop {
+            crossbeam_channel::select! {
+                recv(ticker) -> _ => {
+                    for name in &may_promote {
+                        if let Ok(false) = systemd::is_active(&systemd::escaped_services_target(&name)) {
+                            let res = cfg
+                                .resources
+                                .get(name)
+                                .expect("Can not happen, name filter is built from the cfg");
+
+                            last_start = Instant::now();
+                            // see start_actions comments in process_drbd_event()
+                            // we do not manipulate the may_promote state from here
+                            if start_actions(&name, &res.start, &res.runner).is_err() {
                                 if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
                                     warn!("Stopping '{}' failed: {}", name, e);
                                 }
                             }
                         }
-                    } else if !u.old.quorum && u.new.quorum {
-                        if res.on_quorum_loss == QuorumLossPolicy::Freeze
-                            && u.resource.role == Role::Primary
-                        {
-                            info!("run: resource '{}' gained quorum, thawing Primary", name);
-                            if let Err(e) = freeze_actions(&name, State::Thaw, &res.runner) {
-                                warn!("Thawing '{}' failed: {}", name, e);
-                            }
-                        }
                     }
-                }
-                PluginUpdate::PeerDevice(u) => {
-                    if res.preferred_nodes.len() == 0 {
-                        continue;
-                    } else if !(u.old.peer_disk_state != DiskState::UpToDate
-                        && u.new.peer_disk_state == DiskState::UpToDate)
-                    {
-                        continue;
-                    } else if u.resource.role != Role::Primary {
-                        continue;
-                    }
-
-                    let peer_name = match u.resource.get_peerdevice(u.peer_node_id, u.volume) {
-                        Some(pd) => pd.conn_name.clone(),
-                        None => {
-                            warn!("Could not find peer device for resource '{}'", name);
-                            continue;
+                },
+                recv(rx) -> msg => match msg {
+                    Ok(update) => {
+                        if (type_change(&update) || type_exists(&update)) && names_filter(&update) {
+                            process_drbd_event(&update, &cfg, &mut last_start, &mut may_promote);
                         }
-                    };
-                    let peer_pos = match res.preferred_nodes.iter().position(|n| n == &peer_name) {
-                        Some(pos) => pos,
-                        None => {
-                            // not in the list, it can not be better
-                            debug!(
-                                "Peer '{}' was not found in preferred_nodes, continue",
-                                peer_name
-                            );
-                            continue;
-                        }
-                    };
-
-                    let node_name = match uname_n() {
-                        Ok(node_name) => node_name,
-                        Err(e) => {
-                            warn!("Could not determine 'uname -n': {}", e);
-                            continue;
-                        }
-                    };
-                    let node_pos = match res.preferred_nodes.iter().position(|n| n == &node_name) {
-                        Some(pos) => pos,
-                        None => res.preferred_nodes.len(),
-                    };
-
-                    if peer_pos < node_pos {
-                        info!(
-                            "run: resource '{}' has a new preferred node ('{}'), stopping services locally ('{}')",
-                            name, peer_name, node_name
-                        );
-                        if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                            warn!("Stopping '{}' failed: {}", name, e);
-                        }
-                    }
-                }
-                _ => (),
+                    },
+                    Err(_) => break,
+                },
             }
         }
 
@@ -285,6 +196,161 @@ fn systemd_stop(unit: &str) -> Result<()> {
     plugin::map_status(Command::new("systemctl").arg("stop").arg(unit).status())
 }
 
+fn process_drbd_event(
+    r: &Arc<PluginUpdate>,
+    cfg: &PromoterConfig,
+    last_start: &mut Instant,
+    may_promote: &mut HashSet<String>,
+) {
+    let name = r.get_name();
+    let res = cfg
+        .resources
+        .get(&name)
+        .expect("Can not happen, name filter is built from the cfg");
+
+    match r.as_ref() {
+        PluginUpdate::Resource(u) => {
+            match u.new.may_promote {
+                true => may_promote.insert(name.clone()),
+                false => may_promote.remove(&name),
+            };
+            if !u.old.may_promote && u.new.may_promote {
+                let sleep_millis = get_sleep_before_promote_ms(
+                    &u.resource,
+                    &res.preferred_nodes,
+                    &res.on_quorum_loss,
+                    res.sleep_before_promote_factor,
+                );
+
+                // no saturating_sub on old rust
+                let min_sleep = Duration::from_secs(MIN_SECS_PROMOTE);
+                let calc_sleep = Duration::from_millis(sleep_millis);
+                let final_sleep = if calc_sleep >= min_sleep {
+                    Duration::from_secs(0)
+                } else {
+                    min_sleep - calc_sleep
+                };
+
+                if last_start.elapsed() < final_sleep {
+                    debug!("got may_promote but start interval for '{}' too fast", name);
+                    return;
+                }
+
+                info!(
+                    "run: resource '{}' may promote after {}ms",
+                    name, sleep_millis
+                );
+                if sleep_millis > 0 {
+                    thread::sleep(calc_sleep);
+                }
+
+                *last_start = Instant::now();
+                // we could set may_promote to false here, but:
+                // - start_actions is inherently racy
+                // - it really does not improve things a lot
+                // - better have only one source here that reflects events2 and only events2 at the time
+                if start_actions(&name, &res.start, &res.runner).is_err() {
+                    if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                        warn!("Stopping '{}' failed: {}", name, e);
+                    }
+                }
+            } else if u.old.role == Role::Primary && u.new.role == Role::Secondary {
+                if res.on_quorum_loss == QuorumLossPolicy::Freeze {
+                    // might have been frozen, the other nodes formed a partition and a Primary
+                    // and now they are back and forced me to secondary because I was frozen and
+                    // on-suspended-primary-outdated = force-secondary
+                    //
+                    // we could send a stop in any case, but that would also send stops (which should not matter)
+                    // in case of a normal stop when quorum was lost but the policy was Shutdown
+                    info!(
+                        "resource '{}' got forced to Secondary while frozen, stopping services",
+                        name
+                    );
+                    if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                        warn!("Stopping '{}' failed: {}", name, e);
+                    }
+                }
+            }
+        }
+        PluginUpdate::Device(u) => {
+            if u.old.quorum && !u.new.quorum {
+                info!("run: resource '{}' lost quorum", name);
+                match res.on_quorum_loss {
+                    QuorumLossPolicy::Freeze => {
+                        if let Err(e) = freeze_actions(&name, State::Freeze, &res.runner) {
+                            warn!("Freezing '{}' failed: {}", name, e);
+                        }
+                    }
+                    QuorumLossPolicy::Shutdown => {
+                        if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                            warn!("Stopping '{}' failed: {}", name, e);
+                        }
+                    }
+                }
+            } else if !u.old.quorum && u.new.quorum {
+                if res.on_quorum_loss == QuorumLossPolicy::Freeze
+                    && u.resource.role == Role::Primary
+                {
+                    info!("resource '{}' gained quorum, thawing Primary", name);
+                    if let Err(e) = freeze_actions(&name, State::Thaw, &res.runner) {
+                        warn!("Thawing '{}' failed: {}", name, e);
+                    }
+                }
+            }
+        }
+        PluginUpdate::PeerDevice(u) => {
+            if res.preferred_nodes.len() == 0 {
+                return;
+            } else if !(u.old.peer_disk_state != DiskState::UpToDate
+                && u.new.peer_disk_state == DiskState::UpToDate)
+            {
+                return;
+            } else if u.resource.role != Role::Primary {
+                return;
+            }
+
+            let peer_name = match u.resource.get_peerdevice(u.peer_node_id, u.volume) {
+                Some(pd) => pd.conn_name.clone(),
+                None => {
+                    warn!("Could not find peer device for resource '{}'", name);
+                    return;
+                }
+            };
+            let peer_pos = match res.preferred_nodes.iter().position(|n| n == &peer_name) {
+                Some(pos) => pos,
+                None => {
+                    // not in the list, it can not be better
+                    debug!(
+                        "Peer '{}' was not found in preferred_nodes, continue",
+                        peer_name
+                    );
+                    return;
+                }
+            };
+
+            let node_name = match uname_n() {
+                Ok(node_name) => node_name,
+                Err(e) => {
+                    warn!("Could not determine 'uname -n': {}", e);
+                    return;
+                }
+            };
+            let node_pos = match res.preferred_nodes.iter().position(|n| n == &node_name) {
+                Some(pos) => pos,
+                None => res.preferred_nodes.len(),
+            };
+
+            if peer_pos < node_pos {
+                info!("run: resource '{}' has a new preferred node ('{}'), stopping services locally ('{}')", name, peer_name, node_name);
+                if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                    warn!("Stopping '{}' failed: {}", name, e);
+                }
+            }
+        }
+        _ => (),
+    }
+}
+
 fn systemd_start(unit: &str) -> Result<()> {
     // we really don't care
     let _ = Command::new("systemctl")
@@ -295,7 +361,17 @@ fn systemd_start(unit: &str) -> Result<()> {
         .status();
 
     info!("systemd_start: systemctl start {}", unit);
-    plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())
+    plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())?;
+    // this is inherently racy, systemd might take some time to "propagate" the actual state
+    // still, we might catch it already here, otherwise we will check for the actual state in the "ticker"
+    if !systemd::is_active(unit)? {
+        return Err(anyhow::anyhow!(
+            "systemd_start: unit '{}' is not active",
+            unit
+        ));
+    }
+
+    Ok(())
 }
 
 fn systemd_freeze_thaw(unit: &str, to: State) -> Result<()> {
@@ -356,7 +432,7 @@ fn start_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
             }
             Ok(())
         }
-        Runner::Systemd => action(&escaped_services_target(name), State::Start, how),
+        Runner::Systemd => action(&systemd::escaped_services_target(name), State::Start, how),
     }
 }
 
@@ -374,7 +450,7 @@ fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
             Ok(())
         }
         Runner::Systemd => {
-            let target = escaped_services_target(name);
+            let target = systemd::escaped_services_target(name);
             info!("stop_actions: stopping '{}'", target);
             persist_journal();
             action(&target, State::Stop, how)
@@ -388,7 +464,7 @@ fn freeze_actions(name: &str, to: State, how: &Runner) -> Result<()> {
             "Shell runner can not not freeze/thaw services, use systemd"
         )),
         Runner::Systemd => {
-            let target = escaped_services_target(name);
+            let target = systemd::escaped_services_target(name);
             info!(
                 "freeze_actions: freezing/thawing services in target '{}'",
                 target
@@ -480,7 +556,7 @@ fn generate_systemd_templates(
     systemd_settings: &SystemdSettings,
     secondary_force: bool,
 ) -> Result<()> {
-    let escaped_name = escape_name(name);
+    let escaped_name = systemd::escape_name(name);
     let prefix = Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", escaped_name));
     systemd_write_unit(
         prefix,
@@ -520,7 +596,7 @@ fn generate_systemd_templates(
         let (service_name, env) = match ocf_pattern.captures(action) {
             Some(ocf) => {
                 let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-                escaped_systemd_ocf_parse_to_env(name, vendor, agent, args)?
+                systemd::escaped_ocf_parse_to_env(name, vendor, agent, args)?
             }
             _ => (action.to_string(), Vec::new()),
         };
@@ -571,41 +647,6 @@ fn generate_systemd_templates(
         SYSTEMD_BEFORE_CONF,
         format!("[Unit]\nBefore=drbd-reactor.service\n"),
     )
-}
-
-pub fn escaped_systemd_ocf_parse_to_env(
-    name: &str,
-    vendor: &str,
-    agent: &str,
-    args: &str,
-) -> Result<(String, Vec<String>)> {
-    let args = shell_words::split(args)?;
-
-    if args.len() < 1 {
-        anyhow::bail!("promoter::systemd_ocf: agent needs at least one argument (its name)")
-    }
-
-    let ra_name = &args[0];
-    let ra_name = format!("{}_{}", ra_name, name);
-    let escaped_ra_name = escape_name(&ra_name);
-    let service_name = format!("ocf.ra@{}.service", escaped_ra_name);
-    let mut env = Vec::with_capacity(args.len() - 1);
-    for item in &args[1..] {
-        let mut split = item.splitn(2, "=");
-        let add = match (split.next(), split.next()) {
-            (Some(k), Some(v)) => format!("OCF_RESKEY_{}={}", k, shell_words::quote(v)),
-            (Some(k), None) => format!("OCF_RESKEY_{}=", k),
-            _ => continue, // skip empty items
-        };
-        env.push(add)
-    }
-
-    env.push(format!(
-        "AGENT=/usr/lib/ocf/resource.d/{}/{}",
-        vendor, agent
-    ));
-
-    Ok((service_name, env))
 }
 
 fn drbd_promote(systemd_settings: &SystemdSettings, secondary_force: bool) -> Result<String> {
@@ -882,12 +923,8 @@ fn get_sleep_before_promote_ms(
     (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
 }
 
-pub fn escaped_services_target(name: &str) -> String {
-    format!("drbd-services@{}.target", escape_name(name))
-}
-
 fn escaped_services_target_dir(name: &str) -> PathBuf {
-    Path::new(SYSTEMD_PREFIX).join(format!("{}.d", escaped_services_target(name)))
+    Path::new(SYSTEMD_PREFIX).join(format!("{}.d", systemd::escaped_services_target(name)))
 }
 
 fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
@@ -1021,33 +1058,6 @@ pub fn uname_n() -> Result<String> {
     }
 }
 
-// inlined copy from https://crates.io/crates/libsystemd
-// inlined because currently not packaged in Ubuntu Focal
-pub fn escape_name(name: &str) -> String {
-    if name.is_empty() {
-        return "".to_string();
-    }
-
-    let parts: Vec<String> = name
-        .bytes()
-        .enumerate()
-        .map(|(n, b)| escape_byte(b, n))
-        .collect();
-    parts.join("")
-}
-
-// inlined copy from https://crates.io/crates/libsystemd
-// inlined because currently not packaged in Ubuntu Focal
-fn escape_byte(b: u8, index: usize) -> String {
-    let c = char::from(b);
-    match c {
-        '/' => '-'.to_string(),
-        ':' | '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => c.to_string(),
-        '.' if index > 0 => c.to_string(),
-        _ => format!(r#"\x{:02x}"#, b),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1113,37 +1123,6 @@ mod tests {
                 6000 + 3000
             );
         }
-    }
-
-    #[test]
-    fn test_systemd_ocf_parse_to_env() {
-        let (name, env) = escaped_systemd_ocf_parse_to_env(
-            "res1",
-            "vendor1",
-            "agent1",
-            "name1\nk1=v1 \nk2=\"with whitespace\" k3=with\\ different\\ whitespace foo empty=''",
-        )
-        .expect("should work");
-
-        assert_eq!(name, "ocf.ra@name1_res1.service");
-        assert_eq!(
-            &env[..],
-            &[
-                "OCF_RESKEY_k1=v1",
-                "OCF_RESKEY_k2='with whitespace'",
-                "OCF_RESKEY_k3='with different whitespace'",
-                "OCF_RESKEY_foo=",
-                "OCF_RESKEY_empty=''",
-                "AGENT=/usr/lib/ocf/resource.d/vendor1/agent1"
-            ]
-        );
-
-        // escaping
-        let (name, _env) =
-            escaped_systemd_ocf_parse_to_env("res-1", "vendor1", "agent1", "name-1 do not care")
-                .expect("should work");
-
-        assert_eq!(name, "ocf.ra@name\\x2d1_res\\x2d1.service");
     }
 
     #[test]
