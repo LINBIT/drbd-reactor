@@ -280,9 +280,14 @@ fn min_drbd_versions() -> Result<()> {
     // secondary --force
     let pattern = Regex::new(r"^DRBD_KERNEL_VERSION_CODE=0x([[:xdigit:]]+)$")?;
     let (major, minor, patch) = split_version(pattern, version.stdout)?;
+    if major == 0 && minor == 0 && patch == 0 {
+        return Err(anyhow::anyhow!(
+            "Looks like the DRBD kernel module is not installed or not loaded"
+        ));
+    }
     if let Err(e) = min_version((major, minor, patch), (9, 1, 7)) {
         return Err(anyhow::anyhow!(
-            "kernel module minimum version ('9.1.7') not fulfilled: {}",
+            "DRBD kernel module minimum version ('9.1.7') not fulfilled: {}",
             e
         ));
     }
