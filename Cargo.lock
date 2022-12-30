@@ -96,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "drbd-reactor"
-version = "0.10.2"
+version = "1.0.0-rc.1"
 dependencies = [
  "anyhow",
  "clap",

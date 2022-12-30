@@ -1,3 +1,10 @@
+drbd-reactor (1.0.0~rc.1-1) experimental; urgency=medium
+
+  * core: improve module version check
+  * promoter: try to restart target periodically
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 30 Dec 2022 10:58:24 +0100
+
 drbd-reactor (0.10.2-1) experimental; urgency=medium
 
   [ Moritz "WanzenBug" Wanzenböck ]
