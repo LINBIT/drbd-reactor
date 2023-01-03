@@ -43,6 +43,9 @@ _drbd-reactorctl() {
             rm)
                 cmd+="__rm"
                 ;;
+            start-until)
+                cmd+="__start__until"
+                ;;
             status)
                 cmd+="__status"
                 ;;
@@ -53,7 +56,7 @@ _drbd-reactorctl() {
 
     case "${cmd}" in
         drbd-reactorctl)
-            opts=" -h -V -c  --help --version --config   disable enable status restart edit rm evict cat ls generate-completion help"
+            opts=" -h -V -c  --help --version --config   disable enable status restart edit rm evict cat ls start-until generate-completion help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -229,6 +232,21 @@ _drbd-reactorctl() {
             ;;
         drbd__reactorctl__rm)
             opts=" -f -h -V  --disabled --force --help --version  <configs>... "
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        drbd__reactorctl__start__until)
+            opts=" -h -V  --help --version  <until> <configs> "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

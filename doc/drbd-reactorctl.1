@@ -40,6 +40,9 @@
 .Nm ls
 .Op Fl -disabled
 .Op Ar
+.Nm start-until
+.Ar until
+.Ar file
 .Nm generate-completion
 .Ar SHELL
 .Sh DESCRIPTION
@@ -155,6 +158,34 @@ lists activated plugins.
 .It Fl -disabled
 Also list disabled plugins.
 .El
+.Ss start-until
+starts a promoter generated target unit until (including) the given entry name
+in the start list or a given index. Using an index number is especially
+useful if one wants to stop at a OCF unit. An example use for a
+highly-available LINSTOR controller might look like this:
+.Bd -literal -offset indent
+# drbd-reactorctl cat linstor_db | grep ^start
+Displaying /etc/drbd-reactor.d/linstor_db.toml...
+start = ["var-lib-linstor.mount", "linstor-controller.service"]
+# drbd-reactorclt disable --now linstor_db # on all nodes
+.Ed
+After the service is disabled on all nodes one can now start parts of the
+target on one node. In our example let's assume the admin wants to manually
+alter the database of the LINSTOR controller. For that she wants the DRBD
+device to be promoted and mounted, but the LINSTOR controller itself should be
+kept stopped.
+.Bd -literal -offset indent
+# drbd-reactorclt start-until var-lib-linstor.mount linstor_db
+INFO: To resume normal operation, execute:
+- systemctl stop drbd-services@linstor_db.target # on this node
+- drbd-reactorctl enable /etc/drbd-reactor.d/linstor_db.toml.disabled # on all cluster nodes
+.Ed
+The command show will generate all the usual overrides and then start the
+implicit service responsible for DRBD device promotion and all the services
+(with their overrides) in the start list until and including the one given on
+the command line. After you are done, follow the instructions that
+.Sy start-until
+printed on the standard output.
 .Ss generate-completion
 Generate tab completion script for
 .Ar SHELL

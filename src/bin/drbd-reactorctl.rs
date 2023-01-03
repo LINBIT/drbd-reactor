@@ -117,6 +117,12 @@ fn main() -> Result<()> {
             let disabled = rm_matches.is_present("disabled");
             rm(expand_snippets(&snippets_path, rm_matches, disabled), force)
         }
+        ("start-until", Some(until_matches)) => {
+            let until = until_matches
+                .value_of("until")
+                .expect("expected to be checked by parser");
+            start_until(expand_snippets(&snippets_path, until_matches, true), until)
+        }
         ("status", Some(status_matches)) => {
             let verbose = status_matches.is_present("verbose");
             let resources = status_matches.values_of("resource").unwrap_or_default();
@@ -188,7 +194,8 @@ fn edit_editor(tmppath: &Path, editor: &str, type_opt: &str, force: bool) -> Res
             for config in promoter.resources.values() {
                 if let Some(last) = config.start.last() {
                     if last.ends_with(".mount") {
-                        let err = "Mount unit should not be the topmost unit, consider using an OCF file system RA";
+                        let err = "Mount unit should not be the topmost unit, consider using an \
+                                   OCF file system RA";
                         if force {
                             warn(err);
                         } else {
@@ -224,7 +231,11 @@ fn add_header(tmppath: &Path, last_result: &Result<()>) -> Result<()> {
         &mut f,
         "#| Please edit the snippet below. Lines beginning with a '#|' will be ignored,"
     )?;
-    writeln!(&mut f, "#| and an empty file will abort the edit. If an error occurs while saving this file will be")?;
+    writeln!(
+        &mut f,
+        "#| and an empty file will abort the edit. If an error occurs while saving this file will \
+         be"
+    )?;
     writeln!(&mut f, "#| reopened with the relevant failures.")?;
     writeln!(&mut f, "#|")?;
     if let Err(e) = last_result {
@@ -347,6 +358,56 @@ fn rm(snippets_paths: Vec<PathBuf>, force: bool) -> Result<()> {
     }
     if removed > 0 && !has_autoload()? {
         reload_service()?;
+    }
+    Ok(())
+}
+
+fn start_until_list(config: promoter::PromoterOptResource, until: &str) -> Result<Vec<String>> {
+    match until.parse::<usize>() {
+        Ok(n) => Ok(config.start.into_iter().take(n).collect()),
+        Err(_) => {
+            // assume it it is a service name
+            match config.start.iter().position(|s| s == until) {
+                Some(n) => Ok(config.start.into_iter().take(n + 1).collect()),
+                None => Err(anyhow::anyhow!(
+                    "Could not find unit '{}' in start list",
+                    until
+                )),
+            }
+        }
+    }
+}
+
+fn start_until(snippets_paths: Vec<PathBuf>, until: &str) -> Result<()> {
+    if snippets_paths.len() == 0 {
+        return Err(anyhow::anyhow!("Could not get disabled snippet file"));
+    }
+    let path = &snippets_paths[0];
+    let conf = read_config(path)
+        .map_err(|_| anyhow::anyhow!("File '{}' does not exist", path.display()))?;
+    for promoter in conf.plugins.promoter {
+        // generate the target and therefore all overrides
+        let _ = promoter::Promoter::new(promoter.clone())?;
+        for (drbd_res, config) in promoter.resources {
+            let start_list = start_until_list(config, until)?;
+            let promote_service = promote_service(&drbd_res);
+            println!("systemctl start {}", promote_service);
+            systemctl(vec!["start".into(), promote_service])?;
+            for start in start_list {
+                let service_name = service_name(&start, &drbd_res)?;
+                println!("systemctl start {}", service_name);
+                systemctl(vec!["start".into(), service_name])?;
+            }
+            info("To resume normal operation, execute:");
+            println!(
+                "- systemctl stop {} # on this node",
+                systemd::escaped_services_target(&drbd_res)
+            );
+            println!(
+                "- drbd-reactorctl enable {} # on all cluster nodes",
+                path.display()
+            );
+        }
     }
     Ok(())
 }
@@ -502,8 +563,7 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                 };
                 println!("Currently active on {}", primary);
                 // target itself and the implicit one
-                let promote_service =
-                    format!("drbd-promote@{}.service", systemd::escape_name(&drbd_res));
+                let promote_service = promote_service(&drbd_res);
                 if verbose {
                     systemctl(vec!["status".into(), "--no-pager".into(), target])?;
                     systemctl(vec!["status".into(), "--no-pager".into(), promote_service])?;
@@ -511,17 +571,8 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                     println!("{} {}", status_dot(&target)?, target);
                     println!("{} ├─ {}", status_dot(&promote_service)?, promote_service);
                 }
-                // the implicit one
-                let ocf_pattern = Regex::new(plugin::promoter::OCF_PATTERN)?;
                 for (i, start) in config.start.iter().enumerate() {
-                    let start = start.trim();
-                    let (service_name, _) = match ocf_pattern.captures(start) {
-                        Some(ocf) => {
-                            let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-                            systemd::escaped_ocf_parse_to_env(&drbd_res, vendor, agent, args)?
-                        }
-                        _ => (start.to_string(), Vec::new()),
-                    };
+                    let service_name = service_name(start, &drbd_res)?;
                     if verbose {
                         systemctl(vec!["status".into(), "--no-pager".into(), service_name])?;
                     } else {
@@ -901,7 +952,8 @@ fn expand_snippets(snippets_path: &PathBuf, matches: &ArgMatches, disabled: bool
                     config
                 } else {
                     eprintln!(
-                        "File '{}' has an extension, but it is not the expected one ('.{}'), ignoring",
+                        "File '{}' has an extension, but it is not the expected one ('.{}'), \
+                         ignoring",
                         config.display(),
                         expected_extension
                     );
@@ -918,12 +970,30 @@ fn expand_snippets(snippets_path: &PathBuf, matches: &ArgMatches, disabled: bool
     paths
 }
 
+fn promote_service(drbd_res: &str) -> String {
+    format!("drbd-promote@{}.service", systemd::escape_name(&drbd_res))
+}
+
+fn service_name(start_entry: &str, drbd_res: &str) -> Result<String> {
+    let ocf_pattern = Regex::new(plugin::promoter::OCF_PATTERN)?;
+    let start = start_entry.trim();
+    let (service_name, _) = match ocf_pattern.captures(start) {
+        Some(ocf) => {
+            let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
+            systemd::escaped_ocf_parse_to_env(&drbd_res, vendor, agent, args)?
+        }
+        _ => (start.to_string(), Vec::new()),
+    };
+
+    Ok(service_name)
+}
+
 fn get_app() -> App<'static, 'static> {
     App::new("drbd-reactorctl")
         .author(crate_authors!("\n"))
         .version(crate_version!())
         .about("Controls a local drbd-reactor daemon")
-				.setting(AppSettings::VersionlessSubcommands)
+        .setting(AppSettings::VersionlessSubcommands)
         .arg(
             Arg::with_name("config")
                 .short("c")
@@ -982,11 +1052,10 @@ fn get_app() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("restart")
                 .about("Restart a plugin")
-                .arg(
-                    Arg::with_name("with_targets")
-                        .long("with-targets")
-                        .help("also stop the drbd-service@.target for promoter plugins, might get started on different node."),
-                )
+                .arg(Arg::with_name("with_targets").long("with-targets").help(
+                    "also stop the drbd-service@.target for promoter plugins, might get started \
+                     on different node.",
+                ))
                 .arg(
                     Arg::with_name("configs")
                         .help("Configs to restart")
@@ -1056,26 +1125,28 @@ fn get_app() -> App<'static, 'static> {
                         .validator(has_positive_u32)
                         .help("Positive number of seconds to wait for peer takeover"),
                 )
-                .arg(
-                    Arg::with_name("force")
-                        .short("f")
-                        .long("force")
-                        .help("Override checks (multiple plugins per snippet/multiple resources per promoter)"),
-                )
+                .arg(Arg::with_name("force").short("f").long("force").help(
+                    "Override checks (multiple plugins per snippet/multiple resources per \
+                     promoter)",
+                ))
                 .arg(
                     Arg::with_name("keep_masked")
                         .short("k")
                         .long("keep-masked")
-                        .help("If set the target unit will stay masked (i.e., 'systemctl mask --runtime')"),
+                        .help(
+                            "If set the target unit will stay masked (i.e., 'systemctl mask \
+                             --runtime')",
+                        ),
                 )
                 .arg(
                     Arg::with_name("unmask")
                         .short("u")
                         .long("unmask")
                         .long_help(
-"If set unmask targets (i.e. the equivalent of 'systemctl unmask').
+                            "If set unmask targets (i.e. the equivalent of 'systemctl unmask').
 This does not run any evictions.
-It is used to clear previous '--keep-masked' operations"),
+It is used to clear previous '--keep-masked' operations",
+                        ),
                 )
                 .arg(
                     Arg::with_name("configs")
@@ -1096,14 +1167,29 @@ It is used to clear previous '--keep-masked' operations"),
             SubCommand::with_name("ls")
                 .about("list absolute path and ID of plugins")
                 .arg(
-                    Arg::with_name("disabled").long("disabled")
-                        .help("show disabled plugins")
+                    Arg::with_name("disabled")
+                        .long("disabled")
+                        .help("show disabled plugins"),
                 )
                 .arg(
                     Arg::with_name("configs")
                         .help("Configs to list")
                         .multiple(true)
-                        .takes_value(true)
+                        .takes_value(true),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("start-until")
+                .about("Start reactor target until specified service in start list")
+                .arg(Arg::with_name("until").required(true).help(
+                    "Positive number or service name until which service in the start list the \
+                     target should be started",
+                ))
+                .arg(
+                    Arg::with_name("configs")
+                        .help("Config to start")
+                        .required(true)
+                        .multiple(false),
                 ),
         )
         .subcommand(
@@ -1113,11 +1199,12 @@ It is used to clear previous '--keep-masked' operations"),
                     Arg::with_name("shell")
                         .help("Shell")
                         .takes_value(true)
-												.required(true)
+                        .required(true)
                         .possible_values(&Shell::variants())
                         .default_value("bash"),
-								).display_order(1000),
-				)
+                )
+                .display_order(1000),
+        )
 }
 
 fn has_positive_u32(s: String) -> Result<(), String> {
@@ -1252,8 +1339,16 @@ fn green(text: &str) {
     println!("{}", text.bold().green())
 }
 
+fn yellow_prefix(prefix: &str, text: &str) {
+    println!("{} {}", prefix.bold().yellow(), text)
+}
+
 fn warn(text: &str) {
-    println!("{} {}", "WARN:".bold().yellow(), text)
+    yellow_prefix("WARN:", text)
+}
+
+fn info(text: &str) {
+    yellow_prefix("INFO:", text)
 }
 
 const PROMOTER_TEMPLATE: &str = r###"[[promoter]]
