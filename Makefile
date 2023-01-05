@@ -101,10 +101,8 @@ else
 checkVERSION:
 	test -z "$$(git ls-files -m)"
 	lbvers.py check --base=$(BASE) --build=$(BUILD) --build-nr=$(BUILD_NR) --pkg-nr=$(PKG_NR) \
-		--cargo=Cargo.toml --debian-changelog=debian/changelog --rpm-spec=drbd-reactor.spec
-	if test $$(grep "ENV DRBD_REACTOR_VERSION $(VERSION)" Dockerfile | wc -l) -ne 2; then \
-		echo -e "\n\tDockerfile needs update"; \
-	false; fi;
+		--cargo=Cargo.toml --debian-changelog=debian/changelog --rpm-spec=drbd-reactor.spec \
+		--dockerfiles Dockerfile --dockertoken DRBD_REACTOR_VERSION
 endif
 
 .PHONY: dockerimage
