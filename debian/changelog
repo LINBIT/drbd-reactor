@@ -1,3 +1,9 @@
+drbd-reactor (1.0.0~rc.2-1) experimental; urgency=medium
+
+  * ctl: add start-until
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Thu, 05 Jan 2023 10:59:35 +0100
+
 drbd-reactor (1.0.0~rc.1-1) experimental; urgency=medium
 
   * core: improve module version check
