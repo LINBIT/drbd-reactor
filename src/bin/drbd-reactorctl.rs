@@ -688,7 +688,7 @@ fn get_primary(drbd_resource: &str) -> Result<String> {
     let resources: Vec<Resource> = serde_json::from_slice(&output.stdout)?;
     if resources.len() != 1 {
         return Err(anyhow::anyhow!(
-            "resources lenght from drbdsetup status not exactly 1"
+            "resources length from drbdsetup status not exactly 1"
         ));
     }
 

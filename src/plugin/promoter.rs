@@ -984,7 +984,7 @@ fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
     let resources: Vec<Resource> = serde_json::from_str(&stdout)?;
     if resources.len() != 1 {
         return Err(anyhow::anyhow!(
-            "resources lenght from drbdsetup show not exactly 1"
+            "resources length from drbdsetup show not exactly 1"
         ));
     }
     if &resources[0].resource != name {
