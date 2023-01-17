@@ -1,3 +1,15 @@
+drbd-reactor (1.0.0-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * build: use lbvers.py to check Dockerfile
+  * build: use '=' for consistency
+  * clt,start-until: simplify instructions
+
+  [ Joel Colledge ]
+  * promoter: ctl: correct typo "lenght"
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 17 Jan 2023 09:26:20 +0100
+
 drbd-reactor (1.0.0~rc.2-1) experimental; urgency=medium
 
   * ctl: add start-until
