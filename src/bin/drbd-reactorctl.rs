@@ -400,7 +400,7 @@ fn start_until(snippets_paths: Vec<PathBuf>, until: &str) -> Result<()> {
             }
             info("To resume normal operation, execute:");
             println!(
-                "- systemctl stop {} # on this node",
+                "- systemctl start {} # on this node",
                 systemd::escaped_services_target(&drbd_res)
             );
             println!(
