@@ -1,3 +1,5 @@
+include: e2e-tests/.gitlab-ci.yml
+
 image: "$CI_REGISTRY/linbit/linbit-admin-backend/test-image"
 
 workflow:
@@ -8,6 +10,7 @@ workflow:
 
 stages:
   - check
+  - e2e
 
 # Use cargo to test the project
 test:cargo:

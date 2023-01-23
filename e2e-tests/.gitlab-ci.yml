@@ -1,0 +1,37 @@
+variables:
+  BUILD_HELPERS_VERSION: c2fe128ed6ed1498314589a0f2e28e509c48c144
+  DRBD_REACTOR_VERSION: 1.0.0.$CI_COMMIT_SHA
+
+e2e:build_reactor:
+  stage: e2e
+  needs: []
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  image: $LINBIT_DOCKER_REGISTRY/build-helpers:$BUILD_HELPERS_VERSION
+  script:
+    - . gitlab-utils.sh
+    - ci_prepare_tools
+    - ci_fetch_lbbuildctl
+
+    - version=$DRBD_REACTOR_VERSION
+    - release=1
+
+    - dummy-release.sh drbd-reactor "$version" "$release" drbd-reactor.spec
+    - git add -u && git -c user.email=invalid@linbit -c user.name=dummy commit -m "dummy release version=$version"
+
+    # lbvers.py does not support our semver incompatible version; skip the check
+    - install /dev/null $(which lbvers.py)
+
+    - make debrelease VERSION="$version"
+    - curl -isSf -u $LINBIT_REGISTRY_USER:$LINBIT_REGISTRY_PASSWORD --upload-file drbd-reactor-*.tar.gz $LINBIT_REGISTRY_URL/repository/lbbuild-upstream/
+    - >-
+      lbbuildctl build drbd-reactor --ci -l --arch amd64 -v "$version" -d rhel9.0
+      -e LINBIT_REGISTRY_USER=$LINBIT_REGISTRY_USER
+      -e LINBIT_REGISTRY_PASSWORD=$LINBIT_REGISTRY_PASSWORD
+      -e LINBIT_REGISTRY_URL=$LINBIT_REGISTRY_URL
+  cache:
+    key: $CI_JOB_NAME
+    paths:
+      - .cargo
