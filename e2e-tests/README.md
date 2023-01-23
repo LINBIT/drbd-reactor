@@ -24,5 +24,5 @@ The test suite requires Python 3.10+. The following Python packages are required
 To run a test, execute:
 
 ```
-./drbd_reactor_test.py --test promoter_promote d-{150..152}.test
+./drbd_reactor_test.py --test promoter_promote d-{10..12}
 ```

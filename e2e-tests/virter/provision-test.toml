@@ -1,0 +1,96 @@
+[values]
+RepositoryURL = ""
+ReleaseRepositoryURL = ""
+RepositoryDistribution = "" # for apt, e.g. jammy
+RepositoryPackages = "" # comma separated
+DrbdVersion = ""
+
+[[steps]]
+[steps.shell]
+script = '''
+set -e
+
+die() { >&2 printf "\nError: %s\n" "$*"; exit 1; }
+
+packages=$(printf %s "$REPOSITORY_PACKAGES" | tr , " ")
+
+if command -v yum > /dev/null; then
+	# Cheap hack to allow versions to be specified the same for apt and yum
+	packages=$(printf %s "$packages" | tr = -)
+
+	if [ -n "$REPOSITORY_URL" ]; then
+		cat <<- EOF > /etc/yum.repos.d/linbit-ci.repo
+		[linbit-ci]
+		name=LINBIT CI
+		baseurl=$REPOSITORY_URL
+		gpgcheck=0
+		enabled=1
+		EOF
+	fi
+
+	if [ -n "$RELEASE_REPOSITORY_URL" ]; then
+		cat <<- EOF > /etc/yum.repos.d/linbit-release.repo
+		[linbit-release]
+		name=LINBIT Release
+		baseurl=$RELEASE_REPOSITORY_URL
+		gpgcheck=0
+		enabled=1
+		EOF
+	fi
+
+	if [ -n "$DRBD_VERSION" ]; then
+		available=$(yum list available --quiet --showduplicates \
+			--disablerepo="*" --enablerepo="linbit-ci" --enablerepo="linbit-release" \
+			"kmod-drbd-${DRBD_VERSION}_*" \
+				| grep '^kmod-drbd' \
+				| awk '{print "kmod-drbd-" $2}')
+
+		echo "Available drbd packages for version $DRBD_VERSION:"
+		echo "$available" | tr ' ' '\n'
+
+		best=$(lbdisttool.py --kmods $available)
+		echo "Best kmod: $best"
+		packages="$packages $best"
+	fi
+
+	no_initramfs=1 yum install -y $packages
+
+elif command -v apt-get > /dev/null; then
+	[ -n "$REPOSITORY_URL" ] && \
+		echo deb [trusted=yes] $REPOSITORY_URL $REPOSITORY_DISTRIBUTION main \
+			> /etc/apt/sources.list.d/linbit-ci.list
+
+	[ -n "$RELEASE_REPOSITORY_URL" ] && \
+		echo deb [trusted=yes] $RELEASE_REPOSITORY_URL $REPOSITORY_DISTRIBUTION drbd-9 \
+			> /etc/apt/sources.list.d/linbit-release.list
+
+	apt-get update
+
+	if [ -n "$DRBD_VERSION" ]; then
+		packages="$packages drbd-module-$(uname -r)=${DRBD_VERSION}-*"
+	fi
+
+	DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends $packages
+
+else
+	die "Unknown package manager"
+fi
+
+sed -i 's/usage-count yes/usage-count no/' /etc/drbd.d/global_common.conf
+
+modinfo drbd > /dev/null || die "DRBD not installed"
+modprobe drbd
+
+echo "Output of 'drbdadm --version':"
+drbdadm --version || die "drbd-utils not installed"
+
+echo "Output of 'drbd-reactor --version':"
+drbd-reactor --version
+'''
+
+[steps.shell.env]
+REPOSITORY_URL = "{{.RepositoryURL}}"
+RELEASE_REPOSITORY_URL = "{{.ReleaseRepositoryURL}}"
+REPOSITORY_DISTRIBUTION = "{{.RepositoryDistribution}}"
+REPOSITORY_PACKAGES = "{{.RepositoryPackages}}"
+DRBD_VERSION = "{{.DrbdVersion}}"
