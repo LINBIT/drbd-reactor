@@ -12,7 +12,7 @@ def main() -> None:
                     description='Run a DRBD Reactor end-to-end test.')
 
     parser.add_argument('host', nargs='*')
-    parser.add_argument('-t', '--test', help='the name of the test to run', required=True)
+    parser.add_argument('-t', '--test', help='the name of the test to run', required=True, type=notempty)
 
     args = parser.parse_args()
 
@@ -20,6 +20,12 @@ def main() -> None:
 
     cluster = reactortest.Cluster(args.host)
     mod.test(cluster)
+
+
+def notempty(arg: str) -> str:
+    if not arg:
+       raise ValueError('arg is not allowed to be empty')
+    return arg
 
 
 if __name__ == "__main__":
