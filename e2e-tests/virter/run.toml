@@ -1,0 +1,32 @@
+[values]
+ScratchDisk = "/dev/sda"
+TestSuiteImage = "drbd-reactor-e2e:latest"
+
+[[steps]]
+[steps.shell]
+script = '''
+set -e
+
+if ! vgs scratch; then
+	vgcreate scratch "$SCRATCH_DISK"
+fi
+
+# cloud-init configuration with multiple interfaces is tricky, and sometimes they fail.
+# Just ignore those services.
+systemctl reset-failed "network*.service" || true
+
+while true; do
+	running=$(systemctl is-system-running || true)
+	[ "$running" = initializing ] || [ "$running" = starting ] && { sleep 1; continue; }
+	[ "$running" = running ] && break
+	echo "System in unexpected state '$running'; failed units:" 1>&2
+	systemctl list-units --failed 1>&2
+	exit 1
+done
+'''
+[steps.shell.env]
+SCRATCH_DISK = "{{.ScratchDisk}}"
+
+[[steps]]
+[steps.docker]
+image = "{{.TestSuiteImage}}"
