@@ -1,0 +1,12 @@
+# This is appended to the base image name to form the test image name
+name = "t"
+provision_file = "provision-test.toml"
+
+[[vms]]
+# Borrow the base image from the DRBD tests:
+# https://github.com/LINBIT/drbd9-tests
+base_image = "alma-9-drbd-k70"
+
+[vms.values]
+RepositoryURL = "https://nexus.at.linbit.com/repository/ci-yum/rhel9/"
+ReleaseRepositoryURL = "https://nexus.at.linbit.com/repository/packages-linbit-com/yum/rhel9.0/drbd-9/$basearch/"
