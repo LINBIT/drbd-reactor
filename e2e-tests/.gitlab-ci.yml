@@ -2,6 +2,8 @@ variables:
   BUILD_HELPERS_VERSION: c2fe128ed6ed1498314589a0f2e28e509c48c144
   DRBD_REACTOR_VERSION: 1.0.0.$CI_COMMIT_SHA
   REACTOR_TEST_IMAGE: $LINBIT_DOCKER_REGISTRY/drbd-reactor-e2e:latest
+  VIRTER_VERSION: v0.21.0
+  VMSHED_VERSION: v0.18.1
 
 e2e:build_reactor:
   stage: e2e
@@ -57,3 +59,41 @@ e2e:docker_image:
   artifacts:
     reports:
       dotenv: build.env
+
+e2e:test:
+  stage: e2e
+  needs:
+    - job: e2e:build_reactor
+    - job: e2e:docker_image
+      # Use the overridden value of $REACTOR_TEST_IMAGE if an image was built,
+      # keep the default value otherwise.
+      optional: true
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+  tags:
+    - libvirt
+  script:
+    - curl -sSfL -u gitlab-ci-token:$CI_JOB_TOKEN $CI_SERVER_URL/linbit/build-helpers/-/archive/$BUILD_HELPERS_VERSION/ignored.tar.gz | tar -xvzf -
+    - mv build-helpers-* build-helpers
+    - . build-helpers/gitlab-utils.sh
+
+    - ci_prepare_tools
+    - ci_fetch_binary virter virter-$VIRTER_VERSION https://github.com/LINBIT/virter/releases/download/$VIRTER_VERSION/virter-linux-amd64
+    - ci_fetch_binary vmshed vmshed-$VMSHED_VERSION https://github.com/LINBIT/vmshed/releases/download/$VMSHED_VERSION/vmshed-linux-amd64
+
+    - virter image pull alma-9-drbd-k70 $LINBIT_DOCKER_REGISTRY/vm/drbd9-tests/alma-9-drbd-k70:latest
+
+    - cd e2e-tests
+    - ./virter/drbd-reactor-vmshed.sh --out-dir=../tests-out
+  cache:
+    key: bin-$VIRTER_VERSION-$VMSHED_VERSION
+    paths:
+      - download
+  artifacts:
+    # Provide a convenient name so that the downloaded artifacts can be identified
+    name: $CI_PROJECT_NAME-$CI_JOB_ID
+    paths:
+      - tests-out/
+    when: always
+    reports:
+      junit: tests-out/test-results/*.xml

@@ -13,4 +13,6 @@ vmshed \
 	--vms virter/vms.toml \
 	--tests virter/tests.toml \
 	--set "values.DrbdVersion=${DRBD_VERSION:-9.1.12}" \
-	--set "values.RepositoryPackages=${repository_packages}"
+	--set "values.RepositoryPackages=${repository_packages}" \
+	${REACTOR_TEST_IMAGE:+--set "values.TestSuiteImage=${REACTOR_TEST_IMAGE}"} \
+	"$@"
