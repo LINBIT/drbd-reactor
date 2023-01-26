@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::fs;
@@ -6,7 +7,7 @@ use std::io::{BufRead, BufReader};
 use std::io::{Error, ErrorKind};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -33,6 +34,12 @@ static TERMINATE: AtomicBool = AtomicBool::new(false);
 
 const REACTOR_RELOAD_PATH: &str = "drbd-reactor-reload.path";
 const REACTOR_SERVICE: &str = "drbd-reactor.service";
+
+struct ClusterConf<'a> {
+    context: &'a str,
+    nodes: Vec<&'a str>,
+    local: bool,
+}
 
 fn main() -> Result<()> {
     let mut signals = Signals::new(&[libc::SIGINT, libc::SIGTERM])?;
@@ -62,15 +69,41 @@ fn main() -> Result<()> {
         .with_context(|| "Could not get snippets path from config file")?;
     let snippets_path = PathBuf::from(snippets_path);
 
+    let context = matches
+        .value_of("context")
+        .expect("expected to have a default");
+
+    let mut nodes = matches
+        .values_of("nodes")
+        .expect("expeced to have a default")
+        .collect::<Vec<_>>();
+    nodes.retain(|&x| x != "");
+
+    let local = matches.is_present("local");
+
+    let cluster = ClusterConf {
+        context,
+        nodes,
+        local,
+    };
+
     match matches.subcommand() {
-        ("cat", Some(cat_matches)) => cat(expand_snippets(&snippets_path, cat_matches, false)),
+        ("cat", Some(cat_matches)) => cat(
+            expand_snippets(&snippets_path, cat_matches, false),
+            &cluster,
+        ),
         ("disable", Some(disable_matches)) => {
             let now = disable_matches.is_present("now");
-            disable(expand_snippets(&snippets_path, disable_matches, false), now)
+            disable(
+                expand_snippets(&snippets_path, disable_matches, false),
+                now,
+                &cluster,
+            )
         }
-        ("enable", Some(enable_matches)) => {
-            enable(expand_snippets(&snippets_path, enable_matches, true))
-        }
+        ("enable", Some(enable_matches)) => enable(
+            expand_snippets(&snippets_path, enable_matches, true),
+            &cluster,
+        ),
         ("edit", Some(edit_matches)) => {
             let disabled = edit_matches.is_present("disabled");
             let force = edit_matches.is_present("force");
@@ -82,6 +115,7 @@ fn main() -> Result<()> {
                 &snippets_path,
                 type_opt,
                 force,
+                &cluster,
             )
         }
         ("evict", Some(evict_matches)) => {
@@ -102,7 +136,10 @@ fn main() -> Result<()> {
         }
         ("ls", Some(ls_matches)) => {
             let disabled = ls_matches.is_present("disabled");
-            ls(expand_snippets(&snippets_path, ls_matches, disabled))
+            ls(
+                expand_snippets(&snippets_path, ls_matches, disabled),
+                &cluster,
+            )
         }
         ("restart", Some(restart_matches)) => {
             let with_targets = restart_matches.is_present("with_targets");
@@ -110,12 +147,16 @@ fn main() -> Result<()> {
                 None => Vec::new(),
                 Some(_) => expand_snippets(&snippets_path, restart_matches, false),
             };
-            restart(configs, with_targets)
+            restart(configs, with_targets, &cluster)
         }
         ("rm", Some(rm_matches)) => {
             let force = rm_matches.is_present("force");
             let disabled = rm_matches.is_present("disabled");
-            rm(expand_snippets(&snippets_path, rm_matches, disabled), force)
+            rm(
+                expand_snippets(&snippets_path, rm_matches, disabled),
+                force,
+                &cluster,
+            )
         }
         ("start-until", Some(until_matches)) => {
             let until = until_matches
@@ -131,6 +172,7 @@ fn main() -> Result<()> {
                 expand_snippets(&snippets_path, status_matches, false),
                 verbose,
                 &resources,
+                &cluster,
             )
         }
         _ => {
@@ -140,6 +182,7 @@ fn main() -> Result<()> {
                 expand_snippets(&snippets_path, &args, false),
                 false,
                 &vec![],
+                &cluster,
             )
         }
     }
@@ -266,7 +309,12 @@ fn edit(
     snippets_path: &PathBuf,
     type_opt: &str,
     force: bool,
+    cluster: &ClusterConf,
 ) -> Result<()> {
+    if do_remote(cluster)? {
+        return Ok(());
+    }
+
     let editor = env::var("EDITOR").unwrap_or("vi".to_string());
 
     let mut persisted = 0;
@@ -340,7 +388,11 @@ fn edit(
     Ok(())
 }
 
-fn rm(snippets_paths: Vec<PathBuf>, force: bool) -> Result<()> {
+fn rm(snippets_paths: Vec<PathBuf>, force: bool, cluster: &ClusterConf) -> Result<()> {
+    if do_remote(cluster)? {
+        return Ok(());
+    }
+
     let mut removed = 0;
     for snippet in &snippets_paths {
         if !snippet.exists() {
@@ -412,7 +464,11 @@ fn start_until(snippets_paths: Vec<PathBuf>, until: &str) -> Result<()> {
     Ok(())
 }
 
-fn enable(snippets_paths: Vec<PathBuf>) -> Result<()> {
+fn enable(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
+    if do_remote(cluster)? {
+        return Ok(());
+    }
+
     let mut enabled = 0;
     for snippet in &snippets_paths {
         if !snippet.exists() {
@@ -456,7 +512,11 @@ fn stop_targets(snippets_paths: Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-fn disable(snippets_paths: Vec<PathBuf>, with_targets: bool) -> Result<()> {
+fn disable(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterConf) -> Result<()> {
+    if do_remote(cluster)? {
+        return Ok(());
+    }
+
     let mut disabled_snippets_paths: Vec<PathBuf> = Vec::new();
     for snippet in &snippets_paths {
         if !snippet.exists() {
@@ -541,7 +601,16 @@ fn reload_service() -> Result<()> {
     systemctl(vec!["reload".into(), REACTOR_SERVICE.into()])
 }
 
-fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) -> Result<()> {
+fn status(
+    snippets_paths: Vec<PathBuf>,
+    verbose: bool,
+    resources: &Vec<String>,
+    cluster: &ClusterConf,
+) -> Result<()> {
+    if do_remote(cluster)? {
+        return Ok(());
+    }
+
     for snippet in snippets_paths {
         println!("{}:", snippet.display());
         let conf = read_config(&snippet)?;
@@ -565,8 +634,10 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                 // target itself and the implicit one
                 let promote_service = promote_service(&drbd_res);
                 if verbose {
-                    systemctl(vec!["status".into(), "--no-pager".into(), target])?;
-                    systemctl(vec!["status".into(), "--no-pager".into(), promote_service])?;
+                    // systemctl status in this case returns != 0 if service not started
+                    // but we expect that on n-1 nodes and we don't want to fail in this case
+                    let _ = systemctl(vec!["status".into(), "--no-pager".into(), target]);
+                    let _ = systemctl(vec!["status".into(), "--no-pager".into(), promote_service]);
                 } else {
                     println!("{} {}", status_dot(&target)?, target);
                     println!("{} ├─ {}", status_dot(&promote_service)?, promote_service);
@@ -574,7 +645,9 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
                 for (i, start) in config.start.iter().enumerate() {
                     let service_name = service_name(start, &drbd_res)?;
                     if verbose {
-                        systemctl(vec!["status".into(), "--no-pager".into(), service_name])?;
+                        // systemctl status in this case returns != 0 if service not started
+                        // but we expect that on n-1 nodes and we don't want to fail in this case
+                        let _ = systemctl(vec!["status".into(), "--no-pager".into(), service_name]);
                     } else {
                         let sep = if i == config.start.len() - 1 {
                             "└─"
@@ -618,7 +691,10 @@ fn status(snippets_paths: Vec<PathBuf>, verbose: bool, resources: &Vec<String>) 
     Ok(())
 }
 
-fn cat(snippets_paths: Vec<PathBuf>) -> Result<()> {
+fn cat(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
+    if do_remote(cluster)? {
+        return Ok(());
+    }
     for snippet in snippets_paths {
         if !snippet.exists() {
             warn(&format!(
@@ -849,7 +925,11 @@ fn evict(
     }
 }
 
-fn ls(snippets_paths: Vec<PathBuf>) -> Result<()> {
+fn ls(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
+    if do_remote(cluster)? {
+        return Ok(());
+    }
+
     for snippet in snippets_paths {
         println!("{}:", snippet.display());
         if !snippet.exists() {
@@ -878,16 +958,17 @@ fn ls(snippets_paths: Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-fn restart(snippets_paths: Vec<PathBuf>, with_targets: bool) -> Result<()> {
+fn restart(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterConf) -> Result<()> {
     if snippets_paths.is_empty() {
         systemctl(vec!["restart".into(), REACTOR_SERVICE.into()])
     } else {
-        disable(snippets_paths.clone(), with_targets)?;
+        disable(snippets_paths.clone(), with_targets, cluster)?;
         enable(
             snippets_paths
                 .into_iter()
                 .map(|p| get_disabled_path(&p))
                 .collect(),
+            cluster,
         )
     }
 }
@@ -988,6 +1069,188 @@ fn service_name(start_entry: &str, drbd_res: &str) -> Result<String> {
     Ok(service_name)
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct Node {
+    #[serde(default)]
+    hostname: String,
+    #[serde(default = "default_user")]
+    user: String,
+}
+fn default_user() -> String {
+    "root".to_string()
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+struct Config {
+    #[serde(default)]
+    nodes_script: Option<String>,
+    #[serde(default)]
+    nodes: HashMap<String, Node>,
+}
+
+fn cfg_dir() -> Result<PathBuf> {
+    let cfg_dir = match env::var("XDG_CONFIG_HOME") {
+        Ok(x) if x != "" => PathBuf::from(x),
+        _ => match env::var("HOME") {
+            Ok(x) => Path::new(&x).join(".config"),
+            Err(e) => return Err(anyhow::anyhow!(e)),
+        },
+    };
+    Ok(cfg_dir.join("drbd-reactorctl"))
+}
+
+fn read_ctl_config(context: &str, additional_content: Option<&str>) -> Result<Config> {
+    let cfg_file = cfg_dir()?.join(format!("{}.toml", context));
+
+    // it is fine if the default.toml symlink does not exist
+    if context == "default" && !cfg_file.exists() {
+        return Ok(Default::default());
+    }
+
+    let mut content = fs::read_to_string(&cfg_file)
+        .with_context(|| format!("Could not read config file: {}", cfg_file.display()))?;
+
+    if let Some(ac) = additional_content {
+        content.push_str("\n");
+        content.push_str(ac);
+    }
+
+    toml::from_str(&content).with_context(|| {
+        format!(
+            "Could not parse drbd-reactorctl config file; content: {}",
+            content
+        )
+    })
+}
+
+fn read_nodes(cluster: &ClusterConf) -> Result<Vec<Node>> {
+    if cluster.context == "none" || cluster.context == "local" {
+        return Ok(Vec::new());
+    }
+
+    let cfg = read_ctl_config(cluster.context, None)?;
+    let cfg = match cfg.nodes_script {
+        Some(script) => {
+            let script = cfg_dir()?.join(script);
+            let output = Command::new(&script).output()?;
+            if !output.status.success() {
+                return Err(anyhow::anyhow!(
+                    "Script '{}', did not return successfully",
+                    script.display()
+                ));
+            }
+            let output = String::from_utf8(output.stdout)?;
+            read_ctl_config(cluster.context, Some(&output))?
+        }
+        None => cfg,
+    };
+
+    // "postparse": set hostname to nodename if not overwritten
+    // filter if we got a limited set of nodes
+    let mut nodes = Vec::new();
+    for (name, node) in cfg.nodes {
+        // it is slightly easier to filter here based on the "name" (i.e., "nick name")
+        // than to filter "nodes" later, where we only have the expanded hostname
+        if !cluster.nodes.is_empty() && !cluster.nodes.contains(&&name.as_str()) {
+            continue;
+        }
+        let mut node = node.clone();
+        if node.hostname == "" {
+            node.hostname = name.clone();
+        }
+        nodes.push(node);
+    }
+    nodes.sort_by(|a, b| (a.hostname).cmp(&b.hostname));
+
+    Ok(nodes)
+}
+
+fn pexec(cmds: &Vec<Vec<String>>) -> Vec<Output> {
+    let mut threads = vec![];
+    for i in 0..cmds.len() {
+        let cmd = cmds[i].clone();
+        threads.push(thread::spawn(move || -> Output {
+            let args: Vec<&String> = cmd.iter().skip(1).collect();
+            Command::new(&cmd[0])
+                .args(&args)
+                .stdin(Stdio::null())
+                .output()
+                .expect("command failed to start")
+        }));
+    }
+
+    threads
+        .into_iter()
+        .map(|t| t.join().unwrap())
+        .collect::<Vec<_>>()
+}
+
+fn do_remote(cluster: &ClusterConf) -> Result<bool> {
+    if cluster.local {
+        return Ok(false);
+    }
+
+    let nodes = read_nodes(cluster)?;
+    if nodes.is_empty() {
+        return Ok(false);
+    }
+
+    // remote execution (except local node)
+    let me = promoter::uname_n()?;
+
+    // check if we can reach all nodes, otherwise we might run into some inconsistent cluster state
+    // that is obviously not a 100% guarantee, but IMO a check worth having
+    print!("Checking ssh connection to all remote nodes: ");
+    io::stdout().flush()?;
+    let mut cmds = Vec::new();
+    for node in &nodes {
+        if node.hostname == me {
+            continue;
+        }
+        let userhost = format!("{}@{}", node.user, node.hostname);
+        cmds.push(vec!["ssh".to_string(), userhost, "true".to_string()]);
+    }
+    let results = pexec(&cmds);
+    for (i, result) in results.iter().enumerate() {
+        if !result.status.success() {
+            return Err(anyhow::anyhow!("Command '{}' failed", cmds[i].join(" ")));
+        }
+    }
+    green("✓");
+
+    let orig_args: Vec<String> = env::args().skip(1).collect();
+    cmds.clear();
+    for node in &nodes {
+        let is_me = me == node.hostname;
+        let mut node_args = Vec::new();
+        if !is_me {
+            node_args.push("ssh".to_string());
+            node_args.push("-qtt".to_string());
+            node_args.push(format!("{}@{}", node.user, node.hostname));
+            node_args.push("--".to_string());
+        }
+        node_args.push("drbd-reactorctl".to_string());
+        node_args.push("--local".to_string());
+        let mut args = orig_args.clone();
+        node_args.append(&mut args);
+        cmds.push(node_args);
+    }
+    let results = pexec(&cmds);
+    for (i, result) in results.iter().enumerate() {
+        if !result.status.success() {
+            return Err(anyhow::anyhow!("Command '{}' failed", cmds[i].join(" ")));
+        }
+        println!(
+            "➞ {}:\n{}",
+            nodes[i].hostname,
+            std::str::from_utf8(&result.stdout).unwrap_or("<Could not convert stdout>")
+        );
+    }
+
+    return Ok(true);
+}
+
 fn get_app() -> App<'static, 'static> {
     App::new("drbd-reactorctl")
         .author(crate_authors!("\n"))
@@ -1002,6 +1265,23 @@ fn get_app() -> App<'static, 'static> {
                 .help("Sets a custom config file")
                 .default_value("/etc/drbd-reactor.toml"),
         )
+        .arg(
+            Arg::with_name("context")
+                .long("context")
+                .help("Uses the given (cluster) context")
+                .default_value("default")
+                .global(true),
+        )
+        .arg(
+            Arg::with_name("nodes")
+                .long("nodes")
+                .help("Uses only the given nodes from the context")
+                .default_value("")
+                .multiple(true)
+                .require_delimiter(true)
+                .global(true),
+        )
+        .arg(Arg::with_name("local").long("local").hidden(true))
         .subcommand(
             SubCommand::with_name("disable")
                 .about("Disable plugin")

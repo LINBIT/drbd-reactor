@@ -56,7 +56,7 @@ _drbd-reactorctl() {
 
     case "${cmd}" in
         drbd-reactorctl)
-            opts=" -h -V -c  --help --version --config   disable enable status restart edit rm evict cat ls start-until generate-completion help"
+            opts=" -h -V -c  --local --help --version --config --context --nodes   disable enable status restart edit rm evict cat ls start-until generate-completion help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -71,6 +71,14 @@ _drbd-reactorctl() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -80,13 +88,21 @@ _drbd-reactorctl() {
             ;;
         
         drbd__reactorctl__cat)
-            opts=" -h -V  --help --version  <configs>... "
+            opts=" -h -V  --help --version --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -95,13 +111,21 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__disable)
-            opts=" -h -V  --now --help --version  <configs>... "
+            opts=" -h -V  --now --help --version --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -110,7 +134,7 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__edit)
-            opts=" -f -h -V -t  --force --disabled --help --version --type  <configs>... "
+            opts=" -f -h -V -t  --force --disabled --help --version --type --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -125,6 +149,14 @@ _drbd-reactorctl() {
                     COMPREPLY=($(compgen -W "promoter prometheus umh debugger" -- "${cur}"))
                     return 0
                     ;;
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -133,13 +165,21 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__enable)
-            opts=" -h -V  --help --version  <configs>... "
+            opts=" -h -V  --help --version --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -148,7 +188,7 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__evict)
-            opts=" -f -k -u -h -V -d  --force --keep-masked --unmask --help --version --delay  <configs>... "
+            opts=" -f -k -u -h -V -d  --force --keep-masked --unmask --help --version --delay --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -163,6 +203,14 @@ _drbd-reactorctl() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -171,13 +219,21 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__generate__completion)
-            opts=" -h -V  --help --version  <shell> "
+            opts=" -h -V  --help --version --context --nodes  <shell> "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -186,13 +242,21 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__help)
-            opts=" -h -V  --help --version  "
+            opts=" -h -V  --help --version --context --nodes  "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -201,13 +265,21 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__ls)
-            opts=" -h -V  --disabled --help --version  <configs>... "
+            opts=" -h -V  --disabled --help --version --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -216,13 +288,21 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__restart)
-            opts=" -h -V  --with-targets --help --version  <configs>... "
+            opts=" -h -V  --with-targets --help --version --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -231,13 +311,21 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__rm)
-            opts=" -f -h -V  --disabled --force --help --version  <configs>... "
+            opts=" -f -h -V  --disabled --force --help --version --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -246,13 +334,21 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__start__until)
-            opts=" -h -V  --help --version  <until> <configs> "
+            opts=" -h -V  --help --version --context --nodes  <until> <configs> "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -261,7 +357,7 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__status)
-            opts=" -v -h -V -r  --verbose --help --version --resource  <configs>... "
+            opts=" -v -h -V -r  --verbose --help --version --resource --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -273,6 +369,14 @@ _drbd-reactorctl() {
                     return 0
                     ;;
                     -r)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --context)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --nodes)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

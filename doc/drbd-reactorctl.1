@@ -3,7 +3,7 @@
 .Os
 .Sh NAME
 .Nm drbd-reactorctl
-.Nd Control the drbd-reactor daemon an its plugins
+.Nd Control the drbd-reactor daemon and its plugins
 .Sh SYNOPSIS
 .Nm
 .Op Fl -config Ar CONFIG
@@ -48,9 +48,11 @@
 .Sh DESCRIPTION
 The
 .Nm
-utility is used to control the
+utility is used to control the local
 .Xr drbd-reactor 1
-daemon.
+daemon or a cluster of daemons (see
+.Sx CLUSTER
+for details).
 .Pp
 It is important to note that this utility only operates on plugin snippets
 (configured via
@@ -75,6 +77,18 @@ Global arguments are:
 .It Fl c, -config Ar CONFIG
 Main configuration file, defaults to
 .Pa /etc/drbd-reactor.toml
+.It Fl -context Ar CONTEXT
+Select a cluster context. Commands are then usually executed on all nodes in
+the given context. Subcommands might implement a behavior that is different
+from simple parallel execution (check the subsections of the subcommands for
+more details). The contexts
+.Sy none
+and
+.Sy local
+are reserved and can be used to temporarily disable the default context.
+.It Fl -nodes Ar NODES
+Only use the selected nodes from the given cluster context. Nodes are
+separated by commas.
 .El
 .Pp
 The subcommands and their arguments are as follows:
@@ -89,6 +103,12 @@ Override sanity checks (e.g., topmost unit not a mount unit).
 Type of the plugin to create from template. The default is
 .Sy promoter .
 .El
+.Pp
+Currently this command is not context/cluster aware, so
+.Fl -context
+and
+.Fl -nodes
+are ignored.
 .Ss enable
 enable a currently disabled plugin.
 .Ss disable
@@ -131,6 +151,12 @@ evictions on its own, it is used to clear previous
 .Sy evict --keep-masked
 operations.
 .El
+.Pp
+Currently this command is not context/cluster aware, so
+.Fl -context
+and
+.Fl -nodes
+are ignored.
 .Ss cat
 cat the toml configuration of a plugin. Tries to use a pretty printer (e.g.,
 .Sy bat )
@@ -193,6 +219,64 @@ and write it to
 .Sy stdout .
 Supported shells are
 .Ar zsh | bash | fish | powershell | elvish
+.Sh CLUSTER
+.Pp
+Users can define cluster contexts via toml files in the locations specified in
+the
+.Sx FILES
+section. Such toml files consist of
+.Sy nodes
+entries that themselves have fields for
+.Sy hostname
+and
+.Sy user .
+Usually one does not need to set the specific fields as they have sane
+defaults: The name of the node entry is used as
+.Sy hostname
+if not otherwise specified, and
+.Sy root
+is the default
+.Sy user .
+If a cluster context is given or
+.Pa default.toml
+exists commands are executed on all nodes defined for that context. Execution
+is carried out in parallel via ssh.
+.Pp
+A simple configuration can look like this:
+.Bd -literal -offset indent
+cat ~/.config/drbd-reactorctl/production.toml
+[nodes."alpha.mynet"]
+[nodes."beta.mynet"]
+[nodes."gamma.mynet"]
+.Ed
+.Pp
+Node names should follow the output of
+.Sy uname -n
+and also please make sure to quote node names containing dots.
+.Pp
+It is also possible to define a command that is executed to generate the nodes
+list via
+.Sy nodes-script .
+These commands, usually simple shell scripts, are expected to be stored in the
+same directory as the toml files. The scripts are expected to generate a valid
+nodes list as documented above on stdout. Such a configuration would then look
+like this:
+.Bd -literal -offset indent
+cat ~/.config/drbd-reactorctl/linstor.toml
+nodes-script="linstor.sh"
+.Ed
+.Sh FILES
+.Bl -tag -compact
+.It Pa $XDG_CONFIG_HOME/drbd-reactorctl/
+Default directory for context files in toml format.
+.It Pa $XDG_CONFIG_HOME/drbd-reactorctl/default.toml
+If this file exists (usually a symlink to another toml file), it will be used
+by default.
+.El
+If
+.Sy $XDG_CONFIG_HOME
+is not set or empty, config files get looked up in
+.Pa $HOME/.config/drbd-reactorctl/
 .Sh EXAMPLES
 .Bd -literal -offset indent
 drbd-reactorctl edit -t prometheus myprometheus
@@ -202,6 +286,7 @@ drbd-reactorctl status /etc/drbd-reactor.d/myprometheus.toml
 drbd-reactorctl disable --now mylinstorpromoter
 drbd-reactorctl evict --keep-masked
 drbd-reactorctl evict --unmask mylinstorpromoter
+drbd-reactorctl --context production --nodes alpha,gamma status --verbose
 .Ed
 .Sh AUTHORS
 .An -nosplit
