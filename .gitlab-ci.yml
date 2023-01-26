@@ -6,8 +6,13 @@ workflow:
     - if: $CI_MERGE_REQUEST_ID
     - if: $CI_COMMIT_BRANCH == 'master'
 
+stages:
+  - check
+
 # Use cargo to test the project
 test:cargo:
+  stage: check
+  needs: []
   variables:
     RUSTFLAGS: "-Zinstrument-coverage"
     LLVM_PROFILE_FILE: "coverage-%p-%m.profraw"
@@ -27,11 +32,15 @@ test:cargo:
   coverage: '/lines\.*: \d+\.\d+%/'
 
 test:rustfmt:
+  stage: check
+  needs: []
   script:
     - cargo fmt -- --version && cargo fmt -- --print-config current .
     - cargo fmt -- --check
 
 test:compat:
+  stage: check
+  needs: []
   variables:
     CARGO_HOME: $CI_PROJECT_DIR/.cargo
   parallel:
