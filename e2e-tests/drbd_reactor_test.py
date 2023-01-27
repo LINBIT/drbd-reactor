@@ -24,7 +24,7 @@ def main() -> None:
 
 def notempty(arg: str) -> str:
     if not arg:
-       raise ValueError('arg is not allowed to be empty')
+        raise ValueError('arg is not allowed to be empty')
     return arg
 
 

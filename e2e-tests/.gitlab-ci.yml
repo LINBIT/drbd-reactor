@@ -5,6 +5,17 @@ variables:
   VIRTER_VERSION: v0.21.0
   VMSHED_VERSION: v0.18.1
 
+e2e:lint:
+  stage: e2e
+  needs: []
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+      changes:
+        - e2e-tests/**/*.py
+  image: pipelinecomponents/flake8
+  script:
+    - flake8 --config e2e-tests/.flake8 e2e-tests/
+
 e2e:build_reactor:
   stage: e2e
   needs: []

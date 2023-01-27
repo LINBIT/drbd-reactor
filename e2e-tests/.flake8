@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 120
+# We are not strict about the precise width of hanging and visual indents.
+ignore = E121,E123,E124,E126,E127,E128
