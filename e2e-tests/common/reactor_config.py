@@ -18,8 +18,34 @@ class Promoter(object):
 
 
 @dataclass
+class WithOperator(object):
+    operator: str
+    value: str
+
+
+@dataclass
+class UMHResourceUpdateState(object):
+    role: str | WithOperator
+
+
+@dataclass
+class UMHResource(object):
+    command: str
+    event_type: str
+    resource_name: str
+    old: UMHResourceUpdateState
+    new: UMHResourceUpdateState
+
+
+@dataclass
+class UMH(object):
+    resource: MutableSequence[UMHResource] = field(default_factory=list)
+
+
+@dataclass
 class ReactorConfig(object):
     promoter: MutableSequence[Promoter] = field(default_factory=list)
+    umh: MutableSequence[UMH] = field(default_factory=list)
 
 
 def _rename_key(k: str) -> str:
