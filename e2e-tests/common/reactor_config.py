@@ -6,20 +6,20 @@ import toml
 
 
 @dataclass
-class ReactorPromoterResource(object):
+class PromoterResource(object):
     dependencies_as: str | None = None
     target_as: str | None = None
     start: MutableSequence[str] = field(default_factory=list)
 
 
 @dataclass
-class ReactorPromoter(object):
-    resources: MutableMapping[str, ReactorPromoterResource] = field(default_factory=dict)
+class Promoter(object):
+    resources: MutableMapping[str, PromoterResource] = field(default_factory=dict)
 
 
 @dataclass
 class ReactorConfig(object):
-    promoter: MutableSequence[ReactorPromoter] = field(default_factory=list)
+    promoter: MutableSequence[Promoter] = field(default_factory=list)
 
 
 def _rename_key(k: str) -> str:

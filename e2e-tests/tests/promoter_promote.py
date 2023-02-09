@@ -3,7 +3,7 @@ import time
 from common import drbd_config
 from common import dummy_service
 from common import reactortest
-from common.reactor_config import ReactorConfig, ReactorPromoter, ReactorPromoterResource
+from common.reactor_config import ReactorConfig, Promoter, PromoterResource
 
 
 def test(cluster: reactortest.Cluster) -> None:
@@ -16,9 +16,9 @@ def test(cluster: reactortest.Cluster) -> None:
     device = drbd_config.drbd_device(res.volumes[0].minor_number)
 
     config = ReactorConfig(
-            promoter=[ReactorPromoter(
+            promoter=[Promoter(
                 resources={
-                    'res': ReactorPromoterResource(
+                    'res': PromoterResource(
                         dependencies_as='Requires',
                         start=[dummy_service.dummy_service_unit(device)]
                         )})])
