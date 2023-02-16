@@ -61,7 +61,7 @@ class DRBDResource(object):
 
 
 def drbd_config(resource: DRBDResource) -> str:
-    text = []
+    text: list[str] = []
 
     with ConfigBlock(text, f'resource "{resource.name}"') as resource_block:
         with ConfigBlock(resource_block, 'options') as options_block:
@@ -96,5 +96,5 @@ def _config_one_host_addr(block: ConfigBlock, resource: DRBDResource, node: DRBD
     block.write(f'host {node.name} address {node.addr}:{resource.port};')
 
 
-def drbd_device(minor_number: int):
+def drbd_device(minor_number: int) -> str:
     return f'/dev/drbd{minor_number}'

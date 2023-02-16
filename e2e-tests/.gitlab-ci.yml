@@ -16,6 +16,25 @@ e2e:lint:
   script:
     - flake8 --config e2e-tests/.flake8 e2e-tests/
 
+e2e:typing:
+  stage: e2e
+  needs: []
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+      changes:
+        - e2e-tests/**/*.py
+  image:
+    name: cytopia/mypy:latest-py3.10
+    entrypoint: [""]
+  script:
+    - mkdir -p .pip
+    - python3 -m pip --cache-dir=.pip install types-toml
+    - mypy e2e-tests/drbd_reactor_test.py e2e-tests/tests/*.py --no-warn-no-return --ignore-missing-imports
+  cache:
+    key: $CI_JOB_NAME
+    paths:
+      - .pip
+
 e2e:build_reactor:
   stage: e2e
   needs: []

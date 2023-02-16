@@ -31,7 +31,7 @@ class Node(object):
         self.name = name
         self.ssh = SSH(self.name, timeout=30)
         self.addr = socket.gethostbyname(name)
-        self.hostname = self.run(['uname', '-n'], return_stdout=True)
+        self.hostname = cast(str, self.run(['uname', '-n'], return_stdout=True))
 
         install_dummy_service(self)
 

@@ -47,3 +47,5 @@ def _escape_code_point(c: str) -> str:
             return x
         case _:
             return ''.join([f'\\x{b:02x}' for b in c.encode('utf-8')])
+    # For mypy
+    return ''

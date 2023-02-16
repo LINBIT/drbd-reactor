@@ -10,7 +10,7 @@ class PromoterResource(object):
     dependencies_as: str | None = None
     target_as: str | None = None
     start: MutableSequence[str] = field(default_factory=list)
-    preferred_nodes: str | None = None
+    preferred_nodes: MutableSequence[str] | None = None
 
 
 @dataclass
