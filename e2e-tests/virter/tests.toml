@@ -6,3 +6,6 @@ vms = [3]
 
 [tests.umh_role]
 vms = [3]
+
+[tests.prometheus]
+vms = [1]

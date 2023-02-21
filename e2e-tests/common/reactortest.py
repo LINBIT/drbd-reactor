@@ -172,3 +172,9 @@ def dummy_service_started(node: Node, device: str) -> bool:
     status = node.run(['cat', dummy_service.dummy_service_status_path],
             return_stdout=True)
     return device in cast(str, status).splitlines()
+
+
+def prometheus_endpoint_scrape(node: Node, prometheus_address) -> str:
+    prometheus_output = node.run(['curl', '-fsS', prometheus_address],
+            return_stdout=True, catch=True)
+    return cast(str, prometheus_output)

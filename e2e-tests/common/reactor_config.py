@@ -44,9 +44,16 @@ class UMH(object):
 
 
 @dataclass
+class Prometheus(object):
+    enums: bool | None = False
+    address: str | None = "0.0.0.0:9942"
+
+
+@dataclass
 class ReactorConfig(object):
     promoter: MutableSequence[Promoter] = field(default_factory=list)
     umh: MutableSequence[UMH] = field(default_factory=list)
+    prometheus: MutableSequence[Prometheus] = field(default_factory=list)
 
 
 def _rename_key(k: str) -> str:
