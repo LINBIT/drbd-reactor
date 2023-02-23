@@ -6,6 +6,3 @@ vms = [3]
 
 [tests.umh_role]
 vms = [3]
-
-[tests.promoter_preferred_node]
-vms = [3]
