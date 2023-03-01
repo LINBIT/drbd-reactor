@@ -13,6 +13,10 @@ def test(cluster: reactortest.Cluster) -> None:
 
     device = drbd_config.drbd_device(res.volumes[0].minor_number)
 
+    # Let DRBD connect before deploying Reactor
+    for node in cluster.nodes:
+        node.run(['drbdadm', 'wait-connect', 'res'])
+
     preferred_node = cluster.nodes[-1]
 
     config = ReactorConfig(
