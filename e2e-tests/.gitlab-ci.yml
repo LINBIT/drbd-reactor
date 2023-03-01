@@ -4,6 +4,7 @@ variables:
   REACTOR_TEST_IMAGE: $LINBIT_DOCKER_REGISTRY/drbd-reactor-e2e:latest
   VIRTER_VERSION: v0.21.0
   VMSHED_VERSION: v0.18.1
+  VMSHED_ARGS: ""
 
 e2e:lint:
   stage: e2e
@@ -40,6 +41,7 @@ e2e:build_reactor:
   needs: []
   rules:
     - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_PIPELINE_SOURCE == 'api'
   variables:
     CARGO_HOME: $CI_PROJECT_DIR/.cargo
   image: $LINBIT_DOCKER_REGISTRY/build-helpers:$BUILD_HELPERS_VERSION
@@ -74,7 +76,7 @@ e2e:docker_image:
   needs: []
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_MERGE_REQUEST_ID || $CI_PIPELINE_SOURCE == 'api'
       changes:
         - e2e-tests/docker/**/*
       variables:
@@ -100,6 +102,7 @@ e2e:test:
       optional: true
   rules:
     - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_PIPELINE_SOURCE == 'api'
   tags:
     - libvirt
   script:
@@ -114,7 +117,7 @@ e2e:test:
     - virter image pull alma-9-drbd-k70 $LINBIT_DOCKER_REGISTRY/vm/drbd9-tests/alma-9-drbd-k70:latest
 
     - cd e2e-tests
-    - ./virter/drbd-reactor-vmshed.sh --out-dir=../tests-out
+    - ./virter/drbd-reactor-vmshed.sh --out-dir=../tests-out $VMSHED_ARGS
   cache:
     key: bin-$VIRTER_VERSION-$VMSHED_VERSION
     paths:
