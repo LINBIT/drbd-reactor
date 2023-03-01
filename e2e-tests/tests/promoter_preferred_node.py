@@ -1,5 +1,3 @@
-import time
-
 from common import drbd_config
 from common import dummy_service
 from common import reactortest
@@ -27,22 +25,7 @@ def test(cluster: reactortest.Cluster) -> None:
                         )})])
     reactortest.deploy_reactor(config, 'drbd-res.toml', cluster.nodes)
 
-    for _ in range(20):
-        started_nodes = []
-        for node in cluster.nodes:
-            if reactortest.dummy_service_started(node, device):
-                started_nodes.append(node)
-
-        match started_nodes:
-            case []:
-                time.sleep(0.5)
-            case [node]:
-                if node == preferred_node:
-                    reactortest.log(f'service started on preferred node: {preferred_node}')
-                    break
-                else:
-                    raise AssertionError(f'service started on unpreferred node: {node}')
-            case _:
-                raise AssertionError('service started on multiple nodes')
-    else:
-        raise AssertionError('service did not start on any node')
+    reactortest.poll_nodes(nodes=cluster.nodes,
+            condition=lambda node: reactortest.dummy_service_started(node, device),
+            description='service started',
+            expected_node=preferred_node)

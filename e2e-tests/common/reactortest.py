@@ -1,10 +1,11 @@
+import time
 from collections.abc import Iterable, Mapping, Sequence
 from io import StringIO
 import pipes
 import socket
 from subprocess import CalledProcessError
 import sys
-from typing import cast, TextIO
+from typing import cast, Callable, TextIO
 
 from lbpytest.controlmaster import SSH
 
@@ -178,3 +179,31 @@ def prometheus_endpoint_scrape(node: Node, prometheus_address) -> str:
     prometheus_output = node.run(['curl', '-fsS', prometheus_address],
             return_stdout=True, catch=True)
     return cast(str, prometheus_output)
+
+
+def poll_nodes(nodes: Sequence[Node],
+        condition: Callable[[Node], bool],
+        description: str,
+        expected_node: Node | None = None):
+    for _ in range(20):
+        matched_nodes = []
+        for node in nodes:
+            if condition(node):
+                matched_nodes.append(node)
+
+        match matched_nodes:
+            case []:
+                time.sleep(0.5)
+            case [node]:
+                if expected_node is None:
+                    log(f'{description} on node: {node}')
+                    break
+                elif node == expected_node:
+                    log(f'{description} on expected node: {node}')
+                    break
+                else:
+                    raise AssertionError(f'{description} on unexpected node: {node}')
+            case _:
+                raise AssertionError(f'{description} on multiple nodes')
+    else:
+        raise AssertionError(f'"{description}" did not occur on any node')

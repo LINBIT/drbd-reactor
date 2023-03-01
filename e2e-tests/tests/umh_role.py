@@ -1,5 +1,3 @@
-import time
-
 from common import drbd_config
 from common import dummy_service
 from common import reactortest
@@ -31,22 +29,7 @@ def test(cluster: reactortest.Cluster) -> None:
     primary_node.run(['drbdadm', 'wait-connect', 'res'])
     primary_node.run(['drbdadm', 'primary', 'res'])
 
-    for _ in range(20):
-        command_ran_nodes = []
-        for node in cluster.nodes:
-            if reactortest.dummy_service_started(node, device):
-                command_ran_nodes.append(node)
-
-        match command_ran_nodes:
-            case []:
-                time.sleep(0.5)
-            case [node]:
-                if node == primary_node:
-                    reactortest.log(f'command ran on {primary_node}')
-                    break
-                else:
-                    raise AssertionError(f'command ran on unexpected node {node}')
-            case _:
-                raise AssertionError('command ran on multiple nodes')
-    else:
-        raise AssertionError('command did not run on any node')
+    reactortest.poll_nodes(nodes=cluster.nodes,
+            condition=lambda node: reactortest.dummy_service_started(node, device),
+            description='command ran',
+            expected_node=primary_node)
