@@ -11,6 +11,7 @@ use anyhow::Result;
 use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 
+use crate::drbd;
 use crate::drbd::{ConnectionState, DiskState, EventType, PluginUpdate, Resource, Role};
 
 pub struct Prometheus {
@@ -117,20 +118,24 @@ fn handle_connection(mut stream: TcpStream, metrics: &Arc<Mutex<Metrics>>) -> Re
     Ok(())
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct Metrics {
     resources: HashMap<String, Resource>,
     dirty: bool,
     cache: String,
     enums: bool,
+    drbd_version: drbd::DRBDVersion,
 }
 
 impl Metrics {
     fn new(enums: bool) -> Self {
+        let drbd_version = drbd::get_drbd_versions().unwrap_or_default();
+
         Self {
             resources: HashMap::new(),
             enums,
             dirty: true,
+            drbd_version,
             ..Default::default()
         }
     }
@@ -157,6 +162,17 @@ impl Metrics {
             &mut metrics,
         );
         write!(m, "{} 1\n", k)?;
+
+        let (k, m) = type_gauge(
+            "drbd_version",
+            "Version of the loaded DRBD kernel module and DRBD utils",
+            &mut metrics,
+        );
+        write!(
+            m,
+            "{}{{kmod=\"{}\",utils=\"{}\"}} 1\n",
+            k, self.drbd_version.kmod, self.drbd_version.utils
+        )?;
 
         let (k, m) = type_gauge(
             "drbd_resource_resources",

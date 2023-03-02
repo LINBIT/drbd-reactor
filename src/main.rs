@@ -1,17 +1,16 @@
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
-use std::process::Command;
 use std::time::Duration;
 use std::{io, sync, thread};
 
 use anyhow::{Context, Result};
 use fern;
 use log::{debug, error, warn};
-use regex::Regex;
 use signal_hook::iterator::Signals;
 use structopt::StructOpt;
 
+use drbd_reactor::drbd;
 use drbd_reactor::drbd::{EventType, EventUpdate, PluginUpdate, Resource};
 use drbd_reactor::events::events2;
 use drbd_reactor::{config, plugin};
@@ -253,99 +252,41 @@ fn get_config() -> Result<config::Config> {
 }
 
 fn min_drbd_versions() -> Result<()> {
-    let version = Command::new("drbdadm")
-        .arg("--version")
-        .output()
-        .with_context(|| "running drbdadm --version")?;
-    if !version.status.success() {
-        return Err(anyhow::anyhow!(
-            "'drbdadm --version' not executed successfully, stdout: '{}', stderr: '{}'",
-            String::from_utf8(version.stdout).unwrap_or("<Could not convert stdout>".to_string()),
-            String::from_utf8(version.stderr).unwrap_or("<Could not convert stderr>".to_string())
-        ));
-    }
+    let drbd_versions = drbd::get_drbd_versions()?;
 
     // check utils
     // secondary --force
-    let pattern = Regex::new(r"^DRBDADM_VERSION_CODE=0x([[:xdigit:]]+)$")?;
-    let (major, minor, patch) = split_version(pattern, version.stdout.clone())?;
-    if let Err(e) = min_version((major, minor, patch), (9, 21, 2)) {
+    let want = drbd::Version {
+        major: 9,
+        minor: 21,
+        patch: 2,
+    };
+    if drbd_versions.utils < want {
         return Err(anyhow::anyhow!(
-            "drbdsetup minimum version ('9.21.2') not fulfilled: {}",
-            e
+            "drbdsetup minimum version ('{}') not fulfilled by '{}'",
+            want,
+            drbd_versions.utils
         ));
     }
 
     // minimal kernel module version
     // secondary --force
-    let pattern = Regex::new(r"^DRBD_KERNEL_VERSION_CODE=0x([[:xdigit:]]+)$")?;
-    let (major, minor, patch) = split_version(pattern, version.stdout)?;
-    if major == 0 && minor == 0 && patch == 0 {
+    let kmod = drbd_versions.kmod;
+    if kmod.major == 0 && kmod.minor == 0 && kmod.patch == 0 {
         return Err(anyhow::anyhow!(
             "Looks like the DRBD kernel module is not installed or not loaded"
         ));
     }
-    if let Err(e) = min_version((major, minor, patch), (9, 1, 7)) {
+    let want = drbd::Version {
+        major: 9,
+        minor: 1,
+        patch: 7,
+    };
+    if kmod < want {
         return Err(anyhow::anyhow!(
-            "DRBD kernel module minimum version ('9.1.7') not fulfilled: {}",
-            e
-        ));
-    }
-
-    Ok(())
-}
-
-fn split_version(pattern: regex::Regex, stdout: Vec<u8>) -> Result<(u8, u8, u8)> {
-    let version = String::from_utf8(stdout)?;
-    let version = version
-        .lines()
-        .filter_map(|line| pattern.captures(line))
-        .next()
-        .ok_or(anyhow::anyhow!(
-            "Could not determine version from pattern '{}'",
-            pattern
-        ))?;
-
-    let version = u32::from_str_radix(&version[1], 16)?;
-
-    let major = ((version >> 16) & 0xff) as u8;
-    let minor = ((version >> 8) & 0xff) as u8;
-    let patch = (version & 0xff) as u8;
-
-    Ok((major, minor, patch))
-}
-
-fn min_version(have: (u8, u8, u8), want: (u8, u8, u8)) -> Result<()> {
-    if have.0 > want.0 {
-        return Ok(());
-    }
-    if have.0 < want.0 {
-        return Err(anyhow::anyhow!(
-            "Major version too small {} vs. {}",
-            have.0,
-            want.0
-        ));
-    }
-
-    if have.1 > want.1 {
-        return Ok(());
-    }
-    if have.1 < want.1 {
-        return Err(anyhow::anyhow!(
-            "Minor version too small {} vs. {}",
-            have.1,
-            want.1
-        ));
-    }
-
-    if have.2 > want.2 {
-        return Ok(());
-    }
-    if have.2 < want.2 {
-        return Err(anyhow::anyhow!(
-            "Patch version too small {} vs. {}",
-            have.2,
-            want.2
+            "DRBD kernel module minimum version ('{}') not fulfilled by '{}'",
+            want,
+            kmod
         ));
     }
 

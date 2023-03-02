@@ -1,9 +1,12 @@
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{Error, ErrorKind};
+use std::process::Command;
 use std::slice::Iter;
 use std::str::FromStr;
+
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 common_matchable![Vec<Connection>, Vec<Device>];
 make_matchable![
@@ -1198,4 +1201,69 @@ impl FromStr for EventType {
             _ => Err(Error::new(ErrorKind::InvalidData, "unknown event")),
         }
     }
+}
+
+#[derive(PartialOrd, PartialEq, Default)]
+pub struct Version {
+    pub major: u8,
+    pub minor: u8,
+    pub patch: u8,
+}
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+#[derive(Default)]
+pub struct DRBDVersion {
+    pub kmod: Version,
+    pub utils: Version,
+}
+
+pub fn get_drbd_versions() -> anyhow::Result<DRBDVersion> {
+    let version = match Command::new("drbdadm").arg("--version").output() {
+        Ok(x) => x,
+        Err(e) => return Err(anyhow::anyhow!("failed running drbdadm --version: {}", e)),
+    };
+
+    if !version.status.success() {
+        return Err(anyhow::anyhow!(
+            "'drbdadm --version' not executed successfully, stdout: '{}', stderr: '{}'",
+            String::from_utf8(version.stdout).unwrap_or("<Could not convert stdout>".to_string()),
+            String::from_utf8(version.stderr).unwrap_or("<Could not convert stderr>".to_string())
+        ));
+    }
+
+    let pattern = Regex::new(r"^DRBDADM_VERSION_CODE=0x([[:xdigit:]]+)$")?;
+    let utils = split_version(pattern, version.stdout.clone())?;
+
+    let pattern = Regex::new(r"^DRBD_KERNEL_VERSION_CODE=0x([[:xdigit:]]+)$")?;
+    let kmod = split_version(pattern, version.stdout)?;
+
+    Ok(DRBDVersion { kmod, utils })
+}
+
+fn split_version(pattern: regex::Regex, stdout: Vec<u8>) -> anyhow::Result<Version> {
+    let version = String::from_utf8(stdout)?;
+    let version = version
+        .lines()
+        .filter_map(|line| pattern.captures(line))
+        .next()
+        .ok_or(anyhow::anyhow!(
+            "Could not determine version from pattern '{}'",
+            pattern
+        ))?;
+
+    let version = u32::from_str_radix(&version[1], 16)?;
+
+    let major = ((version >> 16) & 0xff) as u8;
+    let minor = ((version >> 8) & 0xff) as u8;
+    let patch = (version & 0xff) as u8;
+
+    Ok(Version {
+        major,
+        minor,
+        patch,
+    })
 }
