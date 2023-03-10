@@ -1,3 +1,10 @@
+drbd-reactor (1.0.1-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * promoter,ocf: fix env for old systemd
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 10 Mar 2023 13:19:39 +0100
+
 drbd-reactor (1.0.0-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
