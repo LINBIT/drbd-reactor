@@ -96,7 +96,7 @@ pub fn escaped_ocf_parse_to_env(
     for item in &args[1..] {
         let mut split = item.splitn(2, "=");
         let add = match (split.next(), split.next()) {
-            (Some(k), Some(v)) => format!("OCF_RESKEY_{}={}", k, shell_words::quote(v)),
+            (Some(k), Some(v)) => format!("OCF_RESKEY_{}={}", k, escape_env(v)),
             (Some(k), None) => format!("OCF_RESKEY_{}=", k),
             _ => continue, // skip empty items
         };
@@ -105,7 +105,8 @@ pub fn escaped_ocf_parse_to_env(
 
     env.push(format!(
         "AGENT=/usr/lib/ocf/resource.d/{}/{}",
-        vendor, agent
+        escape_env(vendor),
+        escape_env(agent)
     ));
 
     Ok((service_name, env))
@@ -142,13 +143,33 @@ fn escape_byte(b: u8, index: usize) -> String {
     }
 }
 
+// this is a relaxed version of escape_{name,byte}, for example we don't want '/' to be replaced
+// this can be optimized to really just escape what is strictly needed, but IMO fine as is
+fn escape_env(name: &str) -> String {
+    if name.is_empty() {
+        return "".to_string();
+    }
+
+    let parts: Vec<String> = name
+        .bytes()
+        .map(|b| {
+            let c = char::from(b);
+            match c {
+                '.' | '/' | ':' | '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => c.to_string(),
+                _ => format!(r#"\x{:02x}"#, b),
+            }
+        })
+        .collect();
+    parts.join("")
+}
+
 #[test]
 fn test_ocf_parse_to_env() {
     let (name, env) = escaped_ocf_parse_to_env(
         "res1",
         "vendor1",
         "agent1",
-        "name1\nk1=v1 \nk2=\"with whitespace\" k3=with\\ different\\ whitespace foo empty=''",
+        "name1\nk1=v1 \nk2=\"with whitespace\" k3=with\\ different\\ whitespace foo empty='' pass='*pass/'",
     )
     .expect("should work");
 
@@ -157,10 +178,11 @@ fn test_ocf_parse_to_env() {
         &env[..],
         &[
             "OCF_RESKEY_k1=v1",
-            "OCF_RESKEY_k2='with whitespace'",
-            "OCF_RESKEY_k3='with different whitespace'",
+            "OCF_RESKEY_k2=with\\x20whitespace",
+            "OCF_RESKEY_k3=with\\x20different\\x20whitespace",
             "OCF_RESKEY_foo=",
-            "OCF_RESKEY_empty=''",
+            "OCF_RESKEY_empty=",
+            "OCF_RESKEY_pass=\\x2apass/",
             "AGENT=/usr/lib/ocf/resource.d/vendor1/agent1"
         ]
     );
