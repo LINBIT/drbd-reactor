@@ -1,3 +1,39 @@
+drbd-reactor (1.1.0~rc.1-1) experimental; urgency=medium
+
+  [ Joel Colledge ]
+  * e2e: add initial end-to-end test infrastructure
+  * e2e: provide a clear error when an empty test name is given
+  * e2e,virter: add provisioning file for tests
+  * e2e,docker: add initial container configuration for test suite
+  * e2e,virter: add initial Virter provisioning file for running tests
+  * e2e,virter: add configuration and a wrapper script for running vmshed
+  * e2e,virter: add getting started guide
+  * ci: add explicit stage to existing jobs
+  * ci: add job to build for e2e tests
+  * ci: add job to build docker image for e2e tests
+  * ci: add job to run end-to-end tests
+  * ci: add e2e tests lint job
+  * e2e: shorten names ReactorPromoter -> Promoter etc.
+  * e2e: add initial test for the User Mode Helper Plug-in
+  * ci: add job to check e2e test typing
+  * ci: allow pipeline to be started from the API
+  * e2e: factor polling for a condition out into a function
+  * e2e,promoter_preferred_node: make test more reliable
+  * Revert "e2e: disable promoter_preferred_node"
+
+  [ Roland Kammerer ]
+  * ci: disable for ordinary remote branches
+  * e2e: disable promoter_preferred_node
+  * prometheus: expose drbd_version
+  * promoter,ocf: fix env for old systemd
+  * ctl: add context
+
+  [ Matt Kereczman ]
+  * e2e: add preferred node to promoter tests
+  * e2e: add prometheus test
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Thu, 16 Mar 2023 10:29:43 +0100
+
 drbd-reactor (1.0.0-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
