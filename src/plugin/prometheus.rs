@@ -7,7 +7,7 @@ use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 
@@ -16,42 +16,66 @@ use crate::drbd::{ConnectionState, DiskState, EventType, PluginUpdate, Resource,
 
 pub struct Prometheus {
     cfg: PrometheusConfig,
+    listener: TcpListener,
+    thread_handle: Option<thread::JoinHandle<Result<()>>>,
+    metrics: Arc<Mutex<Metrics>>,
 }
 
 impl Prometheus {
     pub fn new(cfg: PrometheusConfig) -> Result<Self> {
-        Ok(Self { cfg })
+        let metrics = Arc::new(Mutex::new(Metrics::new(cfg.enums)));
+
+        debug!("new: listening for connections on address {}", cfg.address);
+        let listener = TcpListener::bind(&cfg.address)
+            .context(format!("Failed to bind to {}", cfg.address))?;
+
+        debug!("new: starting tcp listener");
+        let thread_handle = {
+            let listener_clone = listener.try_clone().context("failed to clone socket")?;
+            let metrics_clone = metrics.clone();
+            thread::spawn(move || tcp_handler(listener_clone, &metrics_clone))
+        };
+
+        Ok(Prometheus {
+            cfg,
+            listener,
+            metrics,
+            thread_handle: Some(thread_handle),
+        })
+    }
+}
+
+impl Drop for Prometheus {
+    fn drop(&mut self) {
+        unsafe {
+            // This is safe: self.listener is a separate FD from the one used by the HTTP handler.
+            // This means there is no chance for the FD to be already closed.
+            libc::shutdown(self.listener.as_raw_fd(), libc::SHUT_RD);
+        }
+
+        if let Some(handle) = self.thread_handle.take() {
+            trace!("drop: wait for server thread to shut down");
+            let res = handle.join();
+            trace!("drop: server thread shut down {:?}", res);
+        }
     }
 }
 
 impl super::Plugin for Prometheus {
     fn run(&self, rx: super::PluginReceiver) -> Result<()> {
         trace!("run: start");
-
-        let metrics = Arc::new(Mutex::new(Metrics::new(self.cfg.enums)));
-
-        let listener = TcpListener::bind(&self.cfg.address)?;
-        debug!(
-            "run: listening for connections on address {}",
-            self.cfg.address
-        );
-        let fd = listener.as_raw_fd();
-
-        let handler_metrics = Arc::clone(&metrics);
-        let handle = thread::spawn(move || tcp_handler(listener, &handler_metrics));
-
         for r in rx {
             match r.as_ref() {
                 PluginUpdate::ResourceOnly(EventType::Exists, u)
                 | PluginUpdate::ResourceOnly(EventType::Create, u)
-                | PluginUpdate::ResourceOnly(EventType::Change, u) => match metrics.lock() {
+                | PluginUpdate::ResourceOnly(EventType::Change, u) => match self.metrics.lock() {
                     Ok(mut m) => m.update(&u),
                     Err(e) => {
                         error!("run: could not lock metrics: {}", e);
                         return Err(anyhow::anyhow!("Tried accessing a poisoned lock"));
                     }
                 },
-                PluginUpdate::ResourceOnly(EventType::Destroy, u) => match metrics.lock() {
+                PluginUpdate::ResourceOnly(EventType::Destroy, u) => match self.metrics.lock() {
                     Ok(mut m) => m.delete(&u.name),
                     Err(e) => {
                         error!("run: could not lock metrics: {}", e);
@@ -61,15 +85,7 @@ impl super::Plugin for Prometheus {
                 _ => (),
             }
         }
-        unsafe {
-            // very unlikely, but has the potential to shutdown the wrong fd (e.g., got reused)
-            // but as good as it gets.
-            libc::shutdown(fd, libc::SHUT_RD);
-        }
 
-        handle
-            .join()
-            .unwrap_or(Err(anyhow::anyhow!("prometheus::run tcp handler panicked")))?;
         trace!("run: exit");
 
         Ok(())
@@ -82,19 +98,14 @@ impl super::Plugin for Prometheus {
 
 fn tcp_handler(listener: TcpListener, metrics: &Arc<Mutex<Metrics>>) -> Result<()> {
     for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                if let Err(e) = handle_connection(stream, metrics) {
-                    // warn but continue processing
-                    warn!("tcp_handler: could not handle connection: {}", e);
-                }
-            }
-            Err(_) => {
-                info!("tcp_handler: error in stream, most likely harmless shutdown");
-                break;
-            }
+        let stream = stream.context("closed socket")?;
+
+        if let Err(e) = handle_connection(stream, metrics) {
+            // warn but continue processing
+            warn!("tcp_handler: could not handle connection: {}", e);
         }
     }
+
     Ok(())
 }
 
@@ -263,8 +274,8 @@ impl Metrics {
 
                 for pd in &c.peerdevices {
                     let (k, m) = type_gauge("drbd_peerdevice_outofsync_bytes",
-                        "Number of bytes currently out of sync with this peer, according to the bitmap that DRBD has for it",
-                        &mut metrics);
+                                            "Number of bytes currently out of sync with this peer, according to the bitmap that DRBD has for it",
+                                            &mut metrics);
                     write!(
                         m,
                         "{}{{{},volume=\"{}\"}} {}\n",
@@ -276,8 +287,8 @@ impl Metrics {
                 }
 
                 let (k, m) = type_gauge("drbd_connection_congested",
-                    "Boolean whether the TCP send buffer of the data connection is more than 80% filled",
-                    &mut metrics
+                                        "Boolean whether the TCP send buffer of the data connection is more than 80% filled",
+                                        &mut metrics,
                 );
                 write!(m, "{}{{{}}} {}\n", k, common, c.congested as i32)?;
 
@@ -459,6 +470,7 @@ pub struct PrometheusConfig {
     pub enums: bool,
     pub id: Option<String>,
 }
+
 fn default_address() -> String {
     "[::]:9942".to_string()
 }

@@ -182,7 +182,7 @@ pub fn start_from_config(
             match debugger::Debugger::new(debug_cfg) {
                 Ok(p) => change_plugins.push(Box::new(p)),
                 Err(e) => error!(
-                    "start_from_config: Could not start debugger plugin, ignoring it: {}",
+                    "start_from_config: Could not start debugger plugin, ignoring it: {:#}",
                     e
                 ),
             };
@@ -193,7 +193,7 @@ pub fn start_from_config(
             match promoter::Promoter::new(promote_cfg) {
                 Ok(p) => change_plugins.push(Box::new(p)),
                 Err(e) => error!(
-                    "start_from_config: Could not start promoter plugin, ignoring it: {}",
+                    "start_from_config: Could not start promoter plugin, ignoring it: {:#}",
                     e
                 ),
             };
@@ -204,7 +204,7 @@ pub fn start_from_config(
             match umh::UMH::new(umh_cfg) {
                 Ok(p) => change_plugins.push(Box::new(p)),
                 Err(e) => error!(
-                    "start_from_config: Could not start umh plugin, ignoring it: {}",
+                    "start_from_config: Could not start umh plugin, ignoring it: {:#}",
                     e
                 ),
             };
@@ -217,7 +217,7 @@ pub fn start_from_config(
             match prometheus::Prometheus::new(prometheus_cfg) {
                 Ok(p) => event_plugins.push(Box::new(p)),
                 Err(e) => error!(
-                    "start_from_config: Could not start prometheus plugin, ignoring it: {}",
+                    "start_from_config: Could not start prometheus plugin, ignoring it: {:#}",
                     e
                 ),
             };
