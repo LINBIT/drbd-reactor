@@ -38,8 +38,10 @@ install -D -m644 %{_builddir}/%{name}-%{tarball_version}/example/ctl.completion.
 %files
 # %{_unitdir}/drbd-reactor.service
 /lib/systemd/system/drbd-reactor.service
+/lib/systemd/system/ocf.rs@.service
 /usr/sbin/drbd-reactor
 /usr/sbin/drbd-reactorctl
+/usr/libexec/drbd-reactor/ocf-rs-wrapper
 %{_datadir}/bash-completion/completions/drbd-reactorctl
 %{_mandir}/man1/drbd-reactor.1*
 %{_mandir}/man1/drbd-reactorctl.1*

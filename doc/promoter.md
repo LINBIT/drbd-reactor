@@ -59,7 +59,7 @@ in [its own section](promoter.md#freezing-resources).
 
 The plugin's configuration can contain an action that is executed if a stop action fails (e.g., triggering a
 reboot). Start actions in `start` are interpreted as systemd units and have to have an according postfix (i.e.
-`.service`, `.mount`,...). `ocf` resource agents are supported via the `ocf.ra@` service, see
+`.service`, `.mount`,...). `ocf` resource agents are supported via the `ocf.rs@` service, see
 [this section](promoter.md#ocf-resource-agents) for details.
 
 The configuration can contain a setting that specifies that resources are stopped whenever the plugin exits
@@ -91,7 +91,7 @@ It is really up to you and how strict/hard you want your dependencies and what t
 It is possible to use [resource agents](https://github.com/ClusterLabs/resource-agents) in the `start` list of
 services via `ocf:$vendor:$agent instance-id name=value ...`. The `instance-id` is user defined and gets
 postfixed with `_$resourcename`. For example the generated systemd unit for an `instance-id` of
-"p_iscsi_demo1" for a DRBD resource "foo" would be `ocf.ra@p_iscsi_demo1_foo`. `name`/`value` pairs are passed
+"p_iscsi_demo1" for a DRBD resource "foo" would be `ocf.rs@p_iscsi_demo1_foo`. `name`/`value` pairs are passed
 to the unit as environment variables prefixed with `OCF_RESKEY_`.
 
 In a concrete example using the "heartbeat:IPaddr2" agent this could look like this:
@@ -210,14 +210,14 @@ The peers will see replication links go down, the resource becomes promotable. S
 
 ## Service failure
 
-If service failure is detected by the service itself, by a monitoring loop in the `ocf.ra` wrapper service, or
+If service failure is detected by the service itself, by a monitoring loop in the `ocf.rs` wrapper service, or
 by systemd, the `drbd-services@.target` instance will be stopped by systemd, resulting in a "promotable"
 resource again.
 
 It is very important to know that the promoter plugin does not do any service monitoring at all! So in order
 to make `drbd-services@.target` restart (i.e., stop and start), one needs to make sure a service failure
-gets propagated to `drbd-services@.target`. The `ocf.ra` service does that by setting `Restart=always`.
-If in your configuration `ocf.ra` is not used, then it is up to you to make sure a service failure is propaged
+gets propagated to `drbd-services@.target`. The `ocf.rs` service does that by setting `Restart=always`.
+If in your configuration `ocf.rs` is not used, then it is up to you to make sure a service failure is propaged
 to the target. This can for example be done setting `Restart=always` in your service (e.g., via a systemd
 override).
 

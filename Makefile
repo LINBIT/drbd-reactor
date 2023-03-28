@@ -67,9 +67,11 @@ tabcompletion: ## Build tab completions
 install:  # install binary and config
 	install -D -m 0750 target/$(TARGET)/$(PROG) $(DESTDIR)/usr/sbin/$(PROG)
 	install -D -m 0750 target/$(TARGET)/$(PROG)ctl $(DESTDIR)/usr/sbin/$(PROG)ctl
+	install -D -m 0750 target/$(TARGET)/ocf-rs-wrapper $(DESTDIR)/usr/libexec/drbd-reactor/ocf-rs-wrapper
 	install -D -m 0640 example/drbd-reactor.toml $(DESTDIR)/etc/drbd-reactor.toml
 	install -d -m 0750 $(DESTDIR)/etc/drbd-reactor.d
 	install -D -m 0644 example/drbd-reactor.service $(DESTDIR)/lib/systemd/system/drbd-reactor.service
+	install -D -m 0644 example/ocf.rs@.service $(DESTDIR)/lib/systemd/system/ocf.rs@.service
 	for f in $(MANPAGES); do \
 		sect=$$(echo $$f | sed -e 's/.*\.\([0-9]\)$$/\1/'); \
 		install -D -m 0644 $$f $(DESTDIR)/usr/share/man/man$${sect}/$$(basename $$f); \

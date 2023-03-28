@@ -91,7 +91,7 @@ pub fn escaped_ocf_parse_to_env(
     let ra_name = &args[0];
     let ra_name = format!("{}_{}", ra_name, name);
     let escaped_ra_name = escape_name(&ra_name);
-    let service_name = format!("ocf.ra@{}.service", escaped_ra_name);
+    let service_name = format!("ocf.rs@{}.service", escaped_ra_name);
     let mut env = Vec::with_capacity(args.len() - 1);
     for item in &args[1..] {
         let mut split = item.splitn(2, "=");
@@ -173,7 +173,7 @@ fn test_ocf_parse_to_env() {
     )
     .expect("should work");
 
-    assert_eq!(name, "ocf.ra@name1_res1.service");
+    assert_eq!(name, "ocf.rs@name1_res1.service");
     assert_eq!(
         &env[..],
         &[
@@ -191,5 +191,5 @@ fn test_ocf_parse_to_env() {
     let (name, _env) = escaped_ocf_parse_to_env("res-1", "vendor1", "agent1", "name-1 do not care")
         .expect("should work");
 
-    assert_eq!(name, "ocf.ra@name\\x2d1_res\\x2d1.service");
+    assert_eq!(name, "ocf.rs@name\\x2d1_res\\x2d1.service");
 }
