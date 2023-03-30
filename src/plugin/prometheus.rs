@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use anyhow::{Context, Result};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, trace, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::drbd;
