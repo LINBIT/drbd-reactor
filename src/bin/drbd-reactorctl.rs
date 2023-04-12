@@ -721,8 +721,13 @@ fn evict_unmask_and_start(drbd_resources: &Vec<String>) -> Result<()> {
         // old (at least RHEL8) systemctl allows you to mask --runtime, but does not allow unmask --runtime
         // we know that we created the thing via mask
         let path = "/run/systemd/system/".to_owned() + &target;
-        fs::remove_file(Path::new(&path))?;
-        println!("Removed {}.", path); // like systemctl unmaks would print it
+        match fs::remove_file(Path::new(&path)) {
+            Ok(()) => (),
+            Err(e) if e.kind() == ErrorKind::NotFound => (), // Target was never masked to begin with
+            Err(e) => Err(e)?,
+        };
+
+        println!("Removed {}.", path); // like systemctl unmask would print it
         systemctl(vec!["daemon-reload".into()])?;
 
         // fails intentional if Primary on other node
