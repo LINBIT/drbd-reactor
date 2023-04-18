@@ -1,7 +1,7 @@
 use anyhow::Result;
 use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::process::{Command, Stdio};
 use std::thread;
 
@@ -12,23 +12,25 @@ use crate::drbd::{
     ResourceUpdateStatePattern,
 };
 use crate::matchable::{BasicPattern, PartialMatchable};
+use crate::plugin::PluginCfg;
 
 pub struct UMH {
     resource_rules: Vec<(CommonRule, Option<ResourcePluginUpdatePattern>)>,
     device_rules: Vec<(CommonRule, Option<DevicePluginUpdatePattern>)>,
     peer_device_rules: Vec<(CommonRule, Option<PeerDevicePluginUpdatePattern>)>,
     connection_rules: Vec<(CommonRule, Option<ConnectionPluginUpdatePattern>)>,
-    id: Option<String>,
+    cfg: UMHConfig,
 }
 
 impl UMH {
     pub fn new(cfg: UMHConfig) -> Result<Self> {
+        let cfg_clone = cfg.clone();
         Ok(Self {
             resource_rules: cfg.resource.into_iter().map(Into::into).collect(),
             device_rules: cfg.device.into_iter().map(Into::into).collect(),
             peer_device_rules: cfg.peerdevice.into_iter().map(Into::into).collect(),
             connection_rules: cfg.connection.into_iter().map(Into::into).collect(),
-            id: cfg.id,
+            cfg: cfg_clone,
         })
     }
 }
@@ -56,8 +58,8 @@ impl super::Plugin for UMH {
         Ok(())
     }
 
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
+    fn get_config(&self) -> PluginCfg {
+        PluginCfg::UMH(self.cfg.clone())
     }
 }
 
@@ -80,7 +82,7 @@ where
 fn spawn_command(
     cmd: &str,
     filter_env: &HashMap<String, String>,
-    user_env: &HashMap<String, String>,
+    user_env: &BTreeMap<String, String>,
 ) {
     debug!("spawn_command: starting handler '{}'", cmd);
 
@@ -131,7 +133,7 @@ fn common_env() -> impl Iterator<Item = (&'static str, &'static str)> {
     .map(ToOwned::to_owned)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Default)]
 #[serde(default)]
 pub struct UMHConfig {
     resource: Vec<ResourceRule>,
@@ -141,16 +143,16 @@ pub struct UMHConfig {
     pub id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
 struct CommonRule {
     command: String,
     #[serde(default)]
     name: String,
     #[serde(default)]
-    env: HashMap<String, String>,
+    env: BTreeMap<String, String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 struct DeviceRule {
     #[serde(flatten)]
@@ -179,7 +181,7 @@ impl Into<(CommonRule, Option<DevicePluginUpdatePattern>)> for DeviceRule {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ResourceRule {
     #[serde(flatten)]
@@ -206,7 +208,7 @@ impl Into<(CommonRule, Option<ResourcePluginUpdatePattern>)> for ResourceRule {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct PeerDeviceRule {
     #[serde(flatten)]
@@ -237,7 +239,7 @@ impl Into<(CommonRule, Option<PeerDevicePluginUpdatePattern>)> for PeerDeviceRul
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ConnectionRule {
     #[serde(flatten)]

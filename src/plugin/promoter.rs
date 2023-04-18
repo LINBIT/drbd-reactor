@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::ffi::CStr;
 use std::fmt;
 use std::fs;
@@ -21,6 +21,7 @@ use tinytemplate::TinyTemplate;
 
 use crate::drbd::{DiskState, EventType, PluginUpdate, Resource, Role};
 use crate::plugin;
+use crate::plugin::PluginCfg;
 use crate::systemd;
 
 pub struct Promoter {
@@ -143,19 +144,19 @@ impl super::Plugin for Promoter {
         Ok(())
     }
 
-    fn get_id(&self) -> Option<String> {
-        self.cfg.id.clone()
+    fn get_config(&self) -> PluginCfg {
+        PluginCfg::Promoter(self.cfg.clone())
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Default)]
 pub struct PromoterConfig {
     #[serde(default)]
-    pub resources: HashMap<String, PromoterOptResource>,
+    pub resources: BTreeMap<String, PromoterOptResource>,
     pub id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct PromoterOptResource {
     #[serde(default)]
@@ -175,7 +176,7 @@ pub struct PromoterOptResource {
     #[serde(default)]
     pub on_drbd_demote_failure: SystemdFailureAction,
     #[serde(default = "default_promote_sleep")]
-    pub sleep_before_promote_factor: f32,
+    pub sleep_before_promote_factor: u32,
     #[serde(default)]
     pub preferred_nodes: Vec<String>,
     #[serde(default = "default_secondary_force")]
@@ -184,8 +185,8 @@ pub struct PromoterOptResource {
     pub on_quorum_loss: QuorumLossPolicy,
 }
 
-fn default_promote_sleep() -> f32 {
-    1.0
+fn default_promote_sleep() -> u32 {
+    1
 }
 fn default_secondary_force() -> bool {
     true
@@ -784,7 +785,7 @@ enum State {
     Thaw,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
 pub enum SystemdDependency {
     Wants,
     Requires,
@@ -807,7 +808,7 @@ impl fmt::Display for SystemdDependency {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum SystemdFailureAction {
     None,
@@ -847,7 +848,7 @@ struct SystemdSettings {
     failure_action: SystemdFailureAction,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
 pub enum QuorumLossPolicy {
     #[serde(rename = "shutdown")]
     Shutdown,
@@ -860,7 +861,7 @@ impl Default for QuorumLossPolicy {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Eq, Hash, Debug, PartialEq, Clone)]
 pub enum Runner {
     #[serde(rename = "systemd")]
     Systemd,
@@ -877,9 +878,9 @@ fn get_sleep_before_promote_ms(
     resource: &Resource,
     preferred_nodes: &[String],
     on_quorum_loss: &QuorumLossPolicy,
-    factor: f32,
+    factor: u32,
 ) -> u64 {
-    let mut max_sleep_s: usize = resource
+    let mut max_sleep_s: u64 = resource
         .devices
         .iter()
         .map(|d| match d.disk_state {
@@ -903,8 +904,8 @@ fn get_sleep_before_promote_ms(
     match uname_n() {
         Ok(node_name) => {
             max_sleep_s += match preferred_nodes.iter().position(|n| n == &node_name) {
-                Some(pos) => pos,
-                None => preferred_nodes.len(),
+                Some(pos) => pos as u64,
+                None => preferred_nodes.len() as u64,
             };
         }
         Err(e) => warn!("Could not determine 'uname -n': {}", e),
@@ -920,7 +921,7 @@ fn get_sleep_before_promote_ms(
     }
 
     // convert to ms and scale by factor
-    (max_sleep_s as f32 * 1000.0 * factor).ceil() as u64
+    max_sleep_s * 1000 * (factor as u64)
 }
 
 fn escaped_services_target_dir(name: &str) -> PathBuf {
@@ -1085,18 +1086,18 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Shutdown, 1.0),
+            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Shutdown, 1),
             6000
         );
 
         r.role = Role::Secondary;
         assert_eq!(
-            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Freeze, 1.0),
+            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Freeze, 1),
             6000 + 2000
         );
         assert_eq!(
-            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Shutdown, 0.5),
-            3000
+            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Shutdown, 2),
+            12000
         );
         if let Ok(node_name) = uname_n() {
             assert_eq!(
@@ -1109,7 +1110,7 @@ mod tests {
                         "".to_string()
                     ],
                     &QuorumLossPolicy::Shutdown,
-                    1.0
+                    1
                 ),
                 6000 + 2000
             );
@@ -1118,7 +1119,7 @@ mod tests {
                     &r,
                     &vec!["".to_string(), "".to_string(), "".to_string()],
                     &QuorumLossPolicy::Shutdown,
-                    1.0
+                    1
                 ),
                 6000 + 3000
             );

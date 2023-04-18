@@ -12,7 +12,7 @@ pub trait PartialMatchable {
     fn matches(&self, matcher: &Self::Pattern) -> bool;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Eq, Hash, Debug, Clone, Copy, PartialEq)]
 pub enum BasicPatternOperator {
     Equals,
     NotEquals,
@@ -24,7 +24,7 @@ impl Default for BasicPatternOperator {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Eq, Hash, Debug, Clone, Copy, PartialEq)]
 #[serde(untagged)]
 pub enum BasicPattern<T> {
     WithOperator {

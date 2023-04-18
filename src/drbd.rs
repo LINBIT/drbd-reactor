@@ -116,7 +116,7 @@ pub struct Path {
 }
 
 make_matchable![
-    #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+    #[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
     pub enum Role {
         Unknown,
         Primary,
@@ -161,7 +161,7 @@ impl Default for Role {
 }
 
 make_matchable![
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq)]
     pub enum DiskState {
         Diskless,
         Attaching,
@@ -237,7 +237,7 @@ impl Default for DiskState {
 }
 
 make_matchable![
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq)]
     pub enum ConnectionState {
         StandAlone,
         Disconnecting,
@@ -316,7 +316,7 @@ impl Default for ConnectionState {
 }
 
 make_matchable![
-    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq)]
     pub enum ReplicationState {
         Off,
         Established,
@@ -391,7 +391,7 @@ impl Default for ReplicationState {
 }
 
 make_matchable![
-    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     #[serde(rename_all = "kebab-case")]
     pub struct ResourceUpdateState {
         pub role: Role,
@@ -402,7 +402,7 @@ make_matchable![
 ];
 
 make_matchable![
-    #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     #[serde(rename_all = "kebab-case")]
     pub struct DeviceUpdateState {
         pub disk_state: DiskState,
@@ -414,7 +414,7 @@ make_matchable![
 ];
 
 make_matchable![
-    #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     #[serde(rename_all = "kebab-case")]
     pub struct PeerDeviceUpdateState {
         pub replication_state: ReplicationState,
@@ -426,7 +426,7 @@ make_matchable![
 ];
 
 make_matchable![
-    #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     #[serde(rename_all = "kebab-case")]
     pub struct ConnectionUpdateState {
         pub conn_name: String,
@@ -1180,7 +1180,7 @@ impl Resource {
 }
 
 make_matchable![
-    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub enum EventType {
         Exists,
         Create,

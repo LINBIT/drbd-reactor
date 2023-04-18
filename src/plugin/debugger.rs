@@ -2,6 +2,8 @@ use anyhow::Result;
 use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 
+use crate::plugin::PluginCfg;
+
 pub struct Debugger {
     cfg: DebuggerConfig,
 }
@@ -24,12 +26,12 @@ impl super::Plugin for Debugger {
         Ok(())
     }
 
-    fn get_id(&self) -> Option<String> {
-        self.cfg.id.clone()
+    fn get_config(&self) -> PluginCfg {
+        PluginCfg::Debugger(self.cfg.clone())
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Default)]
 pub struct DebuggerConfig {
     pub id: Option<String>,
 }

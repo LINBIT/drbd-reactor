@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::drbd;
 use crate::drbd::{ConnectionState, DiskState, EventType, PluginUpdate, Resource, Role};
+use crate::plugin::PluginCfg;
 
 pub struct Prometheus {
     cfg: PrometheusConfig,
@@ -91,8 +92,8 @@ impl super::Plugin for Prometheus {
         Ok(())
     }
 
-    fn get_id(&self) -> Option<String> {
-        self.cfg.id.clone()
+    fn get_config(&self) -> PluginCfg {
+        PluginCfg::Prometheus(self.cfg.clone())
     }
 }
 
@@ -462,7 +463,7 @@ fn type_counter<'a>(
     (k, m)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Default)]
 pub struct PrometheusConfig {
     #[serde(default = "default_address")]
     pub address: String,

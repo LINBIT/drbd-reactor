@@ -58,7 +58,7 @@ impl Core {
     fn run(
         &mut self,
         e2rx: &crossbeam_channel::Receiver<EventUpdate>,
-        started: &Vec<plugin::PluginStarted>,
+        started: &HashMap<plugin::PluginCfg, plugin::PluginStarted>,
     ) -> Result<CoreExit> {
         let _send_updates = |up: Option<PluginUpdate>,
                              res: &Resource,
@@ -67,7 +67,7 @@ impl Core {
          -> Result<()> {
             if let Some(up) = up {
                 let up = sync::Arc::new(up);
-                for p in started {
+                for p in started.values() {
                     if !p.new && only_new {
                         continue;
                     }
@@ -78,7 +78,7 @@ impl Core {
             }
             let up = PluginUpdate::ResourceOnly(et.clone(), res.clone());
             let up = sync::Arc::new(up);
-            for p in started {
+            for p in started.values() {
                 if !p.new && only_new {
                     continue;
                 }
@@ -193,7 +193,7 @@ fn main() -> Result<()> {
 
     let mut core = Core::new();
 
-    let mut started = vec![];
+    let mut started = HashMap::new();
     loop {
         match get_config() {
             Ok(new) => cfg = new,
@@ -201,7 +201,7 @@ fn main() -> Result<()> {
         };
         debug!("main: configuration: {:#?}", cfg);
 
-        started = plugin::start_from_config(cfg.plugins.clone(), started)?;
+        plugin::start_from_config(cfg.plugins.clone(), &mut started)?;
         debug!("main: started.len()={}", started.len());
 
         let exit = core
@@ -209,8 +209,8 @@ fn main() -> Result<()> {
             .context("main: core did not exit successfully")?;
 
         if let CoreExit::Stop = exit {
-            for p in started {
-                p.stop()?;
+            for (_, plugin) in started.drain() {
+                plugin.stop()?;
             }
 
             return Ok(());
