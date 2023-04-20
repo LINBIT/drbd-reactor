@@ -33,5 +33,5 @@ impl super::Plugin for Debugger {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Default)]
 pub struct DebuggerConfig {
-    pub id: Option<String>,
+    pub id: Option<String>, // ! deprecated !
 }

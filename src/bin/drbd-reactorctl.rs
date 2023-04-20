@@ -21,7 +21,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use signal_hook::iterator::Signals;
 use tempfile::NamedTempFile;
-use tinytemplate::TinyTemplate;
 
 use drbd_reactor::config;
 use drbd_reactor::drbd;
@@ -327,15 +326,11 @@ fn edit(
         if snippet.exists() {
             fs::copy(snippet, tmpfile.path())?;
         } else {
-            let id = basename_without_ext(snippet)?;
-            let id = id
-                .to_str()
-                .ok_or(anyhow::anyhow!("Could not convert basaname to str"))?;
             let template = match type_opt {
-                "promoter" => generate_template(PROMOTER_TEMPLATE, &id)?,
-                "prometheus" => generate_template(PROMETHEUS_TEMPLATE, &id)?,
-                "umh" => generate_template(UMH_TEMPLATE, &id)?,
-                "debugger" => generate_template(DEBUGGER_TEMPLATE, &id)?,
+                "promoter" => PROMOTER_TEMPLATE,
+                "prometheus" => PROMETHEUS_TEMPLATE,
+                "umh" => UMH_TEMPLATE,
+                "debugger" => DEBUGGER_TEMPLATE,
                 x => return Err(anyhow::anyhow!("Unknown type ('{}') to edit", x)),
             };
             tmpfile.write_all(template.as_bytes())?;
@@ -561,33 +556,6 @@ fn get_enabled_path(snippet_path: &PathBuf) -> Result<PathBuf> {
     }
 }
 
-fn basename_without_ext(snippet_path: &PathBuf) -> Result<PathBuf> {
-    // in this case it is a bit more comfortable to handle that as string
-    let file_name = snippet_path
-        .file_name()
-        .ok_or(anyhow::anyhow!(
-            "Could not get file name from '{:?}",
-            snippet_path.display()
-        ))?
-        .to_str()
-        .ok_or(anyhow::anyhow!(
-            "Could not convert file name '{:?}' to str",
-            snippet_path.display()
-        ))?;
-
-    if file_name.ends_with(".toml") {
-        Ok(PathBuf::from(file_name).with_extension(""))
-    } else if file_name.ends_with(".toml.disabled") {
-        Ok(PathBuf::from(file_name)
-            .with_extension("")
-            .with_extension(""))
-    } else {
-        Err(anyhow::anyhow!(
-            "Not one of the expected extensions ('.toml' or '.toml.disabled')"
-        ))
-    }
-}
-
 fn has_autoload() -> Result<bool> {
     let status = Command::new("systemctl")
         .arg("is-active")
@@ -617,7 +585,6 @@ fn status(
         let plugins = conf.plugins;
         let me = promoter::uname_n()?;
         for promoter in plugins.promoter {
-            print_promoter_id(&promoter);
             for (drbd_res, config) in promoter.resources {
                 // check if in filter
                 if !resources.is_empty() && !resources.contains(&drbd_res) {
@@ -630,7 +597,7 @@ fn status(
                 } else {
                     format!("node '{}'", primary)
                 };
-                println!("Currently active on {}", primary);
+                println!("Promoter: Currently active on {}", primary);
                 // target itself and the implicit one
                 let promote_service = promote_service(&drbd_res);
                 if verbose {
@@ -666,8 +633,10 @@ fn status(
             }
         }
         for prometheus in plugins.prometheus {
-            print_prometheus_id(&prometheus);
-            green(&format!("listening on {}", prometheus.address));
+            println!(
+                "Prometheus: listening on {}",
+                prometheus.address.bold().green()
+            );
             if verbose {
                 let addr: SocketAddr = prometheus.address.parse()?;
                 let status = match prometheus_connect(&addr) {
@@ -679,13 +648,11 @@ fn status(
                 println!("TCP Connect: {}", status);
             }
         }
-        for debugger in plugins.debugger {
-            print_debugger_id(&debugger);
-            println!("{}", "started".bold().green());
+        for _ in plugins.debugger {
+            println!("Debugger: {}", "started".bold().green());
         }
-        for umh in plugins.umh {
-            print_umh_id(&umh);
-            println!("{}", "started".bold().green());
+        for _ in plugins.umh {
+            println!("UMH: {}", "started".bold().green());
         }
     }
     Ok(())
@@ -947,16 +914,34 @@ fn ls(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
         let conf = read_config(&snippet)?;
         let plugins = conf.plugins;
         for promoter in plugins.promoter {
-            print_promoter_id(&promoter);
+            for (drbd_res, resource) in promoter.resources {
+                let mut start = resource.start.clone();
+                if start.len() > 3 {
+                    start.truncate(3);
+                    start.push("...".into());
+                }
+                let single = start.iter().map(|s| s.len()).max().unwrap_or_default();
+                let all: usize = start.iter().map(|s| s.len()).sum();
+                // some very rough estimate...
+                let delim = if single > 80 || all > 80 { "\n   " } else { "" };
+                print!("- Promoter: {}; start = [", drbd_res);
+                for (i, s) in start.iter().enumerate() {
+                    print!("{}\"{}\"", delim, s);
+                    if i < start.len() - 1 {
+                        print!(", ");
+                    }
+                }
+                println!("]");
+            }
         }
         for prometheus in plugins.prometheus {
-            print_prometheus_id(&prometheus);
+            println!("- Prometheus: {}", prometheus.address);
         }
-        for debugger in plugins.debugger {
-            print_debugger_id(&debugger);
+        for _ in plugins.debugger {
+            println!("- Debugger");
         }
-        for umh in plugins.umh {
-            print_umh_id(&umh);
+        for _ in plugins.umh {
+            println!("- UMH");
         }
     }
 
@@ -1450,7 +1435,7 @@ It is used to clear previous '--keep-masked' operations",
         )
         .subcommand(
             SubCommand::with_name("ls")
-                .about("list absolute path and ID of plugins")
+                .about("list absolute path of plugins")
                 .arg(
                     Arg::with_name("disabled")
                         .long("disabled")
@@ -1588,38 +1573,6 @@ impl fmt::Display for UnitFreezerState {
     }
 }
 
-fn print_promoter_id(promoter: &plugin::promoter::PromoterConfig) {
-    let id = match &promoter.id {
-        Some(id) => id.clone(),
-        None => "<none>".to_string(),
-    };
-    green(&format!("Promoter (ID: '{}')", id))
-}
-
-fn print_prometheus_id(prometheus: &plugin::prometheus::PrometheusConfig) {
-    let id = match &prometheus.id {
-        Some(id) => id.clone(),
-        None => "<none>".to_string(),
-    };
-    green(&format!("Prometheus (ID: '{}')", id))
-}
-
-fn print_umh_id(umh: &plugin::umh::UMHConfig) {
-    let id = match &umh.id {
-        Some(id) => id.clone(),
-        None => "<none>".to_string(),
-    };
-    green(&format!("UMH (ID: '{}')", id))
-}
-
-fn print_debugger_id(debugger: &plugin::debugger::DebuggerConfig) {
-    let id = match &debugger.id {
-        Some(id) => id.clone(),
-        None => "<none>".to_string(),
-    };
-    green(&format!("Debugger (ID: '{}')", id))
-}
-
 fn green(text: &str) {
     println!("{}", text.bold().green())
 }
@@ -1637,7 +1590,6 @@ fn info(text: &str) {
 }
 
 const PROMOTER_TEMPLATE: &str = r###"[[promoter]]
-id = "{id}"
 [promoter.resources.$resname]
 start = ["$service.mount", "$service.service"]
 # runner = "systemd"
@@ -1651,51 +1603,16 @@ start = ["$service.mount", "$service.service"]
 # https://github.com/LINBIT/linstor-gateway which uses LINSTOR and drbd-reactor"###;
 
 const PROMETHEUS_TEMPLATE: &str = r###"[[prometheus]]
-id = "prometheus"  # usually there is only one, this id should be fine
 enums = true
 # address = "[::]:9942""###;
 
 const UMH_TEMPLATE: &str = r###"[[umh]]
-id = "{id}"
 [[umh.resource]]
 command = "slack.sh $DRBD_RES_NAME on $(uname -n) from $DRBD_OLD_ROLE to $DRBD_NEW_ROLE"
 event-type = "Change"
-old.role = \{ operator = "NotEquals", value = "Primary" }
+old.role = { operator = "NotEquals", value = "Primary" }
 new.role = "Primary"
 # This is a trivial resource rule example, please see drbd-reactor.umh(5) for more examples"###;
 
 const DEBUGGER_TEMPLATE: &str = r###"[[debugger]]
-id = "debugger"  # usually there is only one, id should be fine
 # NOTE: make sure the log level in your [[log]] section is at least on level 'debug'"###;
-
-fn generate_template(template: &str, id: &str) -> Result<String> {
-    let mut tt = TinyTemplate::new();
-    tt.add_template("template", template)?;
-
-    #[derive(Serialize)]
-    struct Context {
-        id: String,
-    }
-    let result = tt.render("template", &Context { id: id.into() })?;
-
-    Ok(result)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_basename_without_ext() {
-        let bn = basename_without_ext(&PathBuf::from("/x/foo.toml"))
-            .expect("getting basename from /x/foo.toml");
-        assert_eq!(bn, PathBuf::from("foo"));
-
-        let bn = basename_without_ext(&PathBuf::from("/x/foo.toml.disabled"))
-            .expect("getting basename from /x/foo.toml.disabled");
-        assert_eq!(bn, PathBuf::from("foo"));
-
-        let bn = basename_without_ext(&PathBuf::from("/x/foo.bar"));
-        assert!(bn.is_err());
-    }
-}

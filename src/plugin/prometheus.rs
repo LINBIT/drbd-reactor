@@ -469,7 +469,7 @@ pub struct PrometheusConfig {
     pub address: String,
     #[serde(default)]
     pub enums: bool,
-    pub id: Option<String>,
+    pub id: Option<String>, // ! deprecated !
 }
 
 fn default_address() -> String {

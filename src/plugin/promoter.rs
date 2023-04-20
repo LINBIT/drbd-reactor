@@ -153,7 +153,7 @@ impl super::Plugin for Promoter {
 pub struct PromoterConfig {
     #[serde(default)]
     pub resources: BTreeMap<String, PromoterOptResource>,
-    pub id: Option<String>,
+    pub id: Option<String>, // ! deprecated !
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone)]

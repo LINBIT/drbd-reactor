@@ -140,7 +140,7 @@ pub struct UMHConfig {
     device: Vec<DeviceRule>,
     peerdevice: Vec<PeerDeviceRule>,
     connection: Vec<ConnectionRule>,
-    pub id: Option<String>,
+    pub id: Option<String>, // ! deprecated !
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone)]

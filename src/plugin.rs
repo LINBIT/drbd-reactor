@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::{any, env, thread};
 
 use anyhow::Result;
-use log::{error, info, trace};
+use log::{error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::drbd::{EventType, PluginUpdate};
@@ -151,6 +151,7 @@ pub fn start_from_config(
     let mut event_plugins: Vec<Box<dyn Plugin>> = Vec::new();
 
     for cfg in new_cfgs {
+        deprecate_id(&cfg);
         trace!("start_from_config: starting new config '{:#?}'", cfg);
         match cfg {
             PluginCfg::Debugger(cfg) => match debugger::Debugger::new(cfg) {
@@ -255,6 +256,23 @@ fn thread_panic_error(original: Box<dyn any::Any + Send>) -> anyhow::Error {
     };
 
     anyhow::anyhow!("plugin panicked with unrecoverable error message")
+}
+
+fn deprecate_id(cfg: &PluginCfg) {
+    let warn = || {
+        warn!("'id' is deprecated and ignored!");
+    };
+
+    match cfg {
+        PluginCfg::Debugger(cfg) if cfg.id.is_some() => warn(),
+        PluginCfg::Promoter(cfg) if cfg.id.is_some() => warn(),
+        PluginCfg::UMH(cfg) if cfg.id.is_some() => warn(),
+        PluginCfg::Prometheus(cfg) if cfg.id.is_some() => warn(),
+        PluginCfg::Debugger(_)
+        | PluginCfg::Promoter(_)
+        | PluginCfg::UMH(_)
+        | PluginCfg::Prometheus(_) => (),
+    }
 }
 
 #[cfg(test)]
