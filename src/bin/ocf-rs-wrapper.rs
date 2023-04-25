@@ -9,7 +9,6 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use libc;
 use log::{error, info};
-use rand::Rng;
 use signal_hook::iterator::Signals;
 
 const EXIT_CODE_SUCCESS: i32 = 0;
@@ -133,9 +132,7 @@ fn start_and_monitor(
         systemd_notify(socket, &format!("READY=1\nSTATUS={}", msg))?;
     }
 
-    let initial_sleep: u64 =
-        monitor_interval + rand::thread_rng().gen_range(0..monitor_interval / 2);
-    sleep_max(initial_sleep);
+    sleep_max(monitor_interval);
     while !TERMINATE.load(Ordering::Relaxed) {
         let output = Command::new(agent).arg("monitor").output()?;
         let code = output.status.code().ok_or(anyhow::anyhow!(
