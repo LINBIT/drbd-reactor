@@ -81,6 +81,38 @@ pub enum PluginCfg {
     Prometheus(prometheus::PrometheusConfig),
 }
 
+impl PluginCfg {
+    fn plugin_type(&self) -> PluginType {
+        match self {
+            &PluginCfg::Promoter(_) => PluginType::Change,
+            &PluginCfg::Debugger(_) => PluginType::Change,
+            &PluginCfg::UMH(_) => PluginType::Change,
+            &PluginCfg::Prometheus(_) => PluginType::Event,
+        }
+    }
+
+    fn into_plugin(self) -> Result<Box<dyn Plugin>, anyhow::Error> {
+        match self {
+            PluginCfg::Debugger(cfg) => {
+                let d = debugger::Debugger::new(cfg)?;
+                Ok(Box::new(d))
+            }
+            PluginCfg::Promoter(cfg) => {
+                let p = promoter::Promoter::new(cfg)?;
+                Ok(Box::new(p))
+            }
+            PluginCfg::UMH(cfg) => {
+                let u = umh::UMH::new(cfg)?;
+                Ok(Box::new(u))
+            }
+            PluginCfg::Prometheus(cfg) => {
+                let p = prometheus::Prometheus::new(cfg)?;
+                Ok(Box::new(p))
+            }
+        }
+    }
+}
+
 pub struct PluginStarted {
     pub tx: PluginSender,
     pub handle: thread::JoinHandle<Result<()>>,
@@ -147,72 +179,34 @@ pub fn start_from_config(
     }
     *started = survive;
 
-    let mut change_plugins: Vec<Box<dyn Plugin>> = Vec::new();
-    let mut event_plugins: Vec<Box<dyn Plugin>> = Vec::new();
+    let mut created_plugins = Vec::new();
 
     for cfg in new_cfgs {
         deprecate_id(&cfg);
         trace!("start_from_config: starting new config '{:#?}'", cfg);
-        match cfg {
-            PluginCfg::Debugger(cfg) => match debugger::Debugger::new(cfg) {
-                Ok(p) => change_plugins.push(Box::new(p)),
-                Err(e) => error!(
-                    "start_from_config: Could not start debugger plugin, ignoring it: {:#}",
-                    e
-                ),
-            },
-            PluginCfg::Promoter(cfg) => match promoter::Promoter::new(cfg) {
-                Ok(p) => change_plugins.push(Box::new(p)),
-                Err(e) => error!(
-                    "start_from_config: Could not start promoter plugin, ignoring it: {:#}",
-                    e
-                ),
-            },
-            PluginCfg::UMH(cfg) => match umh::UMH::new(cfg) {
-                Ok(p) => change_plugins.push(Box::new(p)),
-                Err(e) => error!(
-                    "start_from_config: Could not start umh plugin, ignoring it: {:#}",
-                    e
-                ),
-            },
-            PluginCfg::Prometheus(cfg) => match prometheus::Prometheus::new(cfg) {
-                Ok(p) => event_plugins.push(Box::new(p)),
-                Err(e) => error!(
-                    "start_from_config: Could not start prometheus plugin, ignoring it: {:#}",
-                    e
-                ),
-            },
+        match cfg.into_plugin() {
+            Ok(p) => created_plugins.push(p),
+            Err(e) => error!(
+                "start_from_config: Could not start plugin, ignoring it: {:#}",
+                e
+            ),
         }
     }
 
     maybe_systemd_notify_ready()?;
 
-    for d in change_plugins {
-        let cfg = d.get_config();
+    for p in created_plugins {
+        let cfg = p.get_config();
+        let ptype = cfg.plugin_type();
         let (ptx, prx) = crossbeam_channel::unbounded();
-        let handle = thread::spawn(move || d.run(prx));
+        let handle = thread::spawn(move || p.run(prx));
         started.insert(
             cfg,
             PluginStarted {
                 new: true,
                 handle,
                 tx: ptx,
-                ptype: PluginType::Change,
-            },
-        );
-    }
-
-    for d in event_plugins {
-        let cfg = d.get_config();
-        let (ptx, prx) = crossbeam_channel::unbounded();
-        let handle = thread::spawn(move || d.run(prx));
-        started.insert(
-            cfg,
-            PluginStarted {
-                new: true,
-                handle,
-                tx: ptx,
-                ptype: PluginType::Event,
+                ptype,
             },
         );
     }
