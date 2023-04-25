@@ -1,3 +1,18 @@
+drbd-reactor (1.2.0~rc.1-1) experimental; urgency=medium
+
+  [ Moritz "WanzenBug" Wanzenböck ]
+  * prometheus: start server in plugin constructor
+  * ctl: ignore already unmasked targets
+  * plugin: unify starting of plugins
+
+  [ Roland Kammerer ]
+  * prometheus: rm unused import
+  * ocf-wrapper: rewrite in Rust
+  * core,plugins: auto generate IDs
+  * core,plugins,ctl: deprecate IDs
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 25 Apr 2023 13:10:33 +0200
+
 drbd-reactor (1.1.0-1) experimental; urgency=medium
 
   * New upstream release
