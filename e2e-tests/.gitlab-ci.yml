@@ -62,7 +62,7 @@ e2e:build_reactor:
     - make debrelease VERSION="$version"
     - curl -isSf -u $LINBIT_REGISTRY_USER:$LINBIT_REGISTRY_PASSWORD --upload-file drbd-reactor-*.tar.gz $LINBIT_REGISTRY_URL/repository/lbbuild-upstream/
     - >-
-      lbbuildctl build drbd-reactor --ci -l --arch amd64 -v "$version" -d rhel9.0
+      lbbuildctl build drbd-reactor --ci --arch amd64 -v "$version" -d rhel9.0
       -e LINBIT_REGISTRY_USER=$LINBIT_REGISTRY_USER
       -e LINBIT_REGISTRY_PASSWORD=$LINBIT_REGISTRY_PASSWORD
       -e LINBIT_REGISTRY_URL=$LINBIT_REGISTRY_URL
