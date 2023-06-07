@@ -249,8 +249,10 @@ fn parse_kv(item: &str) -> Option<(&str, &str)> {
     }
 }
 
+// this implements a logic that is appropriate for events2 "bools"
+// usually one would be a bit more conservative, but we want to map things like "suspended:user" to "true".
 fn str_to_bool(s: &str) -> bool {
-    s == "yes" || s == "true"
+    !(s == "no" || s == "false")
 }
 
 #[cfg(test)]
@@ -260,8 +262,10 @@ mod tests {
     #[test]
     fn string_to_bool() {
         assert_eq!(str_to_bool(&"yes"), true);
-        assert_eq!(str_to_bool(&"true"), true);
         assert_eq!(str_to_bool(&"no"), false);
+        assert_eq!(str_to_bool(&"true"), true);
+        assert_eq!(str_to_bool(&"false"), false);
+        assert_eq!(str_to_bool(&"user"), true);
     }
 
     #[test]
