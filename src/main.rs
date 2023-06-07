@@ -176,7 +176,18 @@ fn init_loggers(log_cfgs: Vec<config::LogConfig>) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let mut cfg = get_config()?;
+    let cli_opt = CliOpt::from_args();
+
+    let tty = atty::is(atty::Stream::Stdin)
+        || atty::is(atty::Stream::Stdout)
+        || atty::is(atty::Stream::Stderr);
+    if tty && !cli_opt.allow_tty {
+        return Err(anyhow::anyhow!(
+            "Refusing to start in a terminal without --allow-tty. Did you mean drbd-reactorctl?"
+        ));
+    }
+
+    let mut cfg = get_config(&cli_opt.config)?;
     init_loggers(cfg.clone().log)?;
 
     let (e2tx, e2rx) = crossbeam_channel::unbounded();
@@ -195,7 +206,7 @@ fn main() -> Result<()> {
 
     let mut started = HashMap::new();
     loop {
-        match get_config() {
+        match get_config(&cli_opt.config) {
             Ok(new) => cfg = new,
             Err(e) => warn!("main: failed to reload config, reusing old: {}", e),
         };
@@ -241,8 +252,8 @@ fn setup_signals(events: crossbeam_channel::Sender<EventUpdate>) -> Result<()> {
     Ok(())
 }
 
-fn get_config() -> Result<config::Config> {
-    match read_config() {
+fn get_config(config_file: &PathBuf) -> Result<config::Config> {
+    match read_config(config_file) {
         Ok(new) if new.plugins.promoter.len() > 0 => {
             min_drbd_versions()?;
             Ok(new)
@@ -302,19 +313,19 @@ struct CliOpt {
         default_value = "/etc/drbd-reactor.toml"
     )]
     config: PathBuf,
+    #[structopt(long)]
+    allow_tty: bool,
 }
 
-fn read_config() -> Result<config::Config> {
-    let cli_opt = CliOpt::from_args();
-
+fn read_config(config_file: &PathBuf) -> Result<config::Config> {
     // as we also need the content of the main config in the daemon config, we don't use config::get_snippets_path
-    let mut content = read_to_string(&cli_opt.config)
-        .with_context(|| format!("Could not read config file: {}", cli_opt.config.display()))?;
+    let mut content = read_to_string(config_file)
+        .with_context(|| format!("Could not read config file: {}", config_file.display()))?;
 
     let mut config: config::Config = toml::from_str(&content).with_context(|| {
         format!(
             "Could not parse main config file; content: {}",
-            cli_opt.config.display()
+            config_file.display()
         )
     })?;
 

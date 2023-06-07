@@ -99,6 +99,7 @@ name = "drbd-reactor"
 version = "1.2.0"
 dependencies = [
  "anyhow",
+ "atty",
  "clap",
  "colored",
  "crossbeam-channel",
