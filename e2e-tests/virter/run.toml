@@ -1,3 +1,5 @@
+version = 1
+
 [values]
 ScratchDisk = "/dev/sda"
 TestSuiteImage = "drbd-reactor-e2e:latest"
@@ -28,5 +30,5 @@ done
 SCRATCH_DISK = "{{.ScratchDisk}}"
 
 [[steps]]
-[steps.docker]
+[steps.container]
 image = "{{.TestSuiteImage}}"
