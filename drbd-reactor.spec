@@ -48,6 +48,7 @@ install -D -m644 %{_builddir}/%{name}-%{tarball_version}/example/ctl.completion.
 %{_mandir}/man5/drbd-reactor.toml.5*
 %{_mandir}/man5/drbd-reactor.umh.5*
 %{_mandir}/man5/drbd-reactor.promoter.5*
+%{_mandir}/man5/drbd-reactor.agentx.5*
 %{_mandir}/man5/drbd-reactor.debugger.5*
 %{_mandir}/man5/drbd-reactor.prometheus.5*
 %config(noreplace) /etc/drbd-reactor.toml

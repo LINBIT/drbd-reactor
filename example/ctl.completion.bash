@@ -142,11 +142,11 @@ _drbd-reactorctl() {
             case "${prev}" in
                 
                 --type)
-                    COMPREPLY=($(compgen -W "promoter prometheus umh debugger" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "promoter prometheus agentx umh debugger" -- "${cur}"))
                     return 0
                     ;;
                     -t)
-                    COMPREPLY=($(compgen -W "promoter prometheus umh debugger" -- "${cur}"))
+                    COMPREPLY=($(compgen -W "promoter prometheus agentx umh debugger" -- "${cur}"))
                     return 0
                     ;;
                 --context)

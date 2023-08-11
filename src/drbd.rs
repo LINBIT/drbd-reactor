@@ -333,8 +333,32 @@ make_matchable![
         PausedSyncT,
         Ahead,
         Behind,
+        // if you extend this enum, also extend iterator()
     }
 ];
+
+impl ReplicationState {
+    pub fn iterator() -> Iter<'static, ReplicationState> {
+        static STATES: [ReplicationState; 15] = [
+            ReplicationState::Off,
+            ReplicationState::Established,
+            ReplicationState::StartingSyncS,
+            ReplicationState::StartingSyncT,
+            ReplicationState::WFBitMapS,
+            ReplicationState::WFBitMapT,
+            ReplicationState::WFSyncUUID,
+            ReplicationState::SyncSource,
+            ReplicationState::SyncTarget,
+            ReplicationState::VerifyS,
+            ReplicationState::VerifyT,
+            ReplicationState::PausedSyncS,
+            ReplicationState::PausedSyncT,
+            ReplicationState::Ahead,
+            ReplicationState::Behind,
+        ];
+        STATES.iter()
+    }
+}
 
 impl FromStr for ReplicationState {
     type Err = Error;

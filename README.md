@@ -5,12 +5,13 @@ changes in a DRBD resource.
 
 # Plugins
 
-| Plugin                           | Purpose                        |
-| -------------------------------- | ------------------------------ |
-| [debugger](/doc/debugger.md)     | Demo that prints state changes |
-| [promoter](/doc/promoter.md)     | Simple HA for resources        |
-| [umh](/doc/umh.md)               | User mode helper               |
-| [prometheus](/doc/prometheus.md) | Prometheus endpoint            |
+| Plugin                           | Purpose                             |
+| -------------------------------- | ------------------------------------|
+| [debugger](/doc/debugger.md)     | Demo that prints state changes      |
+| [promoter](/doc/promoter.md)     | Simple HA for resources             |
+| [umh](/doc/umh.md)               | User mode helper                    |
+| [prometheus](/doc/prometheus.md) | Prometheus endpoint                 |
+| [agentx](/doc/agentx.md)         | AgentX subagent for SNMP monitoring |
 
 ## Implementation
 - [x] debugger

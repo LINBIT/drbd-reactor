@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "agentx"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "777fd585088237643c74b46485a5eeec86630981d8e7b0b1b1844128fd2a82d6"
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,6 +104,7 @@ dependencies = [
 name = "drbd-reactor"
 version = "1.2.0"
 dependencies = [
+ "agentx",
  "anyhow",
  "atty",
  "clap",

@@ -1,0 +1,471 @@
+LINBIT-DRBD-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    OBJECT-TYPE, MODULE-IDENTITY,
+    enterprises, Unsigned32, Counter64
+    FROM SNMPv2-SMI
+
+    TEXTUAL-CONVENTION, DisplayString, TruthValue
+    FROM SNMPv2-TC;
+
+linbit MODULE-IDENTITY
+    LAST-UPDATED "202309271342Z"
+    ORGANIZATION "LINBIT HA-Solutions GmbH"
+    CONTACT-INFO
+        "This mib is maintained by LINBIT
+         web: http://www.linbit.com
+
+         postal: LINBIT
+                 Stiegergasse 18
+                 1150 Wien
+                 Austria
+
+         mail: office+snmp@linbit.com"
+    DESCRIPTION "Provide status values to ease monitoring of DRBD."
+    ::= { enterprises 23302 }
+
+drbdData OBJECT-TYPE
+    SYNTAX SEQUENCE OF drbdEntry
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION "DRBD information."
+    ::= { linbit 1 }
+
+drbdMeta OBJECT-TYPE
+    SYNTAX drbdMeta
+    ACCESS read-only
+    STATUS current
+    DESCRIPTION "Meta-information on DRBD."
+    ::= { drbdData 1 }
+
+drbdMeta ::= SEQUENCE {
+    ModuleVersion DisplayString
+    UtilsVersion DisplayString
+}
+
+ModuleVersion OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Version of the loaded kernel module"
+    ::= { drbdMeta 1 }
+
+UtilsVersion OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Version of drbd-utils"
+    ::= { drbdMeta 2 }
+
+drbdTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF DrbdEntry
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "An table containing DRBD devices and its statistics."
+    INDEX { drbdMinor }
+    ::= { drbdData 2 }
+
+drbdEntry OBJECT-TYPE 
+    SYNTAX DrbdEntry
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "An entry containing a DRBD device and its statistics."
+    INDEX { drbdMinor }
+    ::= { drbdTable 1 }
+
+DrbdEntry ::= SEQUENCE {
+    Minor INTEGER
+    ResourceName DisplayString
+    ResourceRole DisplayString
+    ResourceSuspended TruthValue
+    ResourceWriteOrdering DisplayString
+    ResourceForceIOFailures TruthValue
+    ResourceMayPromote TruthValue
+    ResourcePromotionScore INTEGER
+    Volume INTEGER
+    DiskState DisplayString
+    BackingDev DisplayString
+    Client TruthValue
+    Quorum TruthValue
+    Size Unsigned32
+    SizeUnits Unsigned32
+    Read Counter64
+    Written Counter64
+    AlWrites Counter64
+    BmWrites Counter64
+    UpperPending Unsigned32
+    LowerPending Unsigned32
+    AlSuspended TruthValue
+    Blocked DisplayString
+    PeerNumberOfPeers INTEGER
+    PeerDiskDiskless INTEGER
+    PeerDiskAttaching INTEGER
+    PeerDiskDetaching INTEGER
+    PeerDiskFailed INTEGER
+    PeerDiskNegotiating INTEGER
+    PeerDiskInconsistent INTEGER
+    PeerDiskOutdated INTEGER
+    PeerDiskUnknown INTEGER
+    PeerDiskConsistent INTEGER
+    PeerDiskUpToDate INTEGER
+    PeerReplOff INTEGER
+    PeerReplEstablished INTEGER
+    PeerReplStartingSyncS INTEGER
+    PeerReplStartingSyncT INTEGER
+    PeerReplWFBitMapS INTEGER
+    PeerReplWFBitMapT INTEGER
+    PeerReplWFSyncUUID INTEGER
+    PeerReplSyncSource INTEGER
+    PeerReplSyncTarget INTEGER
+    PeerReplVerifyS INTEGER
+    PeerReplVerifyT INTEGER
+    PeerReplPausedSyncS INTEGER
+    PeerReplPausedSyncT INTEGER
+    PeerReplAhead INTEGER
+    PeerReplBehind INTEGER
+}
+
+Minor OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "The DRBD minor number"
+    ::= { drbdEntry 1 }
+
+ResourceName OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Name of the Resource the minor belongs to"
+    ::= { drbdEntry 2 }
+
+ResourceRole OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Current role of the resource (e.g., Primary)"
+    ::= { drbdEntry 3 }
+
+ResourceSuspended OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Boolean wheather the resource is suspendended or not"
+    ::= { drbdEntry 4 }
+
+ResourceWriteOrdering OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Write Ordering (e.g., flush)"
+    ::= { drbdEntry 5 }
+
+ResourceForceIOFailures OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Boolean wheather the resource should force IO errors or not"
+    ::= { drbdEntry 6 }
+
+ResourceMayPromote OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Boolean wheather the resource can be promoted to Primary or not"
+    ::= { drbdEntry 7 }
+
+ResourcePromotionScore OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "The promotion score of a resource"
+    ::= { drbdEntry 8 }
+
+Volume OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "DRBD volume number within the resource"
+    ::= { drbdEntry 9 }
+
+DiskState OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Disk state of the device (e.g., UpToDate)"
+    ::= { drbdEntry 10 }
+
+BackingDev OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Path of the backing device for the resource"
+    ::= { drbdEntry 11 }
+
+Client OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Boolean wheather the resource is an intentional diskless client or not"
+    ::= { drbdEntry 12 }
+
+Quorum OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Boolean wheather the resource has quorum or not"
+    ::= { drbdEntry 13 }
+
+Size OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "The size of the device in bytes measured by SizeUnit"
+    ::= { drbdEntry 14 }
+
+SizeUnits OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of bytes used to express Size (e.g., 1024 for KiB)"
+    ::= { drbdEntry 15 }
+
+Read OBJECT-TYPE
+    SYNTAX Counter64
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Net data read from local hard disk in bytes"
+    ::= { drbdEntry 16 }
+
+Written OBJECT-TYPE
+    SYNTAX Counter64
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Net data written to local hard disk in bytes"
+    ::= { drbdEntry 17 }
+
+AlWrites OBJECT-TYPE
+    SYNTAX Counter64
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of updates of the activity log area of the meta data"
+    ::= { drbdEntry 18 }
+
+BmWrites OBJECT-TYPE
+    SYNTAX Counter64
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of updates of the bitmap area of the meta data"
+    ::= { drbdEntry 19 }
+
+UpperPending OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of I/O requests forwarded to DRBD, but not yet answered by DRBD"
+    ::= { drbdEntry 20 }
+
+LowerPending OBJECT-TYPE
+    SYNTAX Unsigned32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of open requests to the local I/O sub-system issued by DRBD"
+    ::= { drbdEntry 21 }
+
+AlSuspended OBJECT-TYPE
+    SYNTAX TruthValue
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Boolean wheather the Activity-Log is suspended or not"
+    ::= { drbdEntry 22 }
+
+Blocked OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Information why the device is blocked (e.g, upper)"
+    ::= { drbdEntry 23 }
+
+PeerNumberOfPeers OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers for the device"
+    ::= { drbdEntry 24 }
+
+PeerDiskDiskless OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Diskless'"
+    ::= { drbdEntry 25 }
+
+PeerDiskAttaching OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Attaching'"
+    ::= { drbdEntry 26 }
+
+PeerDiskDetaching OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Detaching'"
+    ::= { drbdEntry 27 }
+
+PeerDiskFailed OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Failed'"
+    ::= { drbdEntry 28 }
+
+PeerDiskNegotiating OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Negotiating'"
+    ::= { drbdEntry 29 }
+
+PeerDiskInconsistent OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Inconsistent'"
+    ::= { drbdEntry 30 }
+
+PeerDiskOutdated OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Outdated'"
+    ::= { drbdEntry 31 }
+
+PeerDiskUnknown OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Unknown'"
+    ::= { drbdEntry 32 }
+
+PeerDiskConsistent OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Consistent'"
+    ::= { drbdEntry 33 }
+
+PeerDiskUpToDate OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'UpToDate'"
+    ::= { drbdEntry 34 }
+
+PeerReplOff OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Off'"
+    ::= { drbdEntry 35 }
+
+PeerReplEstablished OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Established'"
+    ::= { drbdEntry 36 }
+
+PeerReplStartingSyncS OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'StartingSyncS'"
+    ::= { drbdEntry 37 }
+
+PeerReplStartingSyncT OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'StartingSyncT'"
+    ::= { drbdEntry 38 }
+
+PeerReplWFBitMapS OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'WFBitMapS'"
+    ::= { drbdEntry 39 }
+
+PeerReplWFBitMapT OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'WFBitMapT'"
+    ::= { drbdEntry 40 }
+
+PeerReplWFSyncUUID OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'WFSyncUUID'"
+    ::= { drbdEntry 41 }
+
+PeerReplSyncSource OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'SyncSource'"
+    ::= { drbdEntry 42 }
+
+PeerReplSyncTarget OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'SyncTarget'"
+    ::= { drbdEntry 43 }
+
+PeerReplVerifyS OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'VerifyS'"
+    ::= { drbdEntry 44 }
+
+PeerReplVerifyT OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'VerifyT'"
+    ::= { drbdEntry 45 }
+
+PeerReplPausedSyncS OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'PausedSyncS'"
+    ::= { drbdEntry 46 }
+
+PeerReplPausedSyncT OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'PausedSyncT'"
+    ::= { drbdEntry 47 }
+
+PeerReplAhead OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Ahead'"
+    ::= { drbdEntry 48 }
+
+PeerReplBehind OBJECT-TYPE
+    SYNTAX INTEGER
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION "Number of peers in state 'Behind'"
+    ::= { drbdEntry 49 }
+
+END

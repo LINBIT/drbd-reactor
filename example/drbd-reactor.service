@@ -13,6 +13,9 @@ After=dbus.service
 Wants=polkit.service
 After=polkit.service
 
+# If the AgentX plugin is used we want to be started after snmpd
+After=snmpd.service
+
 [Service]
 Type=notify
 ExecStart=/usr/sbin/drbd-reactor

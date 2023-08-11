@@ -1,0 +1,43 @@
+.Dd $Mdocdate$
+.Dt DRBD-REACTOR.AGENTX 5
+.Os
+.Sh NAME
+.Nm drbd-reactor.agentx
+.Nd drbd-reactor agentx plugin
+.Sh DESCRIPTION
+.Nm
+is the SNMP plugin (via AgentX) for
+.Xr drbd-reactor 1 .
+.Pp
+This plugin serves a AgentX subagent for SNMP monitoring of DRBD resources
+exposing various DRBD metrics.
+.Sh METRICS
+The plugin exposes a wide variety of metrics, for more details please check
+.Ss snmptranslate -Tp -IR -mALL linbit
+.Sh EXAMPLES
+Configure net-snmp to include the LINBIT ID and turn on agentx:
+.Bd -literal -offset indent
+\&...
+view    systemview    included   .1.3.6.1.2.1.25.1.1
+# add LINBIT ID to the system view and enable agentx
+view    systemview    included   .1.3.6.1.4.1.23302
+master agentx
+agentXSocket tcp:127.0.0.1:705
+\&...
+.Ed
+After preparing the SNMP daemon a plugin configuration looks like this:
+.Bd -literal -offset indent
+[[agentx]]
+address = "localhost:705"
+cache-max = 60 # seconds
+agent-timeout = 60 # seconds snmpd waits for an answer
+peer-states = true # include peer connection and disk states
+.Ed
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr drbd-reactor 1
+program was written by the following authors:
+.An -split
+.An Roland Kammerer Aq Mt rck@linbit.com
+.An Moritz Wanzenböck Aq Mt moritz.wanzenboeck@linbit.com

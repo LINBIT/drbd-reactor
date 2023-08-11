@@ -251,6 +251,10 @@ fn edit_editor(tmppath: &Path, editor: &str, type_opt: &str, force: bool) -> Res
         if plugins.prometheus.len() != 1 {
             return len_err();
         }
+    } else if type_opt == "agentx" {
+        if plugins.agentx.len() != 1 {
+            return len_err();
+        }
     } else if type_opt == "umh" {
         if plugins.umh.len() != 1 {
             return len_err();
@@ -329,6 +333,7 @@ fn edit(
             let template = match type_opt {
                 "promoter" => PROMOTER_TEMPLATE,
                 "prometheus" => PROMETHEUS_TEMPLATE,
+                "agentx" => AGENTX_TEMPLATE,
                 "umh" => UMH_TEMPLATE,
                 "debugger" => DEBUGGER_TEMPLATE,
                 x => return Err(anyhow::anyhow!("Unknown type ('{}') to edit", x)),
@@ -654,6 +659,12 @@ fn status(
         for _ in plugins.umh {
             println!("UMH: {}", "started".bold().green());
         }
+        for agentx in plugins.agentx {
+            println!(
+                "AgentX: connecting to main agent at {}",
+                agentx.address.bold().green()
+            );
+        }
     }
     Ok(())
 }
@@ -836,7 +847,11 @@ fn evict_resources(drbd_resources: &Vec<String>, keep_masked: bool, delay: u32) 
 }
 
 fn nr_plugins(plugins: &plugin::PluginConfig) -> usize {
-    plugins.promoter.len() + plugins.umh.len() + plugins.debugger.len() + plugins.prometheus.len()
+    plugins.promoter.len()
+        + plugins.umh.len()
+        + plugins.debugger.len()
+        + plugins.prometheus.len()
+        + plugins.agentx.len()
 }
 
 fn evict(
@@ -942,6 +957,9 @@ fn ls(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
         }
         for _ in plugins.umh {
             println!("- UMH");
+        }
+        for agentx in plugins.agentx {
+            println!("- AgentX: {}", agentx.address);
         }
     }
 
@@ -1342,7 +1360,7 @@ fn get_app() -> App<'static, 'static> {
                         .long("type")
                         .help("Plugin type")
                         .takes_value(true)
-                        .possible_values(&["promoter", "prometheus", "umh", "debugger"])
+                        .possible_values(&["promoter", "prometheus", "agentx", "umh", "debugger"])
                         .default_value("promoter"),
                 )
                 .arg(
@@ -1605,6 +1623,13 @@ start = ["$service.mount", "$service.service"]
 const PROMETHEUS_TEMPLATE: &str = r###"[[prometheus]]
 enums = true
 # address = "[::]:9942""###;
+
+const AGENTX_TEMPLATE: &str = r###"[[agentx]]
+## adress of the main SNMP daemon AgentX TCP socket
+# address = "localhost:705"
+# cache-max = 60 # seconds
+# agent-timeout = 60 # seconds snmpd waits for an answer
+# peer-states = true # include peer connection and disk states"###;
 
 const UMH_TEMPLATE: &str = r###"[[umh]]
 [[umh.resource]]

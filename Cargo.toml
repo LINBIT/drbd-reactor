@@ -25,6 +25,7 @@ serde_json = "1.0"
 shell-words = ">= 0.1.0" # 0.1.0 because it is in Ubuntu Focal/PPA
 crossbeam-channel = ">= 0.3.9" # 0.3.9 because it is in Ubuntu Focal/PPA
 atty = "0.2"
+agentx = "0.1"
 # drbd-reactorctl
 clap = "2.33"  # 2.33.0 because it is in Ubuntu Focal/PPA
 colored = ">= 1.6.1"  # 1.6.1 because it is in Ubuntu Focal/PPA

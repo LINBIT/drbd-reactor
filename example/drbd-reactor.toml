@@ -87,3 +87,11 @@ statistics-poll-interval = 60
 # enums = false
 ## address and port combination, 9942 is the registered port for that exporter
 # address = "[::]:9942"
+
+# Configure a AgentX subagent
+#[[agentx]]
+## adress of the main SNMP daemon AgentX TCP socket
+# address = "localhost:705"
+# cache-max = 60 # seconds
+# agent-timeout = 60 # seconds snmpd waits for an answer
+# peer-states = true # include peer connection and disk states

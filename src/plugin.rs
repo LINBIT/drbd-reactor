@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::drbd::{EventType, PluginUpdate};
 
+pub mod agentx;
 pub mod debugger;
 pub mod prometheus;
 pub mod promoter;
@@ -71,6 +72,8 @@ pub struct PluginConfig {
     pub umh: Vec<umh::UMHConfig>,
     #[serde(default)]
     pub prometheus: Vec<prometheus::PrometheusConfig>,
+    #[serde(default)]
+    pub agentx: Vec<agentx::AgentXConfig>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -79,6 +82,7 @@ pub enum PluginCfg {
     Debugger(debugger::DebuggerConfig),
     UMH(umh::UMHConfig),
     Prometheus(prometheus::PrometheusConfig),
+    AgentX(agentx::AgentXConfig),
 }
 
 impl PluginCfg {
@@ -88,6 +92,7 @@ impl PluginCfg {
             &PluginCfg::Debugger(_) => PluginType::Change,
             &PluginCfg::UMH(_) => PluginType::Change,
             &PluginCfg::Prometheus(_) => PluginType::Event,
+            &PluginCfg::AgentX(_) => PluginType::Event,
         }
     }
 
@@ -107,6 +112,10 @@ impl PluginCfg {
             }
             PluginCfg::Prometheus(cfg) => {
                 let p = prometheus::Prometheus::new(cfg)?;
+                Ok(Box::new(p))
+            }
+            PluginCfg::AgentX(cfg) => {
+                let p = agentx::AgentX::new(cfg)?;
                 Ok(Box::new(p))
             }
         }
@@ -162,6 +171,9 @@ pub fn start_from_config(
     }
     for p in &cfg.prometheus {
         try_insert_unique(&mut new_cfgs, PluginCfg::Prometheus(p.clone()))?;
+    }
+    for p in &cfg.agentx {
+        try_insert_unique(&mut new_cfgs, PluginCfg::AgentX(p.clone()))?;
     }
 
     let mut survive = HashMap::new();
@@ -265,6 +277,7 @@ fn deprecate_id(cfg: &PluginCfg) {
         PluginCfg::Debugger(_)
         | PluginCfg::Promoter(_)
         | PluginCfg::UMH(_)
+        | PluginCfg::AgentX(_)
         | PluginCfg::Prometheus(_) => (),
     }
 }
