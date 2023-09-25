@@ -1,3 +1,15 @@
+drbd-reactor (1.3.0~rc.1-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * core,events2: fix str_to_bool
+  * core,daemon: don't start if tty
+  * agentx: implement plugin
+
+  [ Joel Colledge ]
+  * ci: upgrade virter and vmshed versions
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 25 Sep 2023 10:55:00 +0200
+
 drbd-reactor (1.2.0-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
