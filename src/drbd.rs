@@ -470,6 +470,7 @@ pub enum EventUpdate {
     Path(EventType, Path),
     Stop,
     Reload,
+    Flush,
 }
 
 make_matchable![

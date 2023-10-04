@@ -30,9 +30,11 @@ struct Core {
     resources: HashMap<String, Resource>,
 }
 
+#[derive(PartialEq)]
 enum CoreExit {
     Stop,
     Reload,
+    Flush,
 }
 
 impl Core {
@@ -139,6 +141,7 @@ impl Core {
                 }
                 EventUpdate::Stop => return Ok(CoreExit::Stop),
                 EventUpdate::Reload => return Ok(CoreExit::Reload),
+                EventUpdate::Flush => return Ok(CoreExit::Flush),
             }
         }
 
@@ -215,16 +218,24 @@ fn main() -> Result<()> {
         plugin::start_from_config(cfg.plugins.clone(), &mut started)?;
         debug!("main: started.len()={}", started.len());
 
-        let exit = core
+        let reason = core
             .run(&e2rx, &started)
             .context("main: core did not exit successfully")?;
 
-        if let CoreExit::Stop = exit {
-            for (_, plugin) in started.drain() {
-                plugin.stop()?;
+        match reason {
+            CoreExit::Stop => {
+                for (_, plugin) in started.drain() {
+                    plugin.stop()?;
+                }
+                return Ok(());
             }
-
-            return Ok(());
+            CoreExit::Flush => {
+                for (_, plugin) in started.drain() {
+                    plugin.stop()?;
+                }
+                core.resources.clear();
+            }
+            CoreExit::Reload => (),
         }
     }
 }

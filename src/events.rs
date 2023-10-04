@@ -14,24 +14,18 @@ use std::thread;
 use std::time::Duration;
 
 pub fn events2(tx: Sender<EventUpdate>, statistics_poll: Duration) -> Result<()> {
-    // TODO(): add some duration, like if we failed 5 times in the last minute or so
-    let mut failed = 0;
+    let mut send_flush = false;
     loop {
-        if failed == 5 {
-            return Err(anyhow::anyhow!(
-                "events: events2_loop: Restarted events tracking too often, giving up"
-            ));
-        }
-
         debug!("events2_loop: starting process_events2 loop");
-        match process_events2(&tx, statistics_poll) {
+        let result = process_events2(&tx, statistics_poll, send_flush);
+        send_flush = true;
+        match result {
             Ok(()) => break,
             Err(e) => {
                 if e.is::<SendError<EventUpdate>>() {
                     debug!("events2_loop: send error on chanel, bye");
                     return Err(e);
                 }
-                failed += 1;
                 thread::sleep(Duration::from_secs(2));
             }
         }
@@ -40,7 +34,18 @@ pub fn events2(tx: Sender<EventUpdate>, statistics_poll: Duration) -> Result<()>
     Ok(())
 }
 
-fn process_events2(tx: &Sender<EventUpdate>, statistics_poll: Duration) -> Result<()> {
+struct KillOnDrop(std::process::Child);
+impl Drop for KillOnDrop {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+    }
+}
+
+fn process_events2(
+    tx: &Sender<EventUpdate>,
+    statistics_poll: Duration,
+    send_flush: bool,
+) -> Result<()> {
     let mut cmd = Command::new("drbdsetup")
         .arg("events2")
         .arg("--full")
@@ -67,6 +72,14 @@ fn process_events2(tx: &Sender<EventUpdate>, statistics_poll: Duration) -> Resul
         .stdout
         .take()
         .expect("events: process_events2: stdout set to Stdio::piped()");
+
+    let _kill_cmd = KillOnDrop(cmd);
+
+    // great, we established a successful events2 tracking
+    if send_flush {
+        debug!("process_events2: sending flush");
+        tx.send(EventUpdate::Flush)?;
+    }
 
     let mut reader = BufReader::new(stdout);
 
