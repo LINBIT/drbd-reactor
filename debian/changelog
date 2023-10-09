@@ -1,3 +1,9 @@
+drbd-reactor (1.3.0-1) experimental; urgency=medium
+
+  * New upstream release
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 09 Oct 2023 16:19:37 +0200
+
 drbd-reactor (1.3.0~rc.1-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
