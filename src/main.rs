@@ -277,11 +277,11 @@ fn min_drbd_versions() -> Result<()> {
     let drbd_versions = drbd::get_drbd_versions()?;
 
     // check utils
-    // secondary --force
+    // proper events2 --poll termination
     let want = drbd::Version {
         major: 9,
-        minor: 21,
-        patch: 2,
+        minor: 26,
+        patch: 0,
     };
     if drbd_versions.utils < want {
         return Err(anyhow::anyhow!(
