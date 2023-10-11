@@ -1273,8 +1273,7 @@ fn split_version(pattern: regex::Regex, stdout: Vec<u8>) -> anyhow::Result<Versi
     let version = String::from_utf8(stdout)?;
     let version = version
         .lines()
-        .filter_map(|line| pattern.captures(line))
-        .next()
+        .find_map(|line| pattern.captures(line))
         .ok_or(anyhow::anyhow!(
             "Could not determine version from pattern '{}'",
             pattern
