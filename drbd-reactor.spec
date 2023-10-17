@@ -58,6 +58,7 @@ install -D -m644 %{_builddir}/%{name}-%{tarball_version}/example/ctl.completion.
 %doc example/drbd-reactor-reload.service
 %doc example/drbd-reactor.toml
 %doc example/on-no-quorum-io-error.sh
+%doc example/LINBIT-DRBD-MIB.mib
 
 
 %changelog
