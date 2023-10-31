@@ -5,7 +5,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
 use std::io::{Error, ErrorKind};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::str::FromStr;
@@ -640,17 +640,16 @@ fn status(
         for prometheus in plugins.prometheus {
             println!(
                 "Prometheus: listening on {}",
-                prometheus.address.bold().green()
+                prometheus.address.to_string().bold().green()
             );
             if verbose {
-                let addr: SocketAddr = prometheus.address.parse()?;
-                let status = match prometheus_connect(&addr) {
-                    Ok(_) => format!("{}", "success".bold().green()),
-                    Err(e) => {
-                        format!("{} ({})", "failed".bold().red(), e)
-                    }
-                };
-                println!("TCP Connect: {}", status);
+                for addr in prometheus.address.to_socket_addrs()? {
+                    let status = match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+                        Ok(_) => format!("{}", "success".bold().green()),
+                        Err(e) => format!("{} ({})", "failed".bold().red(), e),
+                    };
+                    println!("TCP Connect ({}): {}", addr, status);
+                }
             }
         }
         for _ in plugins.debugger {
@@ -1522,23 +1521,6 @@ fn systemctl(args: Vec<String>) -> Result<()> {
     systemctl_out_err(args, Stdio::inherit(), Stdio::inherit())
 }
 
-fn prometheus_connect(addr: &SocketAddr) -> Result<()> {
-    let mut status = TcpStream::connect_timeout(&addr, Duration::from_secs(2));
-    if status.is_ok() {
-        return Ok(());
-    }
-
-    if addr.is_ipv6() && addr.ip().is_unspecified() {
-        let addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, addr.port()));
-        status = TcpStream::connect_timeout(&addr, Duration::from_secs(2));
-    }
-
-    match status {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!("{}", e)),
-    }
-}
-
 fn status_dot(unit: &str) -> Result<String> {
     let prop = systemd::show_property(unit, "ActiveState")?;
     let state = UnitActiveState::from_str(&prop)?;
@@ -1622,7 +1604,7 @@ start = ["$service.mount", "$service.service"]
 
 const PROMETHEUS_TEMPLATE: &str = r###"[[prometheus]]
 enums = true
-# address = "[::]:9942""###;
+# address = ":9942""###;
 
 const AGENTX_TEMPLATE: &str = r###"[[agentx]]
 ## adress of the main SNMP daemon AgentX TCP socket

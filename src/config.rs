@@ -1,8 +1,10 @@
-use std::fs;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
+use std::{fmt, fs};
 
 use anyhow::Result;
 use log::LevelFilter;
+use serde::de::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::plugin;
@@ -29,6 +31,66 @@ pub struct LogConfig {
     #[serde(default = "default_level")]
     pub level: LevelFilter,
     pub file: Option<PathBuf>,
+}
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug, Clone)]
+#[serde(untagged)]
+pub enum LocalAddress {
+    Explicit(SocketAddr),
+    #[serde(
+        serialize_with = "unspecified_ser",
+        deserialize_with = "unspecified_de"
+    )]
+    Unspecified(u16),
+}
+
+fn unspecified_ser<S>(port: &u16, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&format!(":{}", port))
+}
+
+fn unspecified_de<'de, D>(deserializer: D) -> Result<u16, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let str = String::deserialize(deserializer)?;
+    if !str.starts_with(":") {
+        return Err(Error::custom("expected ':' to start unspecified address"));
+    }
+
+    str[1..].parse().map_err(Error::custom)
+}
+
+impl ToSocketAddrs for LocalAddress {
+    type Iter = std::vec::IntoIter<SocketAddr>;
+
+    fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
+        match self {
+            LocalAddress::Explicit(addr) => Ok(vec![addr.clone()].into_iter()),
+            LocalAddress::Unspecified(port) => Ok(vec![
+                (Ipv6Addr::UNSPECIFIED, *port).into(),
+                (Ipv4Addr::UNSPECIFIED, *port).into(),
+            ]
+            .into_iter()),
+        }
+    }
+}
+
+impl fmt::Display for LocalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LocalAddress::Explicit(socket) => socket.fmt(f),
+            LocalAddress::Unspecified(port) => write!(f, ":{}", port),
+        }
+    }
+}
+
+impl Default for LocalAddress {
+    fn default() -> Self {
+        LocalAddress::Unspecified(0)
+    }
 }
 
 fn default_statistics() -> u64 {
@@ -92,6 +154,10 @@ mod tests {
     level = "trace"
     file = "/var/log/drbd-reactor.log"
     "#;
+    const LOCAL_ADDRESS_IPV4: &str = "address = \"127.0.0.1:9999\"";
+    const LOCAL_ADDRESS_IPV6: &str = "address = \"[::1]:9999\"";
+    const LOCAL_ADDRESS_UNSPECIFIED: &str = "address = \":9999\"";
+    const LOCAL_ADDRESS_ERR: &str = "address = \"::9999\"";
 
     #[test]
     fn test_default_cfg() {
@@ -110,5 +176,40 @@ mod tests {
             cfg.log[0].file,
             Some(PathBuf::from("/var/log/drbd-reactor.log"))
         );
+    }
+
+    #[derive(Deserialize)]
+    struct AddressTest {
+        address: LocalAddress,
+    }
+
+    #[test]
+    fn test_local_address_ipv4() {
+        let addr: AddressTest = toml::from_str(LOCAL_ADDRESS_IPV4).expect("must parse");
+        assert_eq!(
+            addr.address,
+            LocalAddress::Explicit((Ipv4Addr::LOCALHOST, 9999).into())
+        )
+    }
+
+    #[test]
+    fn test_local_address_ipv6() {
+        let addr: AddressTest = toml::from_str(LOCAL_ADDRESS_IPV6).expect("must parse");
+        assert_eq!(
+            addr.address,
+            LocalAddress::Explicit((Ipv6Addr::LOCALHOST, 9999).into())
+        )
+    }
+
+    #[test]
+    fn test_local_address_unspecified() {
+        let addr: AddressTest = toml::from_str(LOCAL_ADDRESS_UNSPECIFIED).expect("must parse");
+        assert_eq!(addr.address, LocalAddress::Unspecified(9999))
+    }
+
+    #[test]
+    fn test_local_address_err() {
+        let addr: Result<AddressTest, _> = toml::from_str(LOCAL_ADDRESS_ERR);
+        assert!(addr.is_err());
     }
 }

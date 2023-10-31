@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use log::{debug, error, trace, warn};
 use serde::{Deserialize, Serialize};
 
+use crate::config::LocalAddress;
 use crate::drbd;
 use crate::drbd::{ConnectionState, DiskState, EventType, PluginUpdate, Resource, Role};
 use crate::plugin::PluginCfg;
@@ -466,12 +467,12 @@ fn type_counter<'a>(
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, Clone, Default)]
 pub struct PrometheusConfig {
     #[serde(default = "default_address")]
-    pub address: String,
+    pub address: LocalAddress,
     #[serde(default)]
     pub enums: bool,
     pub id: Option<String>, // ! deprecated !
 }
 
-fn default_address() -> String {
-    "[::]:9942".to_string()
+fn default_address() -> LocalAddress {
+    LocalAddress::Unspecified(9942)
 }
