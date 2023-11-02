@@ -18,7 +18,7 @@ test:cargo:
   stage: check
   needs: []
   variables:
-    RUSTFLAGS: "-Zinstrument-coverage"
+    RUSTFLAGS: "-C instrument-coverage"
     LLVM_PROFILE_FILE: "coverage-%p-%m.profraw"
   script:
     - rustc --version && cargo --version  # Print version info for debugging
