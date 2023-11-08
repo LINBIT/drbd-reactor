@@ -1,3 +1,18 @@
+drbd-reactor (1.4.0~rc.1-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * build: add MIB to examples
+  * core,events2: allow events2 reloading
+  * filter_map(..).next() -> find_map(..)
+  * build: bump drbd-utils to 9.26.0
+  * prepare v1.4.0-rc.1
+
+  [ Moritz Wanzenböck ]
+  * prometheus: ensure default works with any IP family
+  * ci: fix coverage instrumentation
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Wed, 08 Nov 2023 10:41:24 +0100
+
 drbd-reactor (1.3.0-1) experimental; urgency=medium
 
   * New upstream release

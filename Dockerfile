@@ -1,7 +1,7 @@
 ARG BUILDER=registry.access.redhat.com/ubi8/ubi
 FROM $BUILDER as builder
 
-ENV DRBD_REACTOR_VERSION 1.3.0
+ENV DRBD_REACTOR_VERSION 1.4.0-rc.1
 
 ENV DRBD_REACTOR_TGZNAME drbd-reactor
 ENV DRBD_REACTOR_TGZ ${DRBD_REACTOR_TGZNAME}-${DRBD_REACTOR_VERSION}.tar.gz
@@ -21,9 +21,9 @@ RUN cd /tmp && tar xvf ${DRBD_REACTOR_TGZ} && cd ${DRBD_REACTOR_TGZNAME}-${DRBD_
 	cp ./example/drbd-reactor.toml /tmp
 
 FROM quay.io/linbit/drbd-utils
-MAINTAINER Roland Kammerer <roland.kammerer@linbit.com>
+LABEL maintainer="Roland Kammerer <roland.kammerer@linbit.com>"
 
-ENV DRBD_REACTOR_VERSION 1.3.0
+ENV DRBD_REACTOR_VERSION 1.4.0-rc.1
 
 ARG release=1
 LABEL	name="drbd-reactor" \
