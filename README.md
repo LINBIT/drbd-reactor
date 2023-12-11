@@ -41,7 +41,7 @@ systemctl enable --now drbd-reactor-reload.path
 # Building
 
 This is a Rust application. If you have a Rust toolchain and `cargo` installed (via distribution packages or
-[rustup](https://rustup.sh)) you can build it via:
+[rustup](https://rustup.rs)) you can build it via:
 
 ```
 cargo build
