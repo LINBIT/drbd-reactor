@@ -72,3 +72,19 @@ test:compat:
     key: $CI_JOB_NAME
     paths:
       - .cargo
+
+test:clippy:
+  stage: check
+  image: $LINBIT_DOCKER_REGISTRY/rust/clippy2codeclimate
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  script:
+    - cargo clippy --no-deps --all-features --message-format=json | clippy2codeclimate codequality.json
+  artifacts:
+    reports:
+      codequality:
+        - codequality.json
+  cache:
+    key: $CI_JOB_NAME
+    paths:
+      - .cargo
