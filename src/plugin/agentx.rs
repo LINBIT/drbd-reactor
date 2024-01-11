@@ -275,7 +275,7 @@ fn tx(stream: &Arc<RwLock<TcpStream>>, bytes: &Vec<u8>) -> Result<()> {
         Err(_) => return Err(anyhow::anyhow!("txrx: could not lock stream")),
     };
     let mut s: &TcpStream = &*lock;
-    s.write(&bytes)?;
+    s.write_all(&bytes)?;
 
     Ok(())
 }

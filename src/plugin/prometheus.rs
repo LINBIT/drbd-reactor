@@ -115,7 +115,7 @@ fn handle_connection(mut stream: TcpStream, metrics: &Arc<Mutex<Metrics>>) -> Re
     // read request body
     // we have to, otherwise we will get a connection reset by peer
     let mut discard = [0u8; 4096];
-    stream.read(&mut discard)?;
+    let _ = stream.read(&mut discard)?;
 
     let content = metrics
         .lock()

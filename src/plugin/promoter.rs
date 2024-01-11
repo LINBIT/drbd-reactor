@@ -300,6 +300,7 @@ fn process_drbd_event(
             }
         }
         PluginUpdate::PeerDevice(u) => {
+            #[allow(clippy::if_same_then_else)]
             if res.preferred_nodes.len() == 0 {
                 return;
             } else if !(u.old.peer_disk_state != DiskState::UpToDate
