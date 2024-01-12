@@ -5,7 +5,7 @@ use std::time::Duration;
 use std::{io, sync, thread};
 
 use anyhow::{Context, Result};
-use fern;
+
 use log::{debug, error, warn};
 use signal_hook::iterator::Signals;
 use structopt::StructOpt;
@@ -113,7 +113,7 @@ impl Core {
                 EventUpdate::Resource(et, r) => {
                     let res = self.get_or_create_resource(&r.name);
                     let up = res.get_resource_update(&et, &r);
-                    send_updates(up, &res, &et)?;
+                    send_updates(up, res, &et)?;
 
                     if et == EventType::Destroy {
                         self.resources.remove(&r.name);
@@ -122,22 +122,22 @@ impl Core {
                 EventUpdate::Device(et, d) => {
                     let res = self.get_or_create_resource(&d.name);
                     let up = res.get_device_update(&et, &d);
-                    send_updates(up, &res, &EventType::Change)?;
+                    send_updates(up, res, &EventType::Change)?;
                 }
                 EventUpdate::PeerDevice(et, pd) => {
                     let res = self.get_or_create_resource(&pd.name);
                     let up = res.get_peerdevice_update(&et, &pd);
-                    send_updates(up, &res, &EventType::Change)?;
+                    send_updates(up, res, &EventType::Change)?;
                 }
                 EventUpdate::Connection(et, c) => {
                     let res = self.get_or_create_resource(&c.name);
                     let up = res.get_connection_update(&et, &c);
-                    send_updates(up, &res, &EventType::Change)?;
+                    send_updates(up, res, &EventType::Change)?;
                 }
                 EventUpdate::Path(et, p) => {
                     let res = self.get_or_create_resource(&p.name);
                     let up = res.get_path_update(&et, &p);
-                    send_updates(up, &res, &EventType::Change)?;
+                    send_updates(up, res, &EventType::Change)?;
                 }
                 EventUpdate::Stop => return Ok(CoreExit::Stop),
                 EventUpdate::Reload => return Ok(CoreExit::Reload),
@@ -195,7 +195,7 @@ fn main() -> Result<()> {
 
     let (e2tx, e2rx) = crossbeam_channel::unbounded();
 
-    let _ = setup_signals(e2tx.clone())?;
+    setup_signals(e2tx.clone())?;
 
     let statistics_poll = Duration::from_secs(cfg.statistics_poll_interval);
     thread::spawn(move || {
@@ -265,7 +265,7 @@ fn setup_signals(events: crossbeam_channel::Sender<EventUpdate>) -> Result<()> {
 
 fn get_config(config_file: &PathBuf) -> Result<config::Config> {
     match read_config(config_file) {
-        Ok(new) if new.plugins.promoter.len() > 0 => {
+        Ok(new) if !new.plugins.promoter.is_empty() => {
             min_drbd_versions()?;
             Ok(new)
         }
@@ -347,7 +347,7 @@ fn read_config(config_file: &PathBuf) -> Result<config::Config> {
 
     let snippets_paths = config::files_with_extension_in(&snippets_path, "toml")?;
     let snippets = config::read_snippets(&snippets_paths)
-        .with_context(|| format!("Could not read config snippets"))?;
+        .with_context(|| "Could not read config snippets".to_string())?;
     content.push_str("\n# Content from snippets:\n");
     content.push_str(&snippets);
     config = toml::from_str(&content).with_context(|| {

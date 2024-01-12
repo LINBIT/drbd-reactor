@@ -7,7 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use libc;
+
 use log::{error, info};
 use signal_hook::iterator::Signals;
 
@@ -68,8 +68,8 @@ fn _main() -> Result<ExitCode> {
         .ok_or(anyhow::anyhow!("Could not get action as first argument"))?;
 
     match action.as_str() {
-        "stop" => stop(&agent, &ocf_resource_instance, &notify_socket),
-        "start-and-monitor" => start_and_monitor(&agent, &ocf_resource_instance, &notify_socket),
+        "stop" => stop(agent, &ocf_resource_instance, &notify_socket),
+        "start-and-monitor" => start_and_monitor(agent, &ocf_resource_instance, &notify_socket),
         _ => Err(anyhow::anyhow!("Action '{}' not implemented", action)),
     }
 }

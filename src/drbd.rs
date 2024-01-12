@@ -1173,30 +1173,30 @@ impl Resource {
         }));
 
         for d in &self.devices {
-            if let Some(u) = r.get_device_update(&EventType::Exists, &d) {
+            if let Some(u) = r.get_device_update(&EventType::Exists, d) {
                 updates.push(u);
             }
         }
 
         for c in &self.connections {
-            if let Some(u) = r.get_connection_update(&EventType::Exists, &c) {
+            if let Some(u) = r.get_connection_update(&EventType::Exists, c) {
                 updates.push(u);
             }
 
             for p in &c.paths {
-                if let Some(u) = r.get_path_update(&EventType::Exists, &p) {
+                if let Some(u) = r.get_path_update(&EventType::Exists, p) {
                     updates.push(u);
                 }
             }
 
             for pd in &c.peerdevices {
-                if let Some(u) = r.get_peerdevice_update(&EventType::Exists, &pd) {
+                if let Some(u) = r.get_peerdevice_update(&EventType::Exists, pd) {
                     updates.push(u);
                 }
             }
         }
 
-        if let Some(u) = r.get_resource_update(&EventType::Change, &self) {
+        if let Some(u) = r.get_resource_update(&EventType::Change, self) {
             updates.push(u);
         }
 

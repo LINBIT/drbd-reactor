@@ -98,7 +98,7 @@ impl super::Plugin for Promoter {
             crossbeam_channel::select! {
                 recv(ticker) -> _ => {
                     for name in &may_promote {
-                        if let Ok(false) = systemd::is_active(&systemd::escaped_services_target(&name)) {
+                        if let Ok(false) = systemd::is_active(&systemd::escaped_services_target(name)) {
                             let res = cfg
                                 .resources
                                 .get(name)
@@ -107,8 +107,8 @@ impl super::Plugin for Promoter {
                             last_start = Instant::now();
                             // see start_actions comments in process_drbd_event()
                             // we do not manipulate the may_promote state from here
-                            if start_actions(&name, &res.start, &res.runner).is_err() {
-                                if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                            if start_actions(name, &res.start, &res.runner).is_err() {
+                                if let Err(e) = stop_actions(name, &res.stop, &res.runner) {
                                     warn!("Stopping '{}' failed: {}", name, e);
                                 }
                             }
@@ -255,21 +255,22 @@ fn process_drbd_event(
                         warn!("Stopping '{}' failed: {}", name, e);
                     }
                 }
-            } else if u.old.role == Role::Primary && u.new.role == Role::Secondary {
-                if res.on_quorum_loss == QuorumLossPolicy::Freeze {
-                    // might have been frozen, the other nodes formed a partition and a Primary
-                    // and now they are back and forced me to secondary because I was frozen and
-                    // on-suspended-primary-outdated = force-secondary
-                    //
-                    // we could send a stop in any case, but that would also send stops (which should not matter)
-                    // in case of a normal stop when quorum was lost but the policy was Shutdown
-                    info!(
-                        "resource '{}' got forced to Secondary while frozen, stopping services",
-                        name
-                    );
-                    if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                        warn!("Stopping '{}' failed: {}", name, e);
-                    }
+            } else if u.old.role == Role::Primary
+                && u.new.role == Role::Secondary
+                && res.on_quorum_loss == QuorumLossPolicy::Freeze
+            {
+                // might have been frozen, the other nodes formed a partition and a Primary
+                // and now they are back and forced me to secondary because I was frozen and
+                // on-suspended-primary-outdated = force-secondary
+                //
+                // we could send a stop in any case, but that would also send stops (which should not matter)
+                // in case of a normal stop when quorum was lost but the policy was Shutdown
+                info!(
+                    "resource '{}' got forced to Secondary while frozen, stopping services",
+                    name
+                );
+                if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                    warn!("Stopping '{}' failed: {}", name, e);
                 }
             }
         }
@@ -288,20 +289,20 @@ fn process_drbd_event(
                         }
                     }
                 }
-            } else if !u.old.quorum && u.new.quorum {
-                if res.on_quorum_loss == QuorumLossPolicy::Freeze
-                    && u.resource.role == Role::Primary
-                {
-                    info!("resource '{}' gained quorum, thawing Primary", name);
-                    if let Err(e) = freeze_actions(&name, State::Thaw, &res.runner) {
-                        warn!("Thawing '{}' failed: {}", name, e);
-                    }
+            } else if !u.old.quorum
+                && u.new.quorum
+                && res.on_quorum_loss == QuorumLossPolicy::Freeze
+                && u.resource.role == Role::Primary
+            {
+                info!("resource '{}' gained quorum, thawing Primary", name);
+                if let Err(e) = freeze_actions(&name, State::Thaw, &res.runner) {
+                    warn!("Thawing '{}' failed: {}", name, e);
                 }
             }
         }
         PluginUpdate::PeerDevice(u) => {
             #[allow(clippy::if_same_then_else)]
-            if res.preferred_nodes.len() == 0 {
+            if res.preferred_nodes.is_empty() {
                 return;
             } else if !(u.old.peer_disk_state != DiskState::UpToDate
                 && u.new.peer_disk_state == DiskState::UpToDate)
@@ -608,7 +609,7 @@ fn generate_systemd_templates(
             systemd_write_unit(
                 prefix.clone(),
                 "reactor-50-mount.conf",
-                format!("[Unit]\nDefaultDependencies=no\n"),
+                "[Unit]\nDefaultDependencies=no\n".to_string(),
             )?;
         }
         systemd_write_unit(
@@ -647,7 +648,7 @@ fn generate_systemd_templates(
     systemd_write_unit(
         escaped_services_target_dir(name),
         SYSTEMD_BEFORE_CONF,
-        format!("[Unit]\nBefore=drbd-reactor.service\n"),
+        "[Unit]\nBefore=drbd-reactor.service\n".to_string(),
     )
 }
 
@@ -1021,13 +1022,13 @@ fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
     check_for(
         name,
         "on-no-quorum",
-        &on_no_quorum_policy,
+        on_no_quorum_policy,
         &resources[0].options.on_no_quorum,
     );
     check_for(
         name,
         "on-no-data-accessible",
-        &on_no_quorum_policy,
+        on_no_quorum_policy,
         &resources[0].options.on_no_data_accessible,
     );
 
@@ -1087,24 +1088,24 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Shutdown, 1),
+            get_sleep_before_promote_ms(&r, &[], &QuorumLossPolicy::Shutdown, 1),
             6000
         );
 
         r.role = Role::Secondary;
         assert_eq!(
-            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Freeze, 1),
+            get_sleep_before_promote_ms(&r, &[], &QuorumLossPolicy::Freeze, 1),
             6000 + 2000
         );
         assert_eq!(
-            get_sleep_before_promote_ms(&r, &vec![], &QuorumLossPolicy::Shutdown, 2),
+            get_sleep_before_promote_ms(&r, &[], &QuorumLossPolicy::Shutdown, 2),
             12000
         );
         if let Ok(node_name) = uname_n() {
             assert_eq!(
                 get_sleep_before_promote_ms(
                     &r,
-                    &vec![
+                    &[
                         "".to_string(),
                         "".to_string(),
                         node_name.clone(),
@@ -1118,7 +1119,7 @@ mod tests {
             assert_eq!(
                 get_sleep_before_promote_ms(
                     &r,
-                    &vec!["".to_string(), "".to_string(), "".to_string()],
+                    &["".to_string(), "".to_string(), "".to_string()],
                     &QuorumLossPolicy::Shutdown,
                     1
                 ),

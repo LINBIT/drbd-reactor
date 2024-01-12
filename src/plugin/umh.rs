@@ -72,7 +72,7 @@ where
     T: PartialMatchable,
 {
     let iter = rules
-        .into_iter()
+        .iter()
         .filter(move |(_, p)| item.matches(p))
         .map(|(c, _)| c);
 
@@ -165,16 +165,16 @@ struct DeviceRule {
     new: Option<DeviceUpdateStatePattern>,
 }
 
-impl Into<(CommonRule, Option<DevicePluginUpdatePattern>)> for DeviceRule {
-    fn into(self) -> (CommonRule, Option<DevicePluginUpdatePattern>) {
+impl From<DeviceRule> for (CommonRule, Option<DevicePluginUpdatePattern>) {
+    fn from(val: DeviceRule) -> Self {
         (
-            self.common,
+            val.common,
             Some(DevicePluginUpdatePattern {
-                event_type: self.event_type,
-                resource_name: self.resource_name,
-                volume: self.volume,
-                old: self.old,
-                new: self.new,
+                event_type: val.event_type,
+                resource_name: val.resource_name,
+                volume: val.volume,
+                old: val.old,
+                new: val.new,
                 resource: None,
             }),
         )
@@ -193,15 +193,15 @@ pub struct ResourceRule {
     new: Option<ResourceUpdateStatePattern>,
 }
 
-impl Into<(CommonRule, Option<ResourcePluginUpdatePattern>)> for ResourceRule {
-    fn into(self) -> (CommonRule, Option<ResourcePluginUpdatePattern>) {
+impl From<ResourceRule> for (CommonRule, Option<ResourcePluginUpdatePattern>) {
+    fn from(val: ResourceRule) -> Self {
         (
-            self.common,
+            val.common,
             Some(ResourcePluginUpdatePattern {
-                event_type: self.event_type,
-                resource_name: self.resource_name,
-                old: self.old,
-                new: self.new,
+                event_type: val.event_type,
+                resource_name: val.resource_name,
+                old: val.old,
+                new: val.new,
                 resource: None,
             }),
         )
@@ -222,17 +222,17 @@ pub struct PeerDeviceRule {
     new: Option<PeerDeviceUpdateStatePattern>,
 }
 
-impl Into<(CommonRule, Option<PeerDevicePluginUpdatePattern>)> for PeerDeviceRule {
-    fn into(self) -> (CommonRule, Option<PeerDevicePluginUpdatePattern>) {
+impl From<PeerDeviceRule> for (CommonRule, Option<PeerDevicePluginUpdatePattern>) {
+    fn from(val: PeerDeviceRule) -> Self {
         (
-            self.common,
+            val.common,
             Some(PeerDevicePluginUpdatePattern {
-                event_type: self.event_type,
-                resource_name: self.resource_name,
-                volume: self.volume,
-                peer_node_id: self.peer_node_id,
-                old: self.old,
-                new: self.new,
+                event_type: val.event_type,
+                resource_name: val.resource_name,
+                volume: val.volume,
+                peer_node_id: val.peer_node_id,
+                old: val.old,
+                new: val.new,
                 resource: None,
             }),
         )
@@ -252,16 +252,16 @@ pub struct ConnectionRule {
     new: Option<ConnectionUpdateStatePattern>,
 }
 
-impl Into<(CommonRule, Option<ConnectionPluginUpdatePattern>)> for ConnectionRule {
-    fn into(self) -> (CommonRule, Option<ConnectionPluginUpdatePattern>) {
+impl From<ConnectionRule> for (CommonRule, Option<ConnectionPluginUpdatePattern>) {
+    fn from(val: ConnectionRule) -> Self {
         (
-            self.common,
+            val.common,
             Some(ConnectionPluginUpdatePattern {
-                event_type: self.event_type,
-                resource_name: self.resource_name,
-                peer_node_id: self.peer_node_id,
-                old: self.old,
-                new: self.new,
+                event_type: val.event_type,
+                resource_name: val.resource_name,
+                peer_node_id: val.peer_node_id,
+                old: val.old,
+                new: val.new,
                 resource: None,
             }),
         )

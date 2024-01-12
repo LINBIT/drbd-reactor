@@ -71,7 +71,7 @@ impl super::Plugin for Prometheus {
                 PluginUpdate::ResourceOnly(EventType::Exists, u)
                 | PluginUpdate::ResourceOnly(EventType::Create, u)
                 | PluginUpdate::ResourceOnly(EventType::Change, u) => match self.metrics.lock() {
-                    Ok(mut m) => m.update(&u),
+                    Ok(mut m) => m.update(u),
                     Err(e) => {
                         error!("run: could not lock metrics: {}", e);
                         return Err(anyhow::anyhow!("Tried accessing a poisoned lock"));
@@ -174,16 +174,16 @@ impl Metrics {
             "Boolean indicating whether or not drbdreactor is running. Always 1",
             &mut metrics,
         );
-        write!(m, "{} 1\n", k)?;
+        writeln!(m, "{} 1", k)?;
 
         let (k, m) = type_gauge(
             "drbd_version",
             "Version of the loaded DRBD kernel module and DRBD utils",
             &mut metrics,
         );
-        write!(
+        writeln!(
             m,
-            "{}{{kmod=\"{}\",utils=\"{}\"}} 1\n",
+            "{}{{kmod=\"{}\",utils=\"{}\"}} 1",
             k, self.drbd_version.kmod, self.drbd_version.utils
         )?;
 
@@ -192,7 +192,7 @@ impl Metrics {
             "Number of resources",
             &mut metrics,
         );
-        write!(m, "{} {}\n", k, self.resources.len())?;
+        writeln!(m, "{} {}", k, self.resources.len())?;
 
         for (name, r) in &self.resources {
             if self.enums {
@@ -202,9 +202,9 @@ impl Metrics {
                     &mut metrics,
                 );
                 for role in Role::iterator() {
-                    write!(
+                    writeln!(
                         m,
-                        "{}{{name=\"{}\",{}=\"{}\"}} {}\n",
+                        "{}{{name=\"{}\",{}=\"{}\"}} {}",
                         k,
                         name,
                         k,
@@ -219,30 +219,30 @@ impl Metrics {
                 "Boolean whether the resource is suspended",
                 &mut metrics,
             );
-            write!(m, "{}{{name=\"{}\"}} {}\n", k, name, r.suspended as i32)?;
+            writeln!(m, "{}{{name=\"{}\"}} {}", k, name, r.suspended as i32)?;
 
             let (k, m) = type_gauge(
                 "drbd_resource_maypromote",
                 "Boolean whether the resource may be promoted to Primary",
                 &mut metrics,
             );
-            write!(m, "{}{{name=\"{}\"}} {}\n", k, name, r.may_promote as i32)?;
+            writeln!(m, "{}{{name=\"{}\"}} {}", k, name, r.may_promote as i32)?;
 
             let (k, m) = type_gauge(
                 "drbd_resource_promotionscore",
                 "The promotion score (higher is better) for the resource",
                 &mut metrics,
             );
-            write!(m, "{}{{name=\"{}\"}} {}\n", k, name, r.promotion_score)?;
+            writeln!(m, "{}{{name=\"{}\"}} {}", k, name, r.promotion_score)?;
 
             let (k, m) = type_gauge(
                 "drbd_resource_forceiofailures",
                 "Boolean whether the resource is configured (could be temporarily) to force IO failures (e.g., during secondary --force)",
                 &mut metrics,
             );
-            write!(
+            writeln!(
                 m,
-                "{}{{name=\"{}\"}} {}\n",
+                "{}{{name=\"{}\"}} {}",
                 k, name, r.force_io_failures as i32
             )?;
 
@@ -262,9 +262,9 @@ impl Metrics {
                         &mut metrics,
                     );
                     for cstate in ConnectionState::iterator() {
-                        write!(
+                        writeln!(
                             m,
-                            "{}{{{},{}=\"{}\"}} {}\n",
+                            "{}{{{},{}=\"{}\"}} {}",
                             k,
                             common,
                             k,
@@ -278,9 +278,9 @@ impl Metrics {
                     let (k, m) = type_gauge("drbd_peerdevice_outofsync_bytes",
                                             "Number of bytes currently out of sync with this peer, according to the bitmap that DRBD has for it",
                                             &mut metrics);
-                    write!(
+                    writeln!(
                         m,
-                        "{}{{{},volume=\"{}\"}} {}\n",
+                        "{}{{{},volume=\"{}\"}} {}",
                         k,
                         common,
                         pd.volume,
@@ -292,21 +292,21 @@ impl Metrics {
                                         "Boolean whether the TCP send buffer of the data connection is more than 80% filled",
                                         &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, c.congested as i32)?;
+                writeln!(m, "{}{{{}}} {}", k, common, c.congested as i32)?;
 
                 let (k, m) = type_gauge(
                     "drbd_connection_apinflight_bytes",
                     "Number of application requests in flight (not completed)",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, c.ap_in_flight * 512)?; // 512 byte sectors
+                writeln!(m, "{}{{{}}} {}", k, common, c.ap_in_flight * 512)?; // 512 byte sectors
 
                 let (k, m) = type_gauge(
                     "drbd_connection_rsinflight_bytes",
                     "Number of resync requests in flight",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, c.rs_in_flight * 512)?; // 512 byte sectors
+                writeln!(m, "{}{{{}}} {}", k, common, c.rs_in_flight * 512)?; // 512 byte sectors
             }
 
             for d in &r.devices {
@@ -319,9 +319,9 @@ impl Metrics {
                 if self.enums {
                     let (k, m) = type_gauge("drbd_device_state", "DRBD device state", &mut metrics);
                     for dstate in DiskState::iterator() {
-                        write!(
+                        writeln!(
                             m,
-                            "{}{{{},{}=\"{}\"}} {}\n",
+                            "{}{{{},{}=\"{}\"}} {}",
                             k,
                             common,
                             k,
@@ -336,7 +336,7 @@ impl Metrics {
                     "Boolean whether this device is a client (i.e., intentional diskless)",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.client as i32)?;
+                writeln!(m, "{}{{{}}} {}", k, common, d.client as i32)?;
 
                 // higher level metric
                 let (k, m) = type_gauge(
@@ -344,9 +344,9 @@ impl Metrics {
                     "Boolean whether the devices is unintentional diskless",
                     &mut metrics,
                 );
-                write!(
+                writeln!(
                     m,
-                    "{}{{{}}} {}\n",
+                    "{}{{{}}} {}",
                     k,
                     common,
                     (!d.client && d.disk_state == DiskState::Diskless) as i32
@@ -357,68 +357,68 @@ impl Metrics {
                     "Boolean if this device has DRBD quorum",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.quorum as i32)?;
+                writeln!(m, "{}{{{}}} {}", k, common, d.quorum as i32)?;
 
                 let (k, m) = type_gauge(
                     "drbd_device_size_bytes",
                     "Device size in bytes",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.size * 1024)?; // KiB
+                writeln!(m, "{}{{{}}} {}", k, common, d.size * 1024)?; // KiB
 
                 let (k, m) = type_counter(
                     "drbd_device_read_bytes_total",
                     "Net data read from local hard disk",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.read * 1024)?; // KiB
+                writeln!(m, "{}{{{}}} {}", k, common, d.read * 1024)?; // KiB
 
                 let (k, m) = type_counter(
                     "drbd_device_written_bytes_total",
                     "Net data written on local disk",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.written * 1024)?; // KiB
+                writeln!(m, "{}{{{}}} {}", k, common, d.written * 1024)?; // KiB
 
                 let (k, m) = type_counter(
                     "drbd_device_alwrites_total",
                     "Number of updates of the activity log area of the meta data",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.al_writes)?;
+                writeln!(m, "{}{{{}}} {}", k, common, d.al_writes)?;
 
                 let (k, m) = type_counter(
                     "drbd_device_bmwrites_total",
                     "Number of updates of the bitmap area of the meta data",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.bm_writes)?;
+                writeln!(m, "{}{{{}}} {}", k, common, d.bm_writes)?;
 
                 let (k, m) = type_gauge(
                     "drbd_device_upperpending",
                     "Number of block I/O requests forwarded to DRBD, but not yet answered by DRBD.",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.upper_pending)?;
+                writeln!(m, "{}{{{}}} {}", k, common, d.upper_pending)?;
 
                 let (k, m) = type_gauge(
                     "drbd_device_lowerpending",
                     "Number of open requests to the local I/O sub-system issued by DRBD",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.lower_pending)?;
+                writeln!(m, "{}{{{}}} {}", k, common, d.lower_pending)?;
 
                 let (k, m) = type_gauge(
                     "drbd_device_alsuspended",
                     "Boolean whether the Activity-Log is suspended",
                     &mut metrics,
                 );
-                write!(m, "{}{{{}}} {}\n", k, common, d.al_suspended as i32)?;
+                writeln!(m, "{}{{{}}} {}", k, common, d.al_suspended as i32)?;
             }
         }
 
         self.cache.clear();
-        metrics.values().for_each(|v| self.cache.push_str(&v));
+        metrics.values().for_each(|v| self.cache.push_str(v));
         self.dirty = false;
         Ok(self.cache.clone())
     }

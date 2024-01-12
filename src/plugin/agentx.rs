@@ -72,7 +72,7 @@ impl super::Plugin for AgentX {
                 PluginUpdate::ResourceOnly(EventType::Exists, u)
                 | PluginUpdate::ResourceOnly(EventType::Create, u)
                 | PluginUpdate::ResourceOnly(EventType::Change, u) => match self.metrics.lock() {
-                    Ok(mut m) => m.update(&u),
+                    Ok(mut m) => m.update(u),
                     Err(e) => {
                         error!("run: could not lock metrics: {}", e);
                         return Err(anyhow::anyhow!("Tried accessing a poisoned lock"));
@@ -144,7 +144,7 @@ fn agentx_handler_process_loop(
     let mut open = pdu::Open::new(agent_id.clone(), "DRBD by drbd-reactor::agentx");
     open.timeout = agent_timeout;
     let bytes = open.to_bytes().expect("Open PDU can be converted to bytes");
-    let resp = txrx(&stream, &bytes)?;
+    let resp = txrx(stream, &bytes)?;
     let session_id = resp.header.session_id;
 
     // register agent
@@ -159,7 +159,7 @@ fn agentx_handler_process_loop(
     // main processing loop
     info!("agentx_handler_process_loop: processing agentx messages");
     loop {
-        let (ty, bytes) = rx(&stream)?;
+        let (ty, bytes) = rx(stream)?;
         trace!("agentx_handler_process_loop:main: got request '{:?}'", ty);
 
         // net-snmpd the defacto standard unfortunately does not implement GetBulk for agentx
@@ -175,7 +175,7 @@ fn agentx_handler_process_loop(
             }
         };
         let bytes = resp.to_bytes()?;
-        tx(&stream, &bytes)?;
+        tx(stream, &bytes)?;
     }
 }
 
@@ -227,7 +227,7 @@ fn agentx_handler(
 }
 
 fn get(bytes: &Vec<u8>, metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Response> {
-    let pkg = pdu::Get::from_bytes(&bytes)?;
+    let pkg = pdu::Get::from_bytes(bytes)?;
     trace!(
         "get: sid: {}, tid: {}",
         pkg.header.session_id,
@@ -245,7 +245,7 @@ fn get(bytes: &Vec<u8>, metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Response> 
 }
 
 fn get_next(bytes: &Vec<u8>, metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Response> {
-    let pkg = pdu::GetNext::from_bytes(&bytes)?;
+    let pkg = pdu::GetNext::from_bytes(bytes)?;
     trace!(
         "getnext: sid: {}, tid: {}",
         pkg.header.session_id,
@@ -274,8 +274,8 @@ fn tx(stream: &Arc<RwLock<TcpStream>>, bytes: &Vec<u8>) -> Result<()> {
         Ok(l) => l,
         Err(_) => return Err(anyhow::anyhow!("txrx: could not lock stream")),
     };
-    let mut s: &TcpStream = &*lock;
-    s.write_all(&bytes)?;
+    let mut s: &TcpStream = &lock;
+    s.write_all(bytes)?;
 
     Ok(())
 }
@@ -288,7 +288,7 @@ fn rx(stream: &Arc<RwLock<TcpStream>>) -> Result<(pdu::Type, Vec<u8>)> {
         Ok(s) => s,
         Err(_) => return Err(anyhow::anyhow!("rx: could not lock stream")),
     };
-    let mut s: &TcpStream = &*lock;
+    let mut s: &TcpStream = &lock;
     s.read_exact(&mut buf)?;
     let header = pdu::Header::from_bytes(&buf)?;
     buf.resize(20 + header.payload_length as usize, 0);
@@ -510,12 +510,12 @@ impl Metrics {
                 for minor in vol_to_minor.values() {
                     let minor = *minor as u32;
                     for ds in DiskState::iterator() {
-                        let id = MIB::from_disk_state(&ds);
+                        let id = MIB::from_disk_state(ds);
                         let id = gen_id(&resource_prefix, &[id as u32, minor]);
                         pd_states.insert(id, 0);
                     }
                     for rs in ReplicationState::iterator() {
-                        let id = MIB::from_replication_state(&rs);
+                        let id = MIB::from_replication_state(rs);
                         let id = gen_id(&resource_prefix, &[id as u32, minor]);
                         pd_states.insert(id, 0);
                     }

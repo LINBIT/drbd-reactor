@@ -27,8 +27,8 @@ fn get_resource_update() {
     match up {
         PluginUpdate::Resource(u) => {
             assert_eq!(u.event_type, EventType::Exists);
-            assert_eq!(u.old.may_promote, true);
-            assert_eq!(u.new.may_promote, false);
+            assert!(u.old.may_promote);
+            assert!(!u.new.may_promote);
         }
         _ => panic!("not a resorce update"),
     }
@@ -56,8 +56,8 @@ fn get_device_update() {
     match up {
         PluginUpdate::Device(u) => {
             assert_eq!(u.event_type, EventType::Exists);
-            assert_eq!(u.old.quorum, false);
-            assert_eq!(u.new.quorum, true);
+            assert!(!u.old.quorum);
+            assert!(u.new.quorum);
             assert_eq!(u.volume, 0);
         }
         _ => panic!("not a device update"),
@@ -93,8 +93,8 @@ fn get_connection_update() {
     match up {
         PluginUpdate::Connection(u) => {
             assert_eq!(u.event_type, EventType::Exists);
-            assert_eq!(u.old.congested, false);
-            assert_eq!(u.new.congested, true);
+            assert!(!u.old.congested);
+            assert!(u.new.congested);
             assert_eq!(u.peer_node_id, 1);
         }
         _ => panic!("not a connection update"),
@@ -133,8 +133,8 @@ fn get_peerdevice_update() {
     match up {
         PluginUpdate::PeerDevice(u) => {
             assert_eq!(u.event_type, EventType::Change);
-            assert_eq!(u.old.peer_client, false);
-            assert_eq!(u.new.peer_client, true);
+            assert!(!u.old.peer_client);
+            assert!(u.new.peer_client);
             assert_eq!(u.peer_node_id, 1);
             assert_eq!(u.volume, 1);
         }

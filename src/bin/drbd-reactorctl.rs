@@ -66,7 +66,7 @@ fn main() -> Result<()> {
         .expect("expected to have a default");
     let snippets_path = get_snippets_path(&PathBuf::from(config_file))
         .with_context(|| "Could not get snippets path from config file")?;
-    let snippets_path = PathBuf::from(snippets_path);
+    let snippets_path = snippets_path;
 
     let context = matches
         .value_of("context")
@@ -76,7 +76,7 @@ fn main() -> Result<()> {
         .values_of("nodes")
         .expect("expeced to have a default")
         .collect::<Vec<_>>();
-    nodes.retain(|&x| x != "");
+    nodes.retain(|&x| !x.is_empty());
 
     let local = matches.is_present("local");
 
@@ -218,7 +218,7 @@ fn edit_editor(tmppath: &Path, editor: &str, type_opt: &str, force: bool) -> Res
     let len_err =
         || -> Result<()> { Err(anyhow::anyhow!("Expected excactly one {} plugin", type_opt)) };
 
-    plugin::map_status(Command::new(&editor).arg(tmppath).status())?;
+    plugin::map_status(Command::new(editor).arg(tmppath).status())?;
 
     let content = fs::read_to_string(tmppath)?;
     let config: config::Config = toml::from_str(&content)?;
@@ -325,7 +325,7 @@ fn edit(
         // use new_in() to avoid $TMPDIR being on a different mount point than snippets_path
         // as this would result in an error on .persist()
         // also we can avoid using special methods and can just use the path as there won't be any TMPDIR cleaners
-        let mut tmpfile = NamedTempFile::new_in(&snippets_path)?;
+        let mut tmpfile = NamedTempFile::new_in(snippets_path)?;
         let mut from_template = false;
         if snippet.exists() {
             fs::copy(snippet, tmpfile.path())?;
@@ -431,7 +431,7 @@ fn start_until_list(config: promoter::PromoterOptResource, until: &str) -> Resul
 }
 
 fn start_until(snippets_paths: Vec<PathBuf>, until: &str) -> Result<()> {
-    if snippets_paths.len() == 0 {
+    if snippets_paths.is_empty() {
         return Err(anyhow::anyhow!("Could not get disabled snippet file"));
     }
     let path = &snippets_paths[0];
@@ -479,7 +479,7 @@ fn enable(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
             continue;
         }
         eprintln!("Enabling '{}'...", snippet.display());
-        let enabled_path = get_enabled_path(&snippet)?;
+        let enabled_path = get_enabled_path(snippet)?;
         if enabled_path.exists() {
             warn(&format!(
                 "'{}' already exists, doing nothing",
@@ -500,10 +500,10 @@ fn enable(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
 
 fn stop_targets(snippets_paths: Vec<PathBuf>) -> Result<()> {
     for snippet in &snippets_paths {
-        let conf = read_config(&snippet)?;
+        let conf = read_config(snippet)?;
         for promoter in conf.plugins.promoter {
             for drbd_res in promoter.resources.keys() {
-                let target = systemd::escaped_services_target(&drbd_res);
+                let target = systemd::escaped_services_target(drbd_res);
                 systemctl(vec!["stop".into(), target])?;
             }
         }
@@ -527,7 +527,7 @@ fn disable(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterCo
             continue;
         }
         eprintln!("Disabling '{}'...", snippet.display());
-        let disabled_path = get_disabled_path(&snippet);
+        let disabled_path = get_disabled_path(snippet);
         fs::rename(snippet, disabled_path.clone())?;
         disabled_snippets_paths.push(disabled_path);
     }
@@ -813,7 +813,7 @@ fn evict_resource(drbd_resource: &str, delay: u32, me: &str) -> Result<()> {
         }
     }
     if needs_newline {
-        println!("");
+        println!();
     }
 
     if primary == UNKNOWN {
@@ -982,7 +982,7 @@ fn restart(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterCo
 
 fn read_config(snippet_path: &PathBuf) -> Result<config::Config> {
     let content = config::read_snippets(&vec![snippet_path.clone()])
-        .with_context(|| format!("Could not read config snippets"))?;
+        .with_context(|| "Could not read config snippets".to_string())?;
     let config = toml::from_str(&content).with_context(|| {
         format!(
             "Could not parse config files including snippets; content: {}",
@@ -1059,7 +1059,7 @@ fn expand_snippets(snippets_path: &PathBuf, matches: &ArgMatches, disabled: bool
 }
 
 fn promote_service(drbd_res: &str) -> String {
-    format!("drbd-promote@{}.service", systemd::escape_name(&drbd_res))
+    format!("drbd-promote@{}.service", systemd::escape_name(drbd_res))
 }
 
 fn service_name(start_entry: &str, drbd_res: &str) -> Result<String> {
@@ -1068,7 +1068,7 @@ fn service_name(start_entry: &str, drbd_res: &str) -> Result<String> {
     let (service_name, _) = match ocf_pattern.captures(start) {
         Some(ocf) => {
             let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-            systemd::escaped_ocf_parse_to_env(&drbd_res, vendor, agent, args)?
+            systemd::escaped_ocf_parse_to_env(drbd_res, vendor, agent, args)?
         }
         _ => (start.to_string(), Vec::new()),
     };
@@ -1098,7 +1098,7 @@ struct Config {
 
 fn cfg_dir() -> Result<PathBuf> {
     let cfg_dir = match env::var("XDG_CONFIG_HOME") {
-        Ok(x) if x != "" => PathBuf::from(x),
+        Ok(x) if !x.is_empty() => PathBuf::from(x),
         _ => match env::var("HOME") {
             Ok(x) => Path::new(&x).join(".config"),
             Err(e) => return Err(anyhow::anyhow!(e)),
@@ -1119,7 +1119,7 @@ fn read_ctl_config(context: &str, additional_content: Option<&str>) -> Result<Co
         .with_context(|| format!("Could not read config file: {}", cfg_file.display()))?;
 
     if let Some(ac) = additional_content {
-        content.push_str("\n");
+        content.push('\n');
         content.push_str(ac);
     }
 
@@ -1159,11 +1159,11 @@ fn read_nodes(cluster: &ClusterConf) -> Result<Vec<Node>> {
     for (name, node) in cfg.nodes {
         // it is slightly easier to filter here based on the "name" (i.e., "nick name")
         // than to filter "nodes" later, where we only have the expanded hostname
-        if !cluster.nodes.is_empty() && !cluster.nodes.contains(&&name.as_str()) {
+        if !cluster.nodes.is_empty() && !cluster.nodes.contains(&name.as_str()) {
             continue;
         }
         let mut node = node.clone();
-        if node.hostname == "" {
+        if node.hostname.is_empty() {
             node.hostname = name.clone();
         }
         nodes.push(node);
@@ -1255,7 +1255,7 @@ fn do_remote(cluster: &ClusterConf) -> Result<bool> {
         );
     }
 
-    return Ok(true);
+    Ok(true)
 }
 
 fn get_app() -> App<'static, 'static> {

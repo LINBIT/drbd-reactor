@@ -82,7 +82,7 @@ fn get_connection_update() -> Resource {
     r.update_connection(&c1);
     assert_eq!(r.connections.len(), 2);
     assert_eq!(r.connections[0].peer_node_id, 1);
-    assert_eq!(r.connections[0].congested, false);
+    assert!(!r.connections[0].congested);
     assert_eq!(r.connections[1].peer_node_id, 2);
 
     let c0_mod = Connection {
@@ -94,7 +94,7 @@ fn get_connection_update() -> Resource {
     r.update_connection(&c0_mod);
     assert_eq!(r.connections.len(), 2);
     assert_eq!(r.connections[0].peer_node_id, 1);
-    assert_eq!(r.connections[0].congested, true);
+    assert!(r.connections[0].congested);
 
     r
 }

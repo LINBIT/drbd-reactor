@@ -56,7 +56,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let str = String::deserialize(deserializer)?;
-    if !str.starts_with(":") {
+    if !str.starts_with(':') {
         return Err(Error::custom("expected ':' to start unspecified address"));
     }
 
@@ -68,7 +68,7 @@ impl ToSocketAddrs for LocalAddress {
 
     fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
         match self {
-            LocalAddress::Explicit(addr) => Ok(vec![addr.clone()].into_iter()),
+            LocalAddress::Explicit(addr) => Ok(vec![*addr].into_iter()),
             LocalAddress::Unspecified(port) => Ok(vec![
                 (Ipv6Addr::UNSPECIFIED, *port).into(),
                 (Ipv4Addr::UNSPECIFIED, *port).into(),
@@ -102,10 +102,10 @@ fn default_level() -> LevelFilter {
 }
 
 fn default_log() -> Vec<LogConfig> {
-    return vec![LogConfig {
+    vec![LogConfig {
         level: default_level(),
         file: None,
-    }];
+    }]
 }
 
 pub fn read_snippets(path: &Vec<PathBuf>) -> Result<String> {

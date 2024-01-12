@@ -92,7 +92,7 @@ fn process_events2(
             continue;
         }
 
-        match parse_events2_line(&line) {
+        match parse_events2_line(line) {
             Ok(update) => tx.send(update)?,
             Err(e) => debug!(
                 "process_events2: could not parse line '{}', because {}",
@@ -151,9 +151,9 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("name", v) => device.name = v.into(),
                 ("volume", v) => device.volume = v.parse::<_>()?,
                 ("minor", v) => device.minor = v.parse::<_>()?,
-                ("disk", v) => device.disk_state = DiskState::from_str(v.into())?,
+                ("disk", v) => device.disk_state = DiskState::from_str(v)?,
                 ("client", v) => device.client = str_to_bool(v),
-                ("backing_dev", v) => device.backing_dev = BackingDevice::from_str(v.into())?,
+                ("backing_dev", v) => device.backing_dev = BackingDevice::from_str(v)?,
                 ("quorum", v) => device.quorum = str_to_bool(v),
                 ("size", v) => device.size = v.parse::<_>()?,
                 ("read", v) => device.read = v.parse::<_>()?,
@@ -179,8 +179,8 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("name", v) => conn.name = v.into(),
                 ("peer-node-id", v) => conn.peer_node_id = v.parse::<_>()?,
                 ("conn-name", v) => conn.conn_name = v.to_string(),
-                ("connection", v) => conn.connection = ConnectionState::from_str(v.into())?,
-                ("role", v) => conn.peer_role = Role::from_str(v.into())?,
+                ("connection", v) => conn.connection = ConnectionState::from_str(v)?,
+                ("role", v) => conn.peer_role = Role::from_str(v)?,
                 ("congested", v) => conn.congested = str_to_bool(v),
                 ("ap-in-flight", v) => conn.ap_in_flight = v.parse::<_>()?,
                 ("rs-in-flight", v) => conn.rs_in_flight = v.parse::<_>()?,
@@ -205,10 +205,8 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("conn-name", v) => peerdevice.conn_name = v.into(),
                 ("volume", v) => peerdevice.volume = v.parse::<_>()?,
                 ("peer-node-id", v) => peerdevice.peer_node_id = v.parse::<_>()?,
-                ("replication", v) => {
-                    peerdevice.replication_state = ReplicationState::from_str(v.into())?
-                }
-                ("peer-disk", v) => peerdevice.peer_disk_state = DiskState::from_str(v.into())?,
+                ("replication", v) => peerdevice.replication_state = ReplicationState::from_str(v)?,
+                ("peer-disk", v) => peerdevice.peer_disk_state = DiskState::from_str(v)?,
                 ("peer-client", v) => peerdevice.peer_client = str_to_bool(v),
                 ("resync-suspended", v) => peerdevice.resync_suspended = str_to_bool(v),
                 ("received", v) => peerdevice.received = v.parse::<_>()?,
@@ -274,11 +272,11 @@ mod tests {
 
     #[test]
     fn string_to_bool() {
-        assert_eq!(str_to_bool(&"yes"), true);
-        assert_eq!(str_to_bool(&"no"), false);
-        assert_eq!(str_to_bool(&"true"), true);
-        assert_eq!(str_to_bool(&"false"), false);
-        assert_eq!(str_to_bool(&"user"), true);
+        assert!(str_to_bool("yes"));
+        assert!(str_to_bool("no"), "{}", false);
+        assert!(str_to_bool("true"));
+        assert!(str_to_bool("false"), "{}", false);
+        assert!(str_to_bool("user"));
     }
 
     #[test]
@@ -314,9 +312,7 @@ mod tests {
                 minor: 1,
                 disk_state: DiskState::Attaching,
                 client: false,
-                backing_dev: BackingDevice {
-                    0: Some("/dev/sda1".to_string()),
-                },
+                backing_dev: BackingDevice(Some("/dev/sda1".to_string())),
                 quorum: true,
                 size: 1,
                 read: 1,
@@ -343,7 +339,7 @@ mod tests {
                 minor: 1,
                 disk_state: DiskState::Attaching,
                 client: true,
-                backing_dev: BackingDevice { 0: None },
+                backing_dev: BackingDevice(None),
                 quorum: true,
                 size: 1,
                 read: 1,

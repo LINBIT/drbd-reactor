@@ -61,11 +61,11 @@ impl fmt::Display for UnitActiveState {
         match self {
             Self::Active => write!(f, "{}", "●".bold().green()),
             Self::Reloading => write!(f, "{}", "↻".bold().green()),
-            Self::Inactive => write!(f, "{}", "○"),
+            Self::Inactive => write!(f, "○"),
             Self::Failed => write!(f, "{}", "×".bold().red()),
             Self::Activating => write!(f, "{}", "●".bold()),
             Self::Deactivating => write!(f, "{}", "●".bold()),
-            Self::Maintenance => write!(f, "{}", "○"),
+            Self::Maintenance => write!(f, "○"),
         }
     }
 }
@@ -84,7 +84,7 @@ pub fn escaped_ocf_parse_to_env(
 ) -> Result<(String, Vec<String>)> {
     let args = shell_words::split(args)?;
 
-    if args.len() < 1 {
+    if args.is_empty() {
         anyhow::bail!("promoter::systemd_ocf: agent needs at least one argument (its name)")
     }
 
@@ -94,7 +94,7 @@ pub fn escaped_ocf_parse_to_env(
     let service_name = format!("ocf.rs@{}.service", escaped_ra_name);
     let mut env = Vec::with_capacity(args.len() - 1);
     for item in &args[1..] {
-        let mut split = item.splitn(2, "=");
+        let mut split = item.splitn(2, '=');
         let add = match (split.next(), split.next()) {
             (Some(k), Some(v)) => format!("OCF_RESKEY_{}={}", k, escape_env(v)),
             (Some(k), None) => format!("OCF_RESKEY_{}=", k),

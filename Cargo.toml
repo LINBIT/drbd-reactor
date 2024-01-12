@@ -6,6 +6,7 @@ edition = "2018"
 description = "Reacts to DRBD events via plugins."
 license = "Apache-2.0"
 readme = "README.md"
+rust-version = "1.47"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

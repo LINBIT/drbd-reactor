@@ -26,18 +26,18 @@ trait Plugin: Send {
 }
 
 pub fn namefilter(names: &[String]) -> impl Fn(&Arc<PluginUpdate>) -> bool + '_ {
-    return move |up: &Arc<PluginUpdate>| {
+    move |up: &Arc<PluginUpdate>| {
         for name in names {
             if up.has_name(name) {
                 return true;
             }
         }
-        return false;
-    };
+        false
+    }
 }
 
 pub fn typefilter(ftype: &EventType) -> impl Fn(&Arc<PluginUpdate>) -> bool + '_ {
-    return move |up: &Arc<PluginUpdate>| up.has_type(ftype);
+    move |up: &Arc<PluginUpdate>| up.has_type(ftype)
 }
 
 pub fn map_status(status: std::result::Result<ExitStatus, std::io::Error>) -> Result<()> {
@@ -46,7 +46,7 @@ pub fn map_status(status: std::result::Result<ExitStatus, std::io::Error>) -> Re
             if status.success() {
                 Ok(())
             } else {
-                return Err(anyhow::anyhow!("Return code not status success"));
+                Err(anyhow::anyhow!("Return code not status success"))
             }
         }
         Err(e) => Err(anyhow::anyhow!("Could not execute: {}", e)),
