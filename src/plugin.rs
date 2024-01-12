@@ -87,12 +87,12 @@ pub enum PluginCfg {
 
 impl PluginCfg {
     fn plugin_type(&self) -> PluginType {
-        match self {
-            &PluginCfg::Promoter(_) => PluginType::Change,
-            &PluginCfg::Debugger(_) => PluginType::Change,
-            &PluginCfg::UMH(_) => PluginType::Change,
-            &PluginCfg::Prometheus(_) => PluginType::Event,
-            &PluginCfg::AgentX(_) => PluginType::Event,
+        match *self {
+            PluginCfg::Promoter(_) => PluginType::Change,
+            PluginCfg::Debugger(_) => PluginType::Change,
+            PluginCfg::UMH(_) => PluginType::Change,
+            PluginCfg::Prometheus(_) => PluginType::Event,
+            PluginCfg::AgentX(_) => PluginType::Event,
         }
     }
 
@@ -251,15 +251,13 @@ fn maybe_systemd_notify_ready() -> Result<()> {
 ///
 /// Useful to convert the Result of a thread handle `.join()` into a readable error message.
 fn thread_panic_error(original: Box<dyn any::Any + Send>) -> anyhow::Error {
-    match original.downcast_ref::<&str>() {
-        Some(d) => return anyhow::anyhow!("plugin panicked: {}", d),
-        None => (),
-    };
+    if let Some(&s) = original.downcast_ref::<&str>() {
+        return anyhow::anyhow!("plugin panicked: {}", s);
+    }
 
-    match original.downcast_ref::<String>() {
-        Some(d) => return anyhow::anyhow!("plugin panicked: {}", d),
-        None => (),
-    };
+    if let Some(s) = original.downcast_ref::<String>() {
+        return anyhow::anyhow!("plugin panicked: {}", s);
+    }
 
     anyhow::anyhow!("plugin panicked with unrecoverable error message")
 }

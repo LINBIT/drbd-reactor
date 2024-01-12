@@ -990,7 +990,7 @@ fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
             "resources length from drbdsetup show not exactly 1"
         ));
     }
-    if &resources[0].resource != name {
+    if resources[0].resource != name {
         return Err(anyhow::anyhow!(
             "res name to check ('{}') and drbdsetup show output ('{}') did not match",
             name,

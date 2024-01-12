@@ -346,7 +346,7 @@ fn read_config(config_file: &PathBuf) -> Result<config::Config> {
     };
 
     let snippets_paths = config::files_with_extension_in(&snippets_path, "toml")?;
-    let snippets = config::read_snippets(&snippets_paths)
+    let snippets = config::read_snippets(snippets_paths)
         .with_context(|| "Could not read config snippets".to_string())?;
     content.push_str("\n# Content from snippets:\n");
     content.push_str(&snippets);
