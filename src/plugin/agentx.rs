@@ -226,7 +226,7 @@ fn agentx_handler(
     Ok(())
 }
 
-fn get(bytes: &Vec<u8>, metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Response> {
+fn get(bytes: &[u8], metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Response> {
     let pkg = pdu::Get::from_bytes(bytes)?;
     trace!(
         "get: sid: {}, tid: {}",
@@ -244,7 +244,7 @@ fn get(bytes: &Vec<u8>, metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Response> 
     Ok(resp)
 }
 
-fn get_next(bytes: &Vec<u8>, metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Response> {
+fn get_next(bytes: &[u8], metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Response> {
     let pkg = pdu::GetNext::from_bytes(bytes)?;
     trace!(
         "getnext: sid: {}, tid: {}",
@@ -263,13 +263,13 @@ fn get_next(bytes: &Vec<u8>, metrics: &Arc<Mutex<Metrics>>) -> Result<pdu::Respo
 }
 
 // for administrative messages where we send stuff and get a response pdu
-fn txrx(stream: &Arc<RwLock<TcpStream>>, bytes: &Vec<u8>) -> Result<pdu::Response> {
+fn txrx(stream: &Arc<RwLock<TcpStream>>, bytes: &[u8]) -> Result<pdu::Response> {
     tx(stream, bytes)?;
     let (_, buf) = rx(stream)?;
     Ok(pdu::Response::from_bytes(&buf)?)
 }
 
-fn tx(stream: &Arc<RwLock<TcpStream>>, bytes: &Vec<u8>) -> Result<()> {
+fn tx(stream: &Arc<RwLock<TcpStream>>, bytes: &[u8]) -> Result<()> {
     let lock = match stream.read() {
         Ok(l) => l,
         Err(_) => return Err(anyhow::anyhow!("txrx: could not lock stream")),
@@ -619,13 +619,14 @@ impl Metrics {
     }
 }
 
-fn gen_id(prefix: &Vec<u32>, extension: &[u32]) -> encodings::ID {
-    let mut id = prefix.clone();
+fn gen_id(prefix: &[u32], extension: &[u32]) -> encodings::ID {
+    let mut id = prefix.to_vec();
     id.extend(extension);
 
     encodings::ID::try_from(id).expect("ID can be constructed from a Vec<u32>")
 }
 
+#[allow(clippy::upper_case_acronyms)]
 enum MIB {
     Minor = 1,
     //
