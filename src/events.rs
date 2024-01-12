@@ -273,9 +273,9 @@ mod tests {
     #[test]
     fn string_to_bool() {
         assert!(str_to_bool("yes"));
-        assert!(str_to_bool("no"), "{}", false);
+        assert!(!str_to_bool("no"));
         assert!(str_to_bool("true"));
-        assert!(str_to_bool("false"), "{}", false);
+        assert!(!str_to_bool("false"));
         assert!(str_to_bool("user"));
     }
 

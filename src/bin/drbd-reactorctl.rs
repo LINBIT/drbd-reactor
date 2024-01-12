@@ -66,7 +66,6 @@ fn main() -> Result<()> {
         .expect("expected to have a default");
     let snippets_path = get_snippets_path(&PathBuf::from(config_file))
         .with_context(|| "Could not get snippets path from config file")?;
-    let snippets_path = snippets_path;
 
     let context = matches
         .value_of("context")
