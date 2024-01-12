@@ -996,12 +996,9 @@ impl Resource {
     }
 
     pub fn delete_peerdevice(&mut self, peer_node_id: i32, peerdevice_volume_id: i32) {
-        match self.get_connection_mut(peer_node_id) {
-            Some(conn) => {
-                conn.peerdevices
-                    .retain(|x| x.volume != peerdevice_volume_id);
-            }
-            None => (),
+        if let Some(conn) = self.get_connection_mut(peer_node_id) {
+            conn.peerdevices
+                .retain(|x| x.volume != peerdevice_volume_id);
         }
     }
 
@@ -1095,13 +1092,10 @@ impl Resource {
     }
 
     pub fn delete_path(&mut self, peer_node_id: i32, local: &str, peer: &str) {
-        match self.get_connection_mut(peer_node_id) {
-            Some(conn) => {
-                conn.paths.retain(|x| {
-                    !(x.peer_node_id == peer_node_id && x.local == local && x.peer == peer)
-                });
-            }
-            None => (),
+        if let Some(conn) = self.get_connection_mut(peer_node_id) {
+            conn.paths.retain(|x| {
+                !(x.peer_node_id == peer_node_id && x.local == local && x.peer == peer)
+            });
         }
     }
 

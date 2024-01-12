@@ -71,11 +71,11 @@ fn main() -> Result<()> {
         .value_of("context")
         .expect("expected to have a default");
 
-    let mut nodes = matches
+    let nodes = matches
         .values_of("nodes")
-        .expect("expeced to have a default")
+        .expect("expected to have a default")
+        .filter(|&x| !x.is_empty())
         .collect::<Vec<_>>();
-    nodes.retain(|&x| !x.is_empty());
 
     let local = matches.is_present("local");
 
@@ -542,11 +542,11 @@ fn disable(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterCo
     Ok(())
 }
 
-fn get_disabled_path(snippet_path: &PathBuf) -> PathBuf {
+fn get_disabled_path(snippet_path: &Path) -> PathBuf {
     snippet_path.with_extension("toml.disabled")
 }
 
-fn get_enabled_path(snippet_path: &PathBuf) -> Result<PathBuf> {
+fn get_enabled_path(snippet_path: &Path) -> Result<PathBuf> {
     match snippet_path.extension().and_then(|p| p.to_str()) {
         Some("disabled") => Ok(snippet_path.with_extension("")),
         Some(_) => Err(anyhow::anyhow!(
@@ -979,8 +979,8 @@ fn restart(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterCo
     }
 }
 
-fn read_config(snippet_path: &PathBuf) -> Result<config::Config> {
-    let content = config::read_snippets(&vec![snippet_path.clone()])
+fn read_config(snippet_path: &Path) -> Result<config::Config> {
+    let content = config::read_snippets(&[snippet_path])
         .with_context(|| "Could not read config snippets".to_string())?;
     let config = toml::from_str(&content).with_context(|| {
         format!(
@@ -1172,24 +1172,25 @@ fn read_nodes(cluster: &ClusterConf) -> Result<Vec<Node>> {
     Ok(nodes)
 }
 
-fn pexec(cmds: &Vec<Vec<String>>) -> Vec<Output> {
-    let mut threads = vec![];
-    for i in 0..cmds.len() {
-        let cmd = cmds[i].clone();
-        threads.push(thread::spawn(move || -> Output {
-            let args: Vec<&String> = cmd.iter().skip(1).collect();
-            Command::new(&cmd[0])
-                .args(&args)
-                .stdin(Stdio::null())
-                .output()
-                .expect("command failed to start")
-        }));
+fn pexec(cmds: &[Vec<String>]) -> Result<Vec<Output>> {
+    let mut threads = Vec::with_capacity(cmds.len());
+    for cmd in cmds {
+        let process = Command::new(&cmd[0])
+            .args(&cmd[1..])
+            .stdin(Stdio::null())
+            .spawn()?;
+
+        threads.push(thread::spawn(move || process.wait_with_output()));
     }
 
     threads
         .into_iter()
-        .map(|t| t.join().unwrap())
-        .collect::<Vec<_>>()
+        .map(|t| {
+            t.join()
+                .expect("thread should not panic")
+                .map_err(anyhow::Error::from)
+        })
+        .collect()
 }
 
 fn do_remote(cluster: &ClusterConf) -> Result<bool> {
@@ -1217,7 +1218,7 @@ fn do_remote(cluster: &ClusterConf) -> Result<bool> {
         let userhost = format!("{}@{}", node.user, node.hostname);
         cmds.push(vec!["ssh".to_string(), userhost, "true".to_string()]);
     }
-    let results = pexec(&cmds);
+    let results = pexec(&cmds)?;
     for (i, result) in results.iter().enumerate() {
         if !result.status.success() {
             return Err(anyhow::anyhow!("Command '{}' failed", cmds[i].join(" ")));
@@ -1242,7 +1243,7 @@ fn do_remote(cluster: &ClusterConf) -> Result<bool> {
         node_args.append(&mut args);
         cmds.push(node_args);
     }
-    let results = pexec(&cmds);
+    let results = pexec(&cmds)?;
     for (i, result) in results.iter().enumerate() {
         if !result.status.success() {
             return Err(anyhow::anyhow!("Command '{}' failed", cmds[i].join(" ")));

@@ -1,5 +1,5 @@
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fmt, fs};
 
 use anyhow::Result;
@@ -108,7 +108,7 @@ fn default_log() -> Vec<LogConfig> {
     }]
 }
 
-pub fn read_snippets(path: &Vec<PathBuf>) -> Result<String> {
+pub fn read_snippets(path: impl IntoIterator<Item = impl AsRef<Path>>) -> Result<String> {
     let mut s = "\n".to_string();
     for snippet in path {
         s.push_str(&fs::read_to_string(snippet)?);
