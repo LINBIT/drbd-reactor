@@ -432,7 +432,7 @@ impl Metrics {
 fn header_generic(k: &str, help: &str, mtype: &str) -> (String, String) {
     (
         k.to_string(),
-        format!("# TYPE {} {}\n# HELP {}\n", k, mtype, help),
+        format!("# TYPE {} {}\n# HELP {} {}\n", k, mtype, k, help),
     )
 }
 
