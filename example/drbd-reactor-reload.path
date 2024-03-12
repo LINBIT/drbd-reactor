@@ -3,6 +3,7 @@ Description=Reload drbd-reactor on plugin changes
 
 [Path]
 PathChanged=/etc/drbd-reactor.d
+TriggerLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target

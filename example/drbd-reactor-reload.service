@@ -1,6 +1,7 @@
 [Unit]
 Description=Reload drbd-reactor on plugin changes
 After=drbd-reactor.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
