@@ -65,6 +65,7 @@ fn process_events2(
     thread::spawn(move || loop {
         if let Err(e) = stdin.write_all("n\n".as_bytes()) {
             warn!("process_events2: could not update statistics: {}", e);
+            break;
         }
         thread::sleep(statistics_poll);
     });
