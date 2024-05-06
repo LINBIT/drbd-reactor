@@ -1,3 +1,31 @@
+drbd-reactor (1.4.1-1) experimental; urgency=medium
+
+  [ Abhayraj Jain ]
+  * Update README.md
+
+  [ Moritz Wanzenböck ]
+  * ci: report clippy lints
+  * Apply suggestions from clippy "deny" configuration
+  * run cargo clippy --fix
+  * fix clippy fixes gone wrong
+  * drbd-reactorctl: apply clippy lint suggestions
+  * agentx: apply clippy lint suggestions
+  * plugins: apply clippy lint suggestions
+  * drbd-reactor-reload: Disable start limit
+  * events2: wait for drbdsetup command on exit
+
+  [ PhilippKolmann ]
+  * prometheus: add metric name to HELP line
+
+  [ Roland Kammerer ]
+  * events2: exit reader thread on error
+  * build: bump drbd-utils to 9.28.0
+
+  [ Michael Troutman ]
+  * example: fix warnings in Grafana dashboard
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 06 May 2024 15:14:16 +0200
+
 drbd-reactor (1.4.0-1) experimental; urgency=medium
 
   * New upstream release
