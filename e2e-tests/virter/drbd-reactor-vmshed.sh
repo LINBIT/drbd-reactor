@@ -2,7 +2,7 @@
 
 set -e
 
-repository_packages="drbd-utils=${DRBD_UTILS_VERSION:-9.26.0}"
+repository_packages="drbd-utils=${DRBD_UTILS_VERSION:-9.28.0}"
 
 # Escape the comma so that it is part of the override value. An unescaped comma
 # separates key-value pairs in the override.

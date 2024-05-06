@@ -15,7 +15,7 @@ BuildRequires:	systemd
 # While most pkgs I looked at have bash-completion as BuildRequires, I don't think we need it
 # looks like it would only help for cmake or pkgconfig projects.
 # BuildRequires:	bash-completion
-Requires:	drbd-utils >= 9.26.0
+Requires:	drbd-utils >= 9.28.0
 
 %description
 Daemon monitoring the state of DRBD resources, and executing plugins

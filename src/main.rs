@@ -277,10 +277,10 @@ fn min_drbd_versions() -> Result<()> {
     let drbd_versions = drbd::get_drbd_versions()?;
 
     // check utils
-    // proper events2 --poll termination
+    // proper netlink messages re ordering on "recent" kernels.
     let want = drbd::Version {
         major: 9,
-        minor: 26,
+        minor: 28,
         patch: 0,
     };
     if drbd_versions.utils < want {
