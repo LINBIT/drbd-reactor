@@ -6,28 +6,30 @@ edition = "2018"
 description = "Reacts to DRBD events via plugins."
 license = "Apache-2.0"
 readme = "README.md"
-rust-version = "1.47"
+rust-version = "1.70"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# we need to be careful here, our baseline has to be the last Ubuntu LTS before the current one
+# e.g., if Noble is out, we also have to build for Jammy (but no longer for Focal or older).
 # drbd-reactor
-serde = { version = "1.0", features = ["derive"] }
-toml = ">= 0.5" # 0.5 because it is in Ubuntu Jammy/PPA
-structopt = { version = "0.3", default-features = false }
-anyhow = "1.0"
-log = { version = "0.4", features = ["serde"] }
-fern = ">= 0.5"  # 0.5 becasue it is in Ubuntu Focal/PPA
+serde = { version = "1", features = ["derive"] }
+toml = ">= 0.5"
+structopt = { version = ">= 0.3", default-features = false }
+anyhow = "1"
+log = { version = ">= 0.4", features = ["serde"] }
+fern = ">= 0.6"
 regex = "1"
-libc = "0.2"
-signal-hook = ">= 0.1"  # 0.1 because it is in Ubuntu Focal/PPA
-tinytemplate = ">= 1.0.3"  # 1.0.3 because it is in Ubuntu Focal/PPA
-serde_json = "1.0"
-shell-words = ">= 0.1.0" # 0.1.0 because it is in Ubuntu Focal/PPA
-crossbeam-channel = ">= 0.3.9" # 0.3.9 because it is in Ubuntu Focal/PPA
-atty = "0.2"
-agentx = "0.1"
+libc = ">= 0.2"
+signal-hook = ">= 0.3"
+tinytemplate = "1"
+serde_json = "1"
+shell-words = "1"
+crossbeam-channel = ">= 0.4"
+atty = ">= 0.2"
+agentx = ">= 0.1"
 # drbd-reactorctl
-clap = "2.33"  # 2.33.0 because it is in Ubuntu Focal/PPA
-colored = ">= 1.6.1"  # 1.6.1 because it is in Ubuntu Focal/PPA
-tempfile = ">= 3.1.0"  # 3.1.0 because it is in Ubuntu Focal/PPA
+clap = "2" # jammy has 2, noble has 2 and 3
+colored = ">= 1.6" # jammy has 1.6, noble 2.1
+tempfile = "3"

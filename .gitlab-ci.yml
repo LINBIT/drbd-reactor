@@ -49,22 +49,8 @@ test:compat:
     CARGO_HOME: $CI_PROJECT_DIR/.cargo
   parallel:
     matrix:
-      # ubuntu-xenial, ubuntu-bionic, ubuntu-focal
-      - IMAGE: rust:1.47
-      # debian-bullseye
-      - IMAGE: rust:1.48
-      # rhel7, rhel8, sles15-sp0, sles15-sp1, sles15-sp2
-      - IMAGE: rust:1.50
-      # sles15-sp3
-      - IMAGE: rust:1.53
-      # ubuntu-jammy
-      - IMAGE: rust:1.58
-      # debian-buster
-      - IMAGE: rust:1.60
-      # rhel9
-      - IMAGE: rust:1.61
-      # sles15-sp4
-      - IMAGE: rust:1.62
+      # current 'cargo msrv':
+      - IMAGE: rust:1.70
   image: $IMAGE
   script:
     - cargo check
