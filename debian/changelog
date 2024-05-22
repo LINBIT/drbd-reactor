@@ -1,3 +1,13 @@
+drbd-reactor (1.4.2-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * build: add shell.nix
+  * build: allow version packaged in Ubuntu Noble
+  * build: fix make vs. gnumake
+  * build: updated dependencies
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Wed, 22 May 2024 10:34:42 +0200
+
 drbd-reactor (1.4.1-1) experimental; urgency=medium
 
   [ Abhayraj Jain ]
