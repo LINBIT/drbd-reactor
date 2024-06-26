@@ -203,7 +203,7 @@ kept stopped.
 .Bd -literal -offset indent
 # drbd-reactorclt start-until var-lib-linstor.mount linstor_db
 INFO: To resume normal operation, execute:
-- systemctl stop drbd-services@linstor_db.target # on this node
+- systemctl start drbd-services@linstor_db.target # on this node
 - drbd-reactorctl enable /etc/drbd-reactor.d/linstor_db.toml.disabled # on all cluster nodes
 .Ed
 The command show will generate all the usual overrides and then start the
