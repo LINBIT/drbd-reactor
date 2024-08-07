@@ -604,6 +604,18 @@ fn generate_systemd_templates(
             _ => (action.to_string(), Vec::new()),
         };
 
+        // we don't want any '/' in our service names which might overwrite unintended paths. most
+        // likely this might happen when people think that they can use something like "/mnt/data"
+        // for their mount units (which is allowed in systemctl start). we don't allow that, people
+        // have to use proper names.
+        if service_name.contains("/") {
+            return Err(anyhow::anyhow!(
+                "generate_systemd_templates: Service name '{}' contains a '/'; If this is a mount unit please use \"systemd-escape --path --suffix=mount '{}'\"",
+                service_name,
+                service_name
+            ));
+        }
+
         let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", service_name));
         if service_name.ends_with(".mount") {
             systemd_write_unit(
