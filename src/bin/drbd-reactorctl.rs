@@ -818,7 +818,7 @@ fn evict_resource(drbd_resource: &str, delay: u32, me: &str) -> Result<()> {
     if primary == UNKNOWN {
         println!("Unfortunately no other node took over, resource in unknown state");
     } else if primary == me {
-        println!("Unfortunately no other node took over, local node still DRBD Primary");
+        println!("Local node still DRBD Primary, not all services stopped in time locally");
     } else {
         println!("Node '{}' took over", primary);
     }
