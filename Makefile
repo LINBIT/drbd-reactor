@@ -83,6 +83,17 @@ clean: ## cargo clean
 test: ## cargo test
 	cargo test
 
+sbom/drbd-reactor.cdx.json: Cargo.toml Cargo.lock
+	test -d sbom || mkdir sbom
+	cargo sbom --output-format cyclone_dx_json_1_4 > $@
+
+sbom/drbd-reactor.spdx.json: Cargo.toml Cargo.lock
+	test -d sbom || mkdir sbom
+	cargo sbom --output-format spdx_json_2_3 > $@
+
+check-vulns: sbom/drbd-reactor.cdx.json
+	osv-scanner --sbom=$<
+
 debrelease: checkVERSION
 	rm -rf .debrelease && mkdir .debrelease
 	cd .debrelease && git clone $(PWD) . && \
@@ -92,9 +103,10 @@ debrelease: checkVERSION
 		$$(git ls-files | grep -v '^\.') .cargo/config vendor
 	rm -rf .debrelease
 
-release: checkVERSION
+release: checkVERSION sbom/drbd-reactor.cdx.json sbom/drbd-reactor.spdx.json
 	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf $(REL).tar.gz \
-		$$(git ls-files | grep -v '^\.' | grep -v '^debian\/')
+		$$(git ls-files | grep -v '^\.' | grep -v '^debian/') \
+		sbom/drbd-reactor.cdx.json sbom/drbd-reactor.spdx.json
 
 ifndef VERSION
 checkVERSION:
