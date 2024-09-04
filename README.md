@@ -14,6 +14,7 @@ changes in a DRBD resource.
 | [agentx](/doc/agentx.md)         | AgentX subagent for SNMP monitoring |
 
 ## Implementation
+
 - [x] debugger
 - [x] promoter
 - [x] umh (user defined filters)
@@ -21,6 +22,7 @@ changes in a DRBD resource.
 - [x] prometheus
 
 # Configuration
+
 This daemon is configured via a configuration file. The only command line option allowed is the path to the
 configuration. The default location for the config is `/etc/drbd-reactor.toml`. The repository contains an example
 [drbd-reactor.toml](/example/drbd-reactor.toml). This file should act as the entry point only to specify a snippets
@@ -33,7 +35,7 @@ In very dynamic environments it might be favorable to automatically reload the d
 snippet is added or removed. This can be done by using the `drbd-reactor-reload` systemd path unit that is shipped
 in the `example` directory:
 
-```
+```shell
 cp example/drbd-reactor-reload.{path,service} /etc/systemd/system/
 systemctl enable --now drbd-reactor-reload.path
 ```
@@ -43,23 +45,9 @@ systemctl enable --now drbd-reactor-reload.path
 This is a Rust application. If you have a Rust toolchain and `cargo` installed (via distribution packages or
 [rustup](https://rustup.rs)) you can build it via:
 
-```
+```shell
 cargo build
 ```
-
-## Packages
-
-`rpm` and `deb` packages can be built in containers, which requires Docker. This repository contains a self
-documenting `Makefile` (just execute `make help`). Building a Debian package looks like this:
-
-```
-make debcontainer # only execute this once
-make deb # as often as needed
-```
-
-The "deb" and "rpm" targets should be called from a git checkout of the repository, not a release tarball.
-Starting from a release tarball rpm building should be done via the shipped `drbd-reactor.spec` file as usual
-via `rpmbuild`.
 
 # Architecture
 
@@ -100,6 +88,7 @@ are packaged as `librust-` package in Ubuntu Focal. We might relax that, but tha
 convincing argument. Again, talk to us early.
 
 # Current implementation considerations
+
 Currently plugins have to filter their `PluginUpdate` stream by themselves. This keeps the core simple, but
 allowing some kind of filtered subscription could make sense. If we don't do that, and keep the "all plugins
 get all events" semantic, we could switch to a broadcast channel, there are some crates out there.
