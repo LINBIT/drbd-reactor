@@ -31,9 +31,11 @@ pub struct Promoter {
 impl Promoter {
     pub fn new(cfg: PromoterConfig) -> Result<Self> {
         let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
+        trace!("Executing adjust_resources({:?})'", &names);
         if let Err(e) = adjust_resources(&names) {
             warn!("Could not adjust '{:?}': {}", names, e);
         }
+        trace!("Executed adjust_resources({:?})'", &names);
 
         for (name, res) in &cfg.resources {
             // deprecated settings
