@@ -60,7 +60,6 @@ impl Promoter {
                     &systemd_settings,
                     res.secondary_force,
                 )?;
-                systemd_daemon_reload()?;
             }
         }
 
@@ -133,7 +132,7 @@ impl super::Plugin for Promoter {
             if res.stop_services_on_exit {
                 let shutdown = || -> Result<()> {
                     fs::remove_file(escaped_services_target_dir(&name).join(SYSTEMD_BEFORE_CONF))?;
-                    systemd_daemon_reload()?;
+                    systemd::daemon_reload()?;
                     stop_actions(&name, &res.stop, &res.runner)
                 };
                 if let Err(e) = shutdown() {
@@ -787,11 +786,6 @@ fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()
     fs::rename(tmp_path, path)?;
 
     Ok(())
-}
-
-fn systemd_daemon_reload() -> Result<()> {
-    info!("systemd_daemon_reload: reloading daemon");
-    plugin::system("systemctl daemon-reload")
 }
 
 enum State {

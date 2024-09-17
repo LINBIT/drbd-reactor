@@ -10,6 +10,7 @@ use log::{error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::drbd::{EventType, PluginUpdate};
+use crate::systemd;
 
 pub mod agentx;
 pub mod debugger;
@@ -192,10 +193,15 @@ pub fn start_from_config(
     *started = survive;
 
     let mut created_plugins = Vec::new();
+    // if we created new systemd units (i.e., promoter) remember that once and reload systemd once.
+    let mut systemd_reload = false;
 
     for cfg in new_cfgs {
         deprecate_id(&cfg);
         trace!("start_from_config: starting new config '{:#?}'", cfg);
+        if let PluginCfg::Promoter(_) = cfg {
+            systemd_reload = true;
+        }
         match cfg.into_plugin() {
             Ok(p) => created_plugins.push(p),
             Err(e) => error!(
@@ -203,6 +209,11 @@ pub fn start_from_config(
                 e
             ),
         }
+    }
+
+    if systemd_reload {
+        info!("systemd_daemon_reload: reloading daemon");
+        systemd::daemon_reload()?;
     }
 
     maybe_systemd_notify_ready()?;

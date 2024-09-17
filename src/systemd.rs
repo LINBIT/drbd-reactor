@@ -7,6 +7,12 @@ use anyhow::Result;
 use colored::Colorize;
 use shell_words;
 
+use crate::plugin;
+
+pub fn daemon_reload() -> Result<()> {
+    plugin::system("systemctl daemon-reload")
+}
+
 pub fn show_property(unit: &str, property: &str) -> Result<String> {
     let output = Command::new("systemctl")
         .arg("show")
