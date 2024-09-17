@@ -1,5 +1,7 @@
+use std::env;
 use std::fmt;
 use std::io::{Error, ErrorKind};
+use std::os::unix::net::UnixDatagram;
 use std::process::Command;
 use std::str::FromStr;
 
@@ -11,6 +13,29 @@ use crate::plugin;
 
 pub fn daemon_reload() -> Result<()> {
     plugin::system("systemctl daemon-reload")
+}
+
+pub fn notify(unset_environment: bool, msg: &str) -> Result<()> {
+    let key = "NOTIFY_SOCKET";
+    let socket = match env::var_os(key) {
+        Some(socket) => socket,
+        None => return Ok(()),
+    };
+
+    if unset_environment {
+        env::remove_var(key);
+    }
+
+    let sock = UnixDatagram::unbound()?;
+    if sock.send_to(msg.as_bytes(), socket)? != msg.len() {
+        Err(anyhow::anyhow!(
+            "Could not completely write '{}' to {}",
+            msg,
+            key
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 pub fn show_property(unit: &str, property: &str) -> Result<String> {
