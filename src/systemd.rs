@@ -12,7 +12,7 @@ use shell_words;
 use crate::plugin;
 
 pub fn daemon_reload() -> Result<()> {
-    plugin::system("systemctl daemon-reload")
+    plugin::map_status(Command::new("systemctl").arg("daemon-reload").status())
 }
 
 pub fn notify(unset_environment: bool, msg: &str) -> Result<()> {
