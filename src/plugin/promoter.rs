@@ -415,6 +415,7 @@ fn systemd_freeze_thaw(unit: &str, to: State) -> Result<()> {
     for service_name in services.iter().filter(|x| !x.ends_with(".mount")) {
         if let Err(e) = plugin::map_status(
             Command::new("systemctl")
+                .stdin(Stdio::null())
                 .arg(action)
                 .arg(service_name.clone())
                 .status(),
@@ -428,6 +429,7 @@ fn systemd_freeze_thaw(unit: &str, to: State) -> Result<()> {
 
 fn persist_journal() {
     let _ = Command::new("journalctl")
+        .stdin(Stdio::null())
         .arg("--flush")
         .arg("--sync")
         .status();
@@ -496,6 +498,7 @@ fn freeze_actions(name: &str, to: State, how: &Runner) -> Result<()> {
 
 fn get_backing_devices(resname: &str) -> Result<Vec<String>> {
     let shlldev = Command::new("drbdadm")
+        .stdin(Stdio::null())
         .arg("sh-ll-dev")
         .arg(resname)
         .output()?;
@@ -515,6 +518,7 @@ fn get_backing_devices(resname: &str) -> Result<Vec<String>> {
 
 fn get_target_services(target: &str) -> Result<Vec<String>> {
     let deps = Command::new("systemctl")
+        .stdin(Stdio::null())
         .arg("list-dependencies")
         .arg("--no-pager")
         .arg("--plain")
@@ -552,7 +556,13 @@ fn adjust_resources(to_start: &[String]) -> Result<()> {
             info!("adjust_resources: backing device '{}' now ready", dev);
         }
 
-        plugin::map_status(Command::new("drbdadm").arg("adjust").arg(res).status())?;
+        plugin::map_status(
+            Command::new("drbdadm")
+                .stdin(Stdio::null())
+                .arg("adjust")
+                .arg(res)
+                .status(),
+        )?;
     }
     Ok(())
 }
@@ -996,6 +1006,7 @@ fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
     };
 
     let output = Command::new("drbdsetup")
+        .stdin(Stdio::null())
         .arg("show")
         .arg("--show-defaults")
         .arg("--json")

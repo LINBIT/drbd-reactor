@@ -2,7 +2,7 @@ use std::env;
 use std::fmt;
 use std::io::{Error, ErrorKind};
 use std::os::unix::net::UnixDatagram;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::Result;
@@ -12,7 +12,12 @@ use shell_words;
 use crate::plugin;
 
 pub fn daemon_reload() -> Result<()> {
-    plugin::map_status(Command::new("systemctl").arg("daemon-reload").status())
+    plugin::map_status(
+        Command::new("systemctl")
+            .stdin(Stdio::null())
+            .arg("daemon-reload")
+            .status(),
+    )
 }
 
 pub fn notify(unset_environment: bool, msg: &str) -> Result<()> {
@@ -40,6 +45,7 @@ pub fn notify(unset_environment: bool, msg: &str) -> Result<()> {
 
 pub fn show_property(unit: &str, property: &str) -> Result<String> {
     let output = Command::new("systemctl")
+        .stdin(Stdio::null())
         .arg("show")
         .arg(format!("--property={}", property))
         .arg(unit)

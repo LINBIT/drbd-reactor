@@ -89,6 +89,7 @@ fn spawn_command(
     let common_env = common_env();
 
     let child = match Command::new("sh")
+        .stdin(Stdio::null())
         .arg("-c")
         .arg(cmd)
         .env_clear()

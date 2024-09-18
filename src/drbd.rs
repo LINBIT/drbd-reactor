@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{Error, ErrorKind};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::slice::Iter;
 use std::str::FromStr;
 
@@ -1241,7 +1241,11 @@ pub struct DRBDVersion {
 }
 
 pub fn get_drbd_versions() -> anyhow::Result<DRBDVersion> {
-    let version = match Command::new("drbdadm").arg("--version").output() {
+    let version = match Command::new("drbdadm")
+        .stdin(Stdio::null())
+        .arg("--version")
+        .output()
+    {
         Ok(x) => x,
         Err(e) => return Err(anyhow::anyhow!("failed running drbdadm --version: {}", e)),
     };
