@@ -195,7 +195,13 @@ fn default_secondary_force() -> bool {
 
 fn systemd_stop(unit: &str) -> Result<()> {
     info!("systemd_stop: systemctl stop {}", unit);
-    plugin::map_status(Command::new("systemctl").arg("stop").arg(unit).status())
+    plugin::map_status(
+        Command::new("systemctl")
+            .stdin(Stdio::null())
+            .arg("stop")
+            .arg(unit)
+            .status(),
+    )
 }
 
 fn process_drbd_event(
@@ -356,8 +362,12 @@ fn process_drbd_event(
 }
 
 fn systemd_start(unit: &str) -> Result<()> {
+    // we need to make sure that stdin is null, otherwise systemd wants to add some
+    // watches for password files. https://github.com/systemd/systemd/blob/fc5037e7d7b35d234720dcf06701a89c66c73adc/src/tty-ask-password-agent/tty-ask-password-agent.c#L367
+
     // we really don't care
     let _ = Command::new("systemctl")
+        .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .arg("reset-failed")
@@ -365,7 +375,13 @@ fn systemd_start(unit: &str) -> Result<()> {
         .status();
 
     info!("systemd_start: systemctl start {}", unit);
-    plugin::map_status(Command::new("systemctl").arg("start").arg(unit).status())?;
+    plugin::map_status(
+        Command::new("systemctl")
+            .stdin(Stdio::null())
+            .arg("start")
+            .arg(unit)
+            .status(),
+    )?;
     // this is inherently racy, systemd might take some time to "propagate" the actual state
     // still, we might catch it already here, otherwise we will check for the actual state in the "ticker"
     if !systemd::is_active(unit)? {
