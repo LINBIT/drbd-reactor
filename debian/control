@@ -5,7 +5,7 @@ Section: admin
 Priority: optional
 Build-Depends: debhelper (>= 9),
                cargo,
-               rustc,
+               rustc (>= 1.70),
                bash-completion,
 Standards-Version: 3.9.6
 

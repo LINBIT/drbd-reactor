@@ -204,7 +204,7 @@ pub fn start_from_config(
     let mut extend = extend_default;
 
     if !new_cfgs.is_empty() {
-        systemd::notify(false, "STATUS=Starting new plugins\n")?;
+        systemd::notify("STATUS=Starting new plugins\n")?;
     }
     for cfg in new_cfgs {
         deprecate_id(&cfg);
@@ -215,7 +215,7 @@ pub fn start_from_config(
             }
             systemd_reload = true;
         }
-        systemd::notify(false, &format!("EXTEND_TIMEOUT_USEC={}\n", extend))?;
+        systemd::notify(&format!("EXTEND_TIMEOUT_USEC={}\n", extend))?;
         if systemd_reload {
             // reset, especially after the first promoter
             extend = extend_default;
@@ -229,14 +229,14 @@ pub fn start_from_config(
             ),
         }
     }
-    systemd::notify(false, "STATUS=Plugins started\n")?;
+    systemd::notify("STATUS=Plugins started\n")?;
 
     if systemd_reload {
         info!("systemd_daemon_reload: reloading daemon");
         systemd::daemon_reload()?;
     }
 
-    systemd::notify(true, "READY=1\n")?;
+    systemd::notify("READY=1\n")?;
 
     for p in created_plugins {
         let cfg = p.get_config();

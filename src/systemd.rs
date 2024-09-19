@@ -2,14 +2,45 @@ use std::env;
 use std::fmt;
 use std::io::{Error, ErrorKind};
 use std::os::unix::net::UnixDatagram;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
+use std::sync::OnceLock;
 
 use anyhow::Result;
 use colored::Colorize;
 use shell_words;
 
 use crate::plugin;
+
+static NOTIFY_SOCKET_CELL: OnceLock<Option<PathBuf>> = OnceLock::new();
+fn notify_socket() -> &'static Option<PathBuf> {
+    NOTIFY_SOCKET_CELL.get_or_init(|| {
+        let notify_socket = env::var_os("NOTIFY_SOCKET")?;
+        // keep the original, but unset for children
+        env::remove_var("NOTIFY_SOCKET");
+        Some(notify_socket.into())
+    })
+}
+
+pub fn notify(msg: &str) -> Result<()> {
+    let socket = match notify_socket() {
+        Some(s) => s,
+        None => return Ok(()),
+    };
+
+    let sock = UnixDatagram::unbound()?;
+    let msg_complete = format!("{}\n", msg);
+    if sock.send_to(msg_complete.as_bytes(), socket)? != msg_complete.len() {
+        Err(anyhow::anyhow!(
+            "systemd notify: could not completely write '{}' to '{}",
+            msg,
+            socket.display()
+        ))
+    } else {
+        Ok(())
+    }
+}
 
 pub fn daemon_reload() -> Result<()> {
     plugin::map_status(
@@ -18,29 +49,6 @@ pub fn daemon_reload() -> Result<()> {
             .arg("daemon-reload")
             .status(),
     )
-}
-
-pub fn notify(unset_environment: bool, msg: &str) -> Result<()> {
-    let key = "NOTIFY_SOCKET";
-    let socket = match env::var_os(key) {
-        Some(socket) => socket,
-        None => return Ok(()),
-    };
-
-    if unset_environment {
-        env::remove_var(key);
-    }
-
-    let sock = UnixDatagram::unbound()?;
-    if sock.send_to(msg.as_bytes(), socket)? != msg.len() {
-        Err(anyhow::anyhow!(
-            "Could not completely write '{}' to {}",
-            msg,
-            key
-        ))
-    } else {
-        Ok(())
-    }
 }
 
 pub fn show_property(unit: &str, property: &str) -> Result<String> {
