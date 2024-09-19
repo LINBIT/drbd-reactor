@@ -3,9 +3,11 @@ Maintainer: LINBIT HA Solutions GmbH <drbd-dev@lists.linbit.com>
 Uploaders: Roland Kammerer <roland.kammerer@linbit.com>
 Section: admin
 Priority: optional
+# don't set a minimal rustc version "yet", we do some trickery in our internal build system
+# if required, set it in the branches for the PPA for example
 Build-Depends: debhelper (>= 9),
                cargo,
-               rustc (>= 1.70),
+               rustc,
                bash-completion,
 Standards-Version: 3.9.6
 
