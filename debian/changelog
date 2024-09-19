@@ -1,3 +1,24 @@
+drbd-reactor (1.5.0~rc.1-1) experimental; urgency=medium
+
+  [ Lars Ellenberg ]
+  * promoter: fix Description override to use %N not %p
+
+  [ Roland Kammerer ]
+  * doc: fix start-until procedure
+  * promoter: check for '/' in service names
+  * ctl: improve evict error message
+  * build: add sbom files to tarballs
+  * build: rm packaging targets
+  * promoter: add trace logging around adjust
+  * promoter: systemctl daemon-reload only once
+  * promoter: use EXTEND_TIMEOUT_USEC in sd_notify
+  * promoter: use Stdio::null() for systemctl commands
+  * all: stop using plugin::system and use Command
+  * daemon: use Stdio::null() for stdin
+  * systemd: improve notify
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Thu, 19 Sep 2024 09:33:19 +0200
+
 drbd-reactor (1.4.2-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
