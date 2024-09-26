@@ -286,7 +286,7 @@ one (maybe even not so important) resource blocks.
 Almost all relevant scenarios include a file system mount. For example to realize a highly available LINSTOR
 controller, a file system containing LINSTOR's database would be mounted right before the LINSTOR controller
 service gets started. In these scenarios where another service is on top of a mount point, one should use
-systemd mount units (`sytemd.mount(5)`). On systemd target shutdown (e.g., quorum loss), systemd has all means
+systemd mount units (`systemd.mount(5)`). On systemd target shutdown (e.g., quorum loss), systemd has all means
 to `SIGTERM/SIGKILL` all processes that use the mount point. For example systemd can stop the LINSTOR
 controller and all processes it has spawned that might use the file system cleanly.
 
