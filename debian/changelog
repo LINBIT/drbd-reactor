@@ -1,3 +1,10 @@
+drbd-reactor (1.5.0-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * all: typo sytemd -> systemd
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Wed, 02 Oct 2024 11:15:44 +0200
+
 drbd-reactor (1.5.0~rc.1-1) experimental; urgency=medium
 
   [ Lars Ellenberg ]
