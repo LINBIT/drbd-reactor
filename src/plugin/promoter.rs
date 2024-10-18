@@ -693,8 +693,6 @@ fn generate_systemd_templates(
 
 fn drbd_promote(systemd_settings: &SystemdSettings, secondary_force: bool) -> Result<String> {
     const PROMOTE_TEMPLATE: &str = r"[Service]
-ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
-ExecCondition=
 {{ if secondary_force -}}
 ExecStop=
 ExecStop=/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force %I
@@ -710,7 +708,6 @@ OnFailureJobMode=replace-irreversibly
 
     #[derive(Serialize)]
     struct Context {
-        strictness: String,
         needs_on_failure: bool,
         secondary_force: bool,
     }
@@ -718,7 +715,6 @@ OnFailureJobMode=replace-irreversibly
     let result = tt.render(
         "devices",
         &Context {
-            strictness: systemd_settings.dependencies_as.to_string(),
             needs_on_failure: systemd_settings.failure_action != SystemdFailureAction::None,
             secondary_force,
         },
@@ -1175,14 +1171,7 @@ mod tests {
         )
         .expect("should work");
 
-        assert_eq!(
-            r"[Service]
-ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
-ExecCondition=
-[Unit]
-",
-            empty
-        );
+        assert_eq!("[Service]\n[Unit]\n", empty);
 
         let on_failure = drbd_promote(
             &SystemdSettings {
@@ -1196,8 +1185,6 @@ ExecCondition=
 
         assert_eq!(
             r"[Service]
-ExecStart=/lib/drbd/scripts/drbd-service-shim.sh primary %I
-ExecCondition=
 ExecStop=
 ExecStop=/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force %I
 [Unit]
