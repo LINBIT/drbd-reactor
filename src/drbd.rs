@@ -624,7 +624,7 @@ impl PeerDevicePluginUpdate {
             self.old.peer_client.to_string(),
         );
         env.insert(
-            "DRBD_NEW_PEER_DISK_STATE".to_string(),
+            "DRBD_NEW_PEER_CLIENT".to_string(),
             self.new.peer_client.to_string(),
         );
 
