@@ -166,6 +166,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("lower-pending", v) => device.lower_pending = v.parse::<_>()?,
                 ("al-suspended", v) => device.al_suspended = str_to_bool(v),
                 ("blocked", v) => device.blocked = v.into(),
+                ("open", v) => device.open = str_to_bool(v),
                 _ => {
                     warn!("events: process_events2: device: unknown keyword '{}'", k)
                 }
@@ -305,7 +306,7 @@ mod tests {
 
     #[test]
     fn all_parsed_device_update() {
-        let up = parse_events2_line("change device name:foo volume:1 minor:1 disk:Attaching backing_dev:/dev/sda1 client:no quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:upper").unwrap();
+        let up = parse_events2_line("change device name:foo volume:1 minor:1 disk:Attaching backing_dev:/dev/sda1 client:no quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:upper open:yes").unwrap();
         let expected = EventUpdate::Device(
             EventType::Change,
             Device {
@@ -325,10 +326,11 @@ mod tests {
                 lower_pending: 1,
                 al_suspended: true,
                 blocked: "upper".to_string(),
+                open: true,
             },
         );
         assert_eq!(up, expected);
-        let up = parse_events2_line("change device name:foo xxx:bla volume:1 minor:1 disk:Attaching backing_dev:/dev/sda1 client:no quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:upper").unwrap();
+        let up = parse_events2_line("change device name:foo xxx:bla volume:1 minor:1 disk:Attaching backing_dev:/dev/sda1 client:no quorum:yes size:1 read:1 written:1 al-writes:1 bm-writes:1 upper-pending:1 lower-pending:1 al-suspended:yes blocked:upper open:yes").unwrap();
         assert_eq!(up, expected);
 
         // backing_dev as none
@@ -352,6 +354,7 @@ mod tests {
                 lower_pending: 1,
                 al_suspended: true,
                 blocked: "no".to_string(),
+                open: false,
             },
         );
         assert_eq!(up, expected);

@@ -67,6 +67,7 @@ pub struct Device {
     pub lower_pending: u64,
     pub al_suspended: bool,
     pub blocked: String,
+    pub open: bool,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -433,6 +434,7 @@ make_matchable![
         pub client: bool,
         pub quorum: bool,
         pub size: u64,
+        pub open: bool,
     },
     DeviceUpdateStatePattern
 ];
@@ -811,6 +813,7 @@ impl Resource {
             client: device.client,
             quorum: device.quorum,
             size: device.size,
+            open: device.open,
         };
 
         match self.get_device(device.volume) {
@@ -820,6 +823,7 @@ impl Resource {
                     client: existing.client,
                     quorum: existing.quorum,
                     size: existing.size,
+                    open: existing.open,
                 };
 
                 self.update_or_delete_device(et, device);

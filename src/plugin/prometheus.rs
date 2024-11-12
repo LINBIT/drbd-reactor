@@ -360,6 +360,13 @@ impl Metrics {
                 writeln!(m, "{}{{{}}} {}", k, common, d.quorum as i32)?;
 
                 let (k, m) = type_gauge(
+                    "drbd_device_open",
+                    "Boolean if this device is opened",
+                    &mut metrics,
+                );
+                writeln!(m, "{}{{{}}} {}", k, common, d.open as i32)?;
+
+                let (k, m) = type_gauge(
                     "drbd_device_size_bytes",
                     "Device size in bytes",
                     &mut metrics,

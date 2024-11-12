@@ -78,12 +78,13 @@ A match on such a rule calls the specified `command` and sets the following envi
 ## Device rules
 Besides the [common fields](umh.md#common-fields), one can match the following fields in a `device` rule:
 
-| Fields        | Description                       | Type                            | State change |
-| ------------- | --------------------------------- | ------------------------------- | ------------ |
-| `volume`      | Volume number                     | Integer                         | no           |
-| `disk-state`  | Disk state of the device          | [DiskState](umh.md#disk-states) | yes          |
-| `client`      | Device is a DRBD client           | Boolean                         | yes          |
-| `quorum`      | Device has DRBD quorum            | Boolean                         | yes          |
+| Fields       | Description              | Type                            | State change |
+| ------------ | ------------------------ | ------------------------------- | ------------ |
+| `volume`     | Volume number            | Integer                         | no           |
+| `disk-state` | Disk state of the device | [DiskState](umh.md#disk-states) | yes          |
+| `client`     | Device is a DRBD client  | Boolean                         | yes          |
+| `quorum`     | Device has DRBD quorum   | Boolean                         | yes          |
+| `open`       | Device is opened         | Boolean                         | yes          |
 
 A match on such a rule calls the specified `command` and sets the following environment variables:
 
@@ -98,6 +99,7 @@ A match on such a rule calls the specified `command` and sets the following envi
 | `DRBD_{OLD,NEW}_DISK_STATE` | [DiskState](umh.md#disk-states) of the device             |
 | `DRBD_{OLD,NEW}_CLIENT`     | Device was/is a DRBD client                               |
 | `DRBD_{OLD,NEW}_QUORUM`     | Device had/has DRBD qourum                                |
+| `DRBD_{OLD,NEW}_OPEN`       | Device was/is opened                                      |
 
 ## Peer device rules
 Besides the [common fields](umh.md#common-fields), one can match the following fields in a `peerdevice` rule:

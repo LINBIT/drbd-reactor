@@ -91,6 +91,7 @@ volume:Volume number:Integer:no
 disk-state:Disk state of the device:DiskState:yes
 client:Device is a DRBD client:Boolean:yes
 quorum:Device has DRBD quorum:Boolean:yes
+open:Device is opened:Boolean:yes
 .TE
 .Pp
 A match on such a rule calls the specified
@@ -120,6 +121,8 @@ DiskState of the device
 Device was/is a DRBD client
 .It Ev DRBD_{OLD,NEW}_QUORUM
 Device had/has DRBD qourum
+.It Ev DRBD_{OLD,NEW}_OPEN
+Device was/is opened
 .El
 .Ss PEER DEVICE RULES
 .TS
