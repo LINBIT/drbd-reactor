@@ -1,3 +1,16 @@
+drbd-reactor (1.6.0~rc.1-1) experimental; urgency=medium
+
+  [ Moritz Wanzenböck ]
+  * umh: fix wrong environment variable name
+  * events: add "open" to device keywords
+
+  [ Roland Kammerer ]
+  * promoter: do not generate ExecStart override
+  * promoter: write overrides if necessary
+  * events: missing keywords -> debug
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Fri, 15 Nov 2024 09:57:43 +0100
+
 drbd-reactor (1.5.0-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
