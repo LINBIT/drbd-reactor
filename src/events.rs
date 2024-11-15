@@ -139,7 +139,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("may_promote", v) => resource.may_promote = str_to_bool(v),
                 ("promotion_score", v) => resource.promotion_score = v.parse::<_>()?,
                 _ => {
-                    warn!("events: process_events2: resource: unknown keyword '{}'", k)
+                    debug!("events: process_events2: resource: unknown keyword '{}'", k)
                 }
             };
         }
@@ -168,7 +168,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("blocked", v) => device.blocked = v.into(),
                 ("open", v) => device.open = str_to_bool(v),
                 _ => {
-                    warn!("events: process_events2: device: unknown keyword '{}'", k)
+                    debug!("events: process_events2: device: unknown keyword '{}'", k)
                 }
             };
         }
@@ -188,7 +188,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("ap-in-flight", v) => conn.ap_in_flight = v.parse::<_>()?,
                 ("rs-in-flight", v) => conn.rs_in_flight = v.parse::<_>()?,
                 _ => {
-                    warn!(
+                    debug!(
                         "events: process_events2: connection: unknown keyword '{}'",
                         k
                     )
@@ -221,7 +221,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("eta", _) => (),
                 ("dbdt1", _) => (),
                 _ => {
-                    warn!(
+                    debug!(
                         "events: process_events2: peer-device: unknown keyword '{}'",
                         k
                     )
@@ -242,7 +242,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("peer", v) => path.peer = v.into(),
                 ("established", v) => path.established = str_to_bool(v),
                 _ => {
-                    warn!("events: process_events2: path: unknown keyword '{}'", k)
+                    debug!("events: process_events2: path: unknown keyword '{}'", k)
                 }
             }
         }
