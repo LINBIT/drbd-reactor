@@ -469,20 +469,12 @@ fn header_generic(k: &str, help: &str, mtype: &str) -> (String, String) {
     )
 }
 
-fn header_gauge(k: &str, help: &str) -> (String, String) {
-    header_generic(k, help, "gauge")
-}
-
-fn header_counter(k: &str, help: &str) -> (String, String) {
-    header_generic(k, help, "counter")
-}
-
 fn type_gauge<'a>(
     k: &'a str,
     help: &'a str,
     metrics: &'a mut HashMap<String, String>,
 ) -> (String, &'a mut String) {
-    let (k, t) = header_gauge(k, help);
+    let (k, t) = header_generic(k, help, "gauge");
     let m = metrics.entry(k.clone()).or_insert(t);
     (k, m)
 }
@@ -492,7 +484,7 @@ fn type_counter<'a>(
     help: &'a str,
     metrics: &'a mut HashMap<String, String>,
 ) -> (String, &'a mut String) {
-    let (k, t) = header_counter(k, help);
+    let (k, t) = header_generic(k, help, "counter");
     let m = metrics.entry(k.clone()).or_insert(t);
     (k, m)
 }
