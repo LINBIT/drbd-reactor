@@ -71,6 +71,12 @@ Net data written on local disk
 .Sy drbd_peerdevice_outofsync_bytes gauge:
 Number of bytes currently out of sync with this peer, according to the bitmap that DRBD has for it
 .It
+.Sy drbd_peerdevice_sent_bytes:
+Number of bytes currently sent to this peer
+.It
+.Sy drbd_peerdevice_received_bytes:
+Number of bytes currently received from this peer
+.It
 .Sy drbd_resource_maypromote gauge:
 Boolean whether the resource may be promoted to Primary
 .It

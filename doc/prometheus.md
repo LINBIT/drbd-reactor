@@ -31,6 +31,8 @@ enums = true
 - `drbd_device_upperpending gauge`: Number of block I/O requests forwarded to DRBD, but not yet answered by DRBD.
 - `drbd_device_written_bytes_total counter`: Net data written on local disk
 - `drbd_peerdevice_outofsync_bytes gauge`: Number of bytes currently out of sync with this peer, according to the bitmap that DRBD has for it
+- `drbd_peerdevice_sent_bytes`: Number of bytes currently sent to this peer
+- `drbd_peerdevice_received_bytes`: Number of bytes currently received from this peer
 - `drbd_resource_maypromote gauge`: Boolean whether the resource may be promoted to Primary
 - `drbd_resource_promotionscore gauge`: The promotion score (higher is better) for the resource
 - `drbd_resource_resources gauge`: Number of resources

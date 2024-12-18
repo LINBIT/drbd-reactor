@@ -286,6 +286,32 @@ impl Metrics {
                         pd.volume,
                         pd.out_of_sync * 1024, // KiB
                     )?;
+                    let (k, m) = type_counter(
+                        "drbd_peerdevice_sent_bytes",
+                        "Number of bytes currently sent to this peer",
+                        &mut metrics,
+                    );
+                    writeln!(
+                        m,
+                        "{}{{{},volume=\"{}\"}} {}",
+                        k,
+                        common,
+                        pd.volume,
+                        pd.sent * 1024, // KiB
+                    )?;
+                    let (k, m) = type_counter(
+                        "drbd_peerdevice_received_bytes",
+                        "Number of bytes currently received from this peer",
+                        &mut metrics,
+                    );
+                    writeln!(
+                        m,
+                        "{}{{{},volume=\"{}\"}} {}",
+                        k,
+                        common,
+                        pd.volume,
+                        pd.received * 1024, // KiB
+                    )?;
                 }
 
                 let (k, m) = type_gauge("drbd_connection_congested",
