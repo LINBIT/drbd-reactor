@@ -1,3 +1,11 @@
+drbd-reactor (1.7.0-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * prometheus: add sent/received peer-device stats
+  * prometheus: rm two pointless wrappers
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Thu, 19 Dec 2024 10:57:36 +0100
+
 drbd-reactor (1.6.0-1) experimental; urgency=medium
 
   * New upstream release
