@@ -58,18 +58,23 @@ pub fn show_property(unit: &str, property: &str) -> Result<String> {
         .arg(format!("--property={}", property))
         .arg(unit)
         .output()?;
+    
     let output = std::str::from_utf8(&output.stdout)?;
-    // split_once('=') would be more elegant, but we want to support old rustc (e.g., bullseye)
-    let mut split = output.splitn(2, '=');
-    match (split.next(), split.next()) {
-        (Some(k), Some(v)) if k == property => Ok(v.trim().to_string()),
-        (Some(_), Some(_)) => Err(anyhow::anyhow!(
-            "Property did not start with '{}='",
-            property
-        )),
-        _ => Err(anyhow::anyhow!("Could not get property '{}'", property)),
+    
+    for line in output.lines() {
+        // split_once('=') would be more elegant, but we want to support old rustc (e.g., bullseye)
+        let mut split = line.splitn(2, '=');
+        match (split.next(), split.next()) {
+            (Some(k), Some(v)) if k == property && !v.trim().is_empty() => {
+                return Ok(v.trim().to_string());
+            }
+            _ => continue,
+        }
     }
+    
+    Err(anyhow::anyhow!("Could not get property '{}'", property))
 }
+
 
 // most of that inspired by systemc/src/basic/unit-def.c
 #[derive(PartialEq)]
