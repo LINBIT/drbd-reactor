@@ -1293,3 +1293,56 @@ fn split_version(pattern: regex::Regex, stdout: Vec<u8>) -> anyhow::Result<Versi
         patch,
     })
 }
+
+#[derive(PartialEq)]
+pub enum PrimaryOn {
+    Local,
+    Remote(String),
+    None,
+}
+
+pub fn get_primary(drbd_resource: &str) -> anyhow::Result<PrimaryOn> {
+    let output = Command::new("drbdsetup")
+        .arg("status")
+        .arg("--json")
+        .arg(drbd_resource)
+        .output()?;
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "'drbdsetup show' not executed successfully"
+        ));
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct Resource {
+        role: Role,
+        connections: Vec<Connection>,
+    }
+    #[derive(Deserialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct Connection {
+        name: String,
+        peer_role: Role,
+    }
+    let resources: Vec<Resource> = serde_json::from_slice(&output.stdout)?;
+    if resources.len() != 1 {
+        return Err(anyhow::anyhow!(
+            "resources length from drbdsetup status not exactly 1"
+        ));
+    }
+
+    // is it me?
+    if resources[0].role == Role::Primary {
+        return Ok(PrimaryOn::Local);
+    }
+
+    // a peer?
+    for conn in &resources[0].connections {
+        if conn.peer_role == Role::Primary {
+            return Ok(PrimaryOn::Remote(conn.name.clone()));
+        }
+    }
+
+    Ok(PrimaryOn::None)
+}

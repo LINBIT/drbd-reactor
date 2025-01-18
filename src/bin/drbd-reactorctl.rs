@@ -24,10 +24,12 @@ use tempfile::NamedTempFile;
 
 use drbd_reactor::config;
 use drbd_reactor::drbd;
+use drbd_reactor::drbd::PrimaryOn;
 use drbd_reactor::plugin;
 use drbd_reactor::plugin::promoter;
 use drbd_reactor::systemd;
 use drbd_reactor::systemd::UnitActiveState;
+use drbd_reactor::utils;
 
 static TERMINATE: AtomicBool = AtomicBool::new(false);
 
@@ -587,7 +589,6 @@ fn status(
         println!("{}:", snippet.display());
         let conf = read_config(&snippet)?;
         let plugins = conf.plugins;
-        let me = promoter::uname_n()?;
         for promoter in plugins.promoter {
             for (drbd_res, config) in promoter.resources {
                 // check if in filter
@@ -595,11 +596,10 @@ fn status(
                     continue;
                 }
                 let target = systemd::escaped_services_target(&drbd_res);
-                let primary = get_primary(&drbd_res).unwrap_or(UNKNOWN.to_string());
-                let primary = if primary == me {
-                    "this node".to_string()
-                } else {
-                    format!("node '{}'", primary)
+                let primary = match drbd::get_primary(&drbd_res)? {
+                    PrimaryOn::Local => "this node".to_string(),
+                    PrimaryOn::Remote(r) => format!("node '{}'", r),
+                    PrimaryOn::None => "<unknown>".to_string(),
                 };
                 println!("Promoter: Currently active on {}", primary);
                 // target itself and the implicit one
@@ -717,70 +717,22 @@ fn evict_unmask_and_start(drbd_resources: &Vec<String>) -> Result<()> {
     Ok(())
 }
 
-const UNKNOWN: &str = "<unknown>";
-fn get_primary(drbd_resource: &str) -> Result<String> {
-    let output = Command::new("drbdsetup")
-        .arg("status")
-        .arg("--json")
-        .arg(drbd_resource)
-        .output()?;
-    if !output.status.success() {
-        return Err(anyhow::anyhow!(
-            "'drbdsetup show' not executed successfully"
-        ));
-    }
-
-    #[derive(Deserialize)]
-    #[serde(rename_all = "kebab-case")]
-    struct Resource {
-        role: drbd::Role,
-        connections: Vec<Connection>,
-    }
-    #[derive(Deserialize)]
-    #[serde(rename_all = "kebab-case")]
-    struct Connection {
-        name: String,
-        peer_role: drbd::Role,
-    }
-    let resources: Vec<Resource> = serde_json::from_slice(&output.stdout)?;
-    if resources.len() != 1 {
-        return Err(anyhow::anyhow!(
-            "resources length from drbdsetup status not exactly 1"
-        ));
-    }
-
-    // is it me?
-    if resources[0].role == drbd::Role::Primary {
-        return promoter::uname_n();
-    }
-
-    // a peer?
-    for conn in &resources[0].connections {
-        if conn.peer_role == drbd::Role::Primary {
-            return Ok(conn.name.clone());
-        }
-    }
-
-    Ok(UNKNOWN.to_string())
-}
-
-fn evict_resource(drbd_resource: &str, delay: u32, me: &str) -> Result<()> {
+fn evict_resource(drbd_resource: &str, delay: u32) -> Result<()> {
     println!("Evicting {}", drbd_resource);
-    let mut primary = get_primary(drbd_resource)?;
-    if primary == UNKNOWN {
-        println!(
-            "Sorry, resource state for '{}' unknown, ignoring",
-            drbd_resource
-        );
-        return Ok(());
-    }
-    if primary != me {
-        println!(
-            "Active on '{}', nothing to do on this node, ignoring",
-            primary,
-        );
-        return Ok(());
-    }
+    match drbd::get_primary(drbd_resource)? {
+        PrimaryOn::None => {
+            println!(
+                "Sorry, resource state for '{}' unknown, ignoring",
+                drbd_resource
+            );
+            return Ok(());
+        }
+        PrimaryOn::Remote(r) => {
+            println!("Active on '{}', nothing to do on this node, ignoring", r,);
+            return Ok(());
+        }
+        PrimaryOn::Local => (), // we continue
+    };
 
     let target = systemd::escaped_services_target(drbd_resource);
     systemctl(vec!["mask".into(), "--runtime".into(), target.clone()])?;
@@ -789,9 +741,8 @@ fn evict_resource(drbd_resource: &str, delay: u32, me: &str) -> Result<()> {
 
     let mut needs_newline = false;
     for i in (0..=delay).rev() {
-        primary = get_primary(drbd_resource)?;
-        if primary != UNKNOWN && primary != me {
-            // a know host/peer
+        // a know host/peer?
+        if let PrimaryOn::Remote(_r) = drbd::get_primary(drbd_resource)? {
             break;
         }
 
@@ -815,23 +766,23 @@ fn evict_resource(drbd_resource: &str, delay: u32, me: &str) -> Result<()> {
         println!();
     }
 
-    if primary == UNKNOWN {
-        println!("Unfortunately no other node took over, resource in unknown state");
-    } else if primary == me {
-        println!("Local node still DRBD Primary, not all services stopped in time locally");
-    } else {
-        println!("Node '{}' took over", primary);
-    }
+    match drbd::get_primary(drbd_resource)? {
+        PrimaryOn::Local => {
+            println!("Local node still DRBD Primary, not all services stopped in time locally");
+        }
+        PrimaryOn::Remote(r) => println!("Node '{}' took over", r),
+        PrimaryOn::None => {
+            println!("Unfortunately no other node took over, resource in unknown state")
+        }
+    };
 
     Ok(())
 }
 
 fn evict_resources(drbd_resources: &Vec<String>, keep_masked: bool, delay: u32) -> Result<()> {
-    let me = promoter::uname_n()?;
-
     TERMINATE.store(false, Ordering::Relaxed);
     for drbd_res in drbd_resources {
-        let result = evict_resource(drbd_res, delay, &me);
+        let result = evict_resource(drbd_res, delay);
         if !keep_masked {
             evict_unmask_and_start(&vec![drbd_res.clone()])?;
         }
@@ -1204,7 +1155,7 @@ fn do_remote(cluster: &ClusterConf) -> Result<bool> {
     }
 
     // remote execution (except local node)
-    let me = promoter::uname_n()?;
+    let me = utils::uname_n()?;
 
     // check if we can reach all nodes, otherwise we might run into some inconsistent cluster state
     // that is obviously not a 100% guarantee, but IMO a check worth having

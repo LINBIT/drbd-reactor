@@ -1,9 +1,8 @@
+use core::time;
 use std::collections::{BTreeMap, HashSet};
-use std::ffi::CStr;
 use std::fmt;
 use std::fs;
 use std::fs::File;
-use std::io;
 use std::io::Write;
 use std::os::unix::fs::FileTypeExt;
 use std::path::{Path, PathBuf};
@@ -13,16 +12,16 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use libc::c_char;
 use log::{debug, info, trace, warn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tinytemplate::TinyTemplate;
 
-use crate::drbd::{DiskState, EventType, PluginUpdate, Resource, Role};
+use crate::drbd::{get_primary, DiskState, EventType, PluginUpdate, PrimaryOn, Resource, Role};
 use crate::plugin;
 use crate::plugin::PluginCfg;
 use crate::systemd;
+use crate::utils;
 
 pub struct Promoter {
     cfg: PromoterConfig,
@@ -73,10 +72,7 @@ impl super::Plugin for Promoter {
     fn run(&self, rx: super::PluginReceiver) -> Result<()> {
         trace!("run: start");
 
-        let type_exists = plugin::typefilter(&EventType::Exists);
-        let type_change = plugin::typefilter(&EventType::Change);
         let names = self.cfg.resources.keys().cloned().collect::<Vec<String>>();
-        let names_filter = plugin::namefilter(&names);
 
         // set default stop actions (i.e., reversed start)
         let cfg = {
@@ -90,8 +86,31 @@ impl super::Plugin for Promoter {
             cfg
         };
 
-        let ticker = crossbeam_channel::tick(Duration::from_secs(MIN_SECS_PROMOTE));
+        // the target might be in a half started state, for example after a "disable" failed to
+        // demote.
+        // Then on start we might never get a may_promote:yes and we never start the services on
+        // top of the promoted Primary.
+        // inserting the names into may_promote HashSet is tempting, but the first update might delete
+        // them before the first ticker, so just start them as usual and be done
+        for name in &names {
+            if !try_initial_target_start(name) {
+                continue;
+            }
+            if let Some(res) = cfg.resources.get(name) {
+                // startup is usually always racy, but pretend nodes started at the same time and
+                // calculate a position in the preferred nodes. This also helps tests.
+                let sleep_s = get_preferred_nodes_sleep_s(&res.preferred_nodes);
+                thread::sleep(time::Duration::from_secs(sleep_s));
 
+                try_start_stop_actions(name, &res.start, &res.stop, &res.runner);
+            }
+        }
+
+        let names_filter = plugin::namefilter(&names);
+        let type_exists = plugin::typefilter(&EventType::Exists);
+        let type_change = plugin::typefilter(&EventType::Change);
+
+        let ticker = crossbeam_channel::tick(Duration::from_secs(MIN_SECS_PROMOTE));
         let mut last_start = Instant::now() - Duration::from_secs(MIN_SECS_PROMOTE + 1);
         let mut may_promote: HashSet<String> = HashSet::new();
 
@@ -108,11 +127,7 @@ impl super::Plugin for Promoter {
                             last_start = Instant::now();
                             // see start_actions comments in process_drbd_event()
                             // we do not manipulate the may_promote state from here
-                            if start_actions(name, &res.start, &res.runner).is_err() {
-                                if let Err(e) = stop_actions(name, &res.stop, &res.runner) {
-                                    warn!("Stopping '{}' failed: {}", name, e);
-                                }
-                            }
+                            try_start_stop_actions(&name, &res.start, &res.stop, &res.runner);
                         }
                     }
                 },
@@ -257,11 +272,7 @@ fn process_drbd_event(
                 // - start_actions is inherently racy
                 // - it really does not improve things a lot
                 // - better have only one source here that reflects events2 and only events2 at the time
-                if start_actions(&name, &res.start, &res.runner).is_err() {
-                    if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                        warn!("Stopping '{}' failed: {}", name, e);
-                    }
-                }
+                try_start_stop_actions(&name, &res.start, &res.stop, &res.runner);
             } else if u.old.role == Role::Primary
                 && u.new.role == Role::Secondary
                 && res.on_quorum_loss == QuorumLossPolicy::Freeze
@@ -338,7 +349,7 @@ fn process_drbd_event(
                 }
             };
 
-            let node_name = match uname_n() {
+            let node_name = match utils::uname_n() {
                 Ok(node_name) => node_name,
                 Err(e) => {
                     warn!("Could not determine 'uname -n': {}", e);
@@ -443,6 +454,15 @@ fn action(what: &str, to: State, how: &Runner) -> Result<()> {
             State::Stop => systemd_stop(what),
             State::Freeze | State::Thaw => systemd_freeze_thaw(what, to),
         },
+    }
+}
+
+fn try_start_stop_actions(name: &str, start: &[String], stop: &[String], how: &Runner) {
+    if let Err(e) = start_actions(name, start, how) {
+        warn!("Starting '{}' failed: {}", name, e);
+        if let Err(e) = stop_actions(name, stop, how) {
+            warn!("Stopping '{}' failed: {}", name, e);
+        }
     }
 }
 
@@ -942,15 +962,7 @@ fn get_sleep_before_promote_ms(
             _ => 0,
         });
 
-    match uname_n() {
-        Ok(node_name) => {
-            max_sleep_s += match preferred_nodes.iter().position(|n| n == &node_name) {
-                Some(pos) => pos as u64,
-                None => preferred_nodes.len() as u64,
-            };
-        }
-        Err(e) => warn!("Could not determine 'uname -n': {}", e),
-    };
+    max_sleep_s += get_preferred_nodes_sleep_s(preferred_nodes);
 
     if *on_quorum_loss == QuorumLossPolicy::Freeze && resource.role == Role::Secondary {
         // nodes might have lost their replication network, and now they join in a random order
@@ -1085,19 +1097,27 @@ fn check_resource(name: &str, on_quorum_loss: &QuorumLossPolicy) -> Result<()> {
     Ok(())
 }
 
-// inspired by https://crates.io/crates/uname
-// inlined because currently not packaged in Ubuntu Focal
-#[inline]
-fn to_cstr(buf: &[c_char]) -> &CStr {
-    unsafe { CStr::from_ptr(buf.as_ptr()) }
+fn get_preferred_nodes_sleep_s(preferred_nodes: &[String]) -> u64 {
+    let sleep = match utils::uname_n() {
+        Ok(node_name) => match preferred_nodes.iter().position(|n| n == &node_name) {
+            Some(pos) => pos,
+            None => preferred_nodes.len(),
+        },
+        Err(e) => {
+            warn!("Could not determine 'uname -n': {}", e);
+            0
+        }
+    };
+
+    sleep as u64
 }
-pub fn uname_n() -> Result<String> {
-    let mut n = unsafe { std::mem::zeroed() };
-    let r = unsafe { libc::uname(&mut n) };
-    if r == 0 {
-        Ok(to_cstr(&n.nodename[..]).to_string_lossy().into_owned())
-    } else {
-        Err(anyhow::anyhow!(io::Error::last_os_error()))
+
+fn try_initial_target_start(name: &str) -> bool {
+    // if we know for sure that a remote is Primary, then we don't try
+    // in all other cases, even if unsure, we can try
+    match get_primary(name) {
+        Ok(PrimaryOn::Remote(_)) => false,
+        _ => true,
     }
 }
 
@@ -1141,7 +1161,7 @@ mod tests {
             get_sleep_before_promote_ms(&r, &[], &QuorumLossPolicy::Shutdown, 2),
             12000
         );
-        if let Ok(node_name) = uname_n() {
+        if let Ok(node_name) = utils::uname_n() {
             assert_eq!(
                 get_sleep_before_promote_ms(
                     &r,
