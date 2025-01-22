@@ -156,6 +156,15 @@ options {
 auto-configuration, you as the admin are the one that should understand your system, but it checks properties
 and writes warnings to the log (file/journal) if misconfiguration is detected.
 
+A note on LINSTOR: LINSTOR created resources obviously can be used with `drbd-reactor`, but one should always
+make sure to create a LINSTOR resource group, set all required options on the resource group, and then spawn
+DRBD resource from that resource group. If a LINSTOR resource is created manually (i.e., `linstor resource
+create ...` and friends) it implicitly gets assigned to LINSTOR's default resource group. If later properties
+of that resource group change, they are passed down to the DRBD resources, which might have unforeseen
+consequences. It is always a good idea to create dedicated LINSTOR resource groups for reactor controlled DRBD
+resources. This could for example be one resource group for DRBD resources that should allow freezing, one for
+DRBD resources that don't, and one for LINSTOR controller HA.
+
 # Handled (failure-) scenarios
 
 ## Promotion and Service Start
