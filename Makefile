@@ -77,10 +77,10 @@ check-vulns: sbom/drbd-reactor.cdx.json
 debrelease: checkVERSION
 	rm -rf .debrelease && mkdir .debrelease
 	cd .debrelease && git clone $(PWD) . && \
-	mkdir .cargo && cp vendor.toml .cargo/config && \
+	mkdir .cargo && cp vendor.toml .cargo/config.toml && \
 	rm -rf vendor && cargo vendor && rm -fr vendor/winapi*gnu*/lib/*.a && \
 	tar --owner=0 --group=0 --transform 's,^,$(REL)/,' -czf ../$(REL).tar.gz \
-		$$(git ls-files | grep -v '^\.') .cargo/config vendor
+		$$(git ls-files | grep -v '^\.') .cargo/config.toml vendor
 	rm -rf .debrelease
 
 release: checkVERSION sbom/drbd-reactor.cdx.json sbom/drbd-reactor.spdx.json
