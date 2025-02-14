@@ -1246,7 +1246,7 @@ fn get_app() -> App<'static, 'static> {
                 .arg(
                     Arg::with_name("now")
                         .long("now")
-                        .help("In case of promoter plugin stop the drbd-resources target"),
+                        .help("In case of promoter plugin stop the drbd-services target"),
                 )
                 .arg(
                     Arg::with_name("configs")
