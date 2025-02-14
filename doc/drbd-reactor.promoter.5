@@ -30,7 +30,7 @@ is a dependency for all the other units from
 (according overrides are generated).
 .It
 a
-.Sy drbd-resource@
+.Sy drbd-services@
 target that subsumes all the generated dependencies from the
 .Sy start
 list.
@@ -68,7 +68,7 @@ containing dependencies on
 and on
 .Sy b.service .
 .It
-.Pa /var/run/systemd/system/drbd-resource@foo.target.d/reactor.conf
+.Pa /var/run/systemd/system/drbd-services@foo.target.d/reactor.conf
 containing dependencies on
 .Sy a.service ,
 .Sy b.service ,
@@ -80,7 +80,7 @@ If a DRBD resource changes its state to
 .Dq may promote ,
 the plugin (i.e., all plugins on all nodes in the cluster)
 start the generated systemd target (e.g.,
-.Sy drbd-resource@foo.target
+.Sy drbd-services@foo.target
 ). All will try to start the
 .Sy drbd-promote@
 unit first, but only one will succeed and continue to start the rest of the

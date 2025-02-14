@@ -26,7 +26,7 @@ is defined via the list specified via `start = []`. The plugin generates two imp
 
 - a `drbd-promote@` override that promotes the DRBD resource (i.e., switches it to Primary). This is a
 dependency for all the other units from `start` (according overrides are generated).
-- a `drbd-resource@` target that subsumes all the generated dependencies from the `start` list.
+- a `drbd-services@` target that subsumes all the generated dependencies from the `start` list.
 
 Let's look at a simple example to see which overrides get generated from a dummy start list like this:
 
@@ -43,11 +43,11 @@ start = [ "a.service", "b.service", "c.service" ]
   `a.service`.
 - `/var/run/systemd/system/c.service.d/reactor.conf` containing dependencies on `drbd-promote@foo` and on
   `b.service`.
-- `/var/run/systemd/system/drbd-resource@foo.target.d/reactor.conf` containing dependencies on
+- `/var/run/systemd/system/drbd-services@foo.target.d/reactor.conf` containing dependencies on
   `a.service`, `b.service`, and `c.service`.
 
 If a DRBD resource changes its state to "may promote", the plugin (i.e., all plugins on all nodes in the cluster)
-start the generated systemd target (e.g., `drbd-resource@foo.target`). All will try to start the
+start the generated systemd target (e.g., `drbd-services@foo.target`). All will try to start the
 `drbd-promote@` unit first, but only one will succeed and continue to start the rest of the services. All the
 others will fail intentionally.
 
