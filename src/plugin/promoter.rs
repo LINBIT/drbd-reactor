@@ -480,7 +480,7 @@ fn start_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
 
 fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
     info!(
-        "stop_actions (could trigger failure actions (e.g., reboot)): {}",
+        "stop_actions (could trigger 'on-drbd-demote-failure' actions if configured): {}",
         name
     );
 
