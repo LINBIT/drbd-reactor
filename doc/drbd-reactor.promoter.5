@@ -320,12 +320,22 @@ done by setting a list of
 On resource startup a delay based on the node's position in the list is added.
 Node names need to match the output of
 .Sy uname -n .
-Nodes with a lower preference will sleep longer. If a node joins on DRBD
-level, and that peer's disk becomes
+Nodes with a lower preference will sleep longer. By default, if a node joins
+on DRBD level, and that peer's disk becomes
 .Sy UpToDate ,
 and the peer has a higher preference, then the active node stops the services
 locally. As it will then have a higher sleep penalty as the preferred node,
-the preferred one will take over the service (if it can).
+the preferred one will take over the service (if it can). If
+.Sy preferred-nodes-policy
+is set to
+.Sy always
+the system behaves as described above.
+If it is set to
+.Sy start-only ,
+then preferred nodes are only taken into account when a service can be
+startet, but it will not fall back to a more preferred node when the service
+is already running on a lower priority node and a higher priority nodes joins
+later.
 .Sh FILES
 .Bl -tag -compact
 .It Pa /usr/lib/ocf/resource.d/

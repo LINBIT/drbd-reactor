@@ -60,6 +60,9 @@ statistics-poll-interval = 60
 # secondary-force = true
 ## if set, resources are started on preferred nodes if possible. node names need to match uname -n
 # preferred-nodes = ["nodeA", "nodeB"]
+## when to take preferred nodes into account. "always" or on "start-only".
+## start-only: avoids jumping back to lower priority node if higher priority node joins later
+# preferred-nodes-policy = "always"
 ## on-quorum-loss policy
 ## what to do if a the currentl DRBD Primary node loses quorum
 ## by default we shutdown the services (and maybe trigger a demote failure action).

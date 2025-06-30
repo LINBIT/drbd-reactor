@@ -195,6 +195,8 @@ pub struct PromoterOptResource {
     pub sleep_before_promote_factor: u32,
     #[serde(default)]
     pub preferred_nodes: Vec<String>,
+    #[serde(default)]
+    pub preferred_nodes_policy: PreferredNodesPolicy,
     #[serde(default = "default_secondary_force")]
     pub secondary_force: bool,
     #[serde(default)]
@@ -321,6 +323,8 @@ fn process_drbd_event(
         PluginUpdate::PeerDevice(u) => {
             #[allow(clippy::if_same_then_else)]
             if res.preferred_nodes.is_empty() {
+                return;
+            } else if res.preferred_nodes_policy == PreferredNodesPolicy::StartOnly {
                 return;
             } else if !(u.old.peer_disk_state != DiskState::UpToDate
                 && u.new.peer_disk_state == DiskState::UpToDate)
@@ -932,6 +936,18 @@ pub enum Runner {
 impl Default for Runner {
     fn default() -> Self {
         Self::Systemd
+    }
+}
+
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum PreferredNodesPolicy {
+    Always,
+    StartOnly,
+}
+impl Default for PreferredNodesPolicy {
+    fn default() -> Self {
+        Self::Always
     }
 }
 

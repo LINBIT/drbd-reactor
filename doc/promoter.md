@@ -320,7 +320,10 @@ start = ["ocf:heartbeat:Filesystem fs_test device=/dev/drbd1000 directory=/mnt/t
 While in a HA cluster that deserves the name every node needs to be able to run all services, some users like
 to add preferences for nodes. This can be done by setting a list of `preferred-nodes`.  On resource startup a
 delay based on the node's position in the list is added. Node names need to match the output of `uname -n`.
-Nodes with a lower preference will sleep longer. If a node joins on DRBD level, and that peer's disk becomes
-`UpToDate`, and the peer has a higher preference, then the active node stops the services locally. As it will
-then have a higher sleep penalty as the preferred node, the preferred one will take over the service (if it
-can).
+Nodes with a lower preference will sleep longer. By default, if a node joins on DRBD level, and that peer's
+disk becomes `UpToDate`, and the peer has a higher preference, then the active node stops the services
+locally. As it will then have a higher sleep penalty as the preferred node, the preferred one will take over
+the service (if it can). If `preferred-nodes-policy` is set to `always` the system behaves as described above.
+If it is set to `start-only`, then preferred nodes are only taken into account when a service can be startet,
+but it will not fall back to a more preferred node when the service is already running on a lower priority
+node and a higher priority nodes joins later.
