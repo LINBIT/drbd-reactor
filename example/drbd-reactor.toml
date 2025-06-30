@@ -58,7 +58,7 @@ statistics-poll-interval = 60
 # on-drbd-demote-failure = "reboot"
 ## if set (the default), "secondary --force" is used for demotion
 # secondary-force = true
-## if set, resources are started on preferred nodes if possible
+## if set, resources are started on preferred nodes if possible. node names need to match uname -n
 # preferred-nodes = ["nodeA", "nodeB"]
 ## on-quorum-loss policy
 ## what to do if a the currentl DRBD Primary node loses quorum

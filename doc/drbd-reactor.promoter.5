@@ -318,6 +318,8 @@ run all services, some users like to add preferences for nodes. This can be
 done by setting a list of 
 .Sy preferred-nodes .
 On resource startup a delay based on the node's position in the list is added.
+Node names need to match the output of
+.Sy uname -n .
 Nodes with a lower preference will sleep longer. If a node joins on DRBD
 level, and that peer's disk becomes
 .Sy UpToDate ,
