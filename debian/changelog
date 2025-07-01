@@ -1,3 +1,18 @@
+drbd-reactor (1.9.0~rc.1-1) experimental; urgency=medium
+
+  [ Moritz Wanzenböck ]
+  * ci: use git fetch instead of archive download
+
+  [ Roland Kammerer ]
+  * promoter: improve log message
+  * promoter,doc: document uname -n
+  * promoter: add preferred-nodes-policy
+
+  [ ggqshr ]
+  * Update promoter.md
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 01 Jul 2025 13:32:18 +0200
+
 drbd-reactor (1.8.0-1) experimental; urgency=medium
 
   * New upstream release
