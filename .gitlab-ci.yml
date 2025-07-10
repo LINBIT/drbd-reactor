@@ -74,3 +74,32 @@ test:clippy:
     key: $CI_JOB_NAME
     paths:
       - .cargo
+
+test:sbom:
+  stage: check
+  image: $LINBIT_DOCKER_REGISTRY/rust/cargo-sbom
+  script:
+  - make sbom/drbd-reactor.cdx.json
+  artifacts:
+    paths:
+    - sbom/*.json
+
+test:cve:
+  stage: check
+  needs:
+  - job: test:sbom
+  image:
+    name: docker.io/aquasec/trivy:latest
+    entrypoint: [ "" ]
+  script:
+    - trivy --version
+    - trivy -q sbom --exit-code 0 --format template --template "@/contrib/html.tpl" -o cve-scan.html sbom/*.json
+    # Prints full report
+    - trivy -q sbom --exit-code 0 sbom/*.json
+    # Fail on critical (unfixed) vulnerabilities
+    - trivy -q sbom --exit-code 1 --ignore-unfixed --severity CRITICAL sbom/*.json
+  artifacts:
+    when: always
+    expose_as: "CVE Scan"
+    paths:
+      - cve-scan.html
