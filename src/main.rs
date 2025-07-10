@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs::read_to_string;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::{io, sync, thread};
@@ -181,9 +182,7 @@ fn init_loggers(log_cfgs: Vec<config::LogConfig>) -> Result<()> {
 fn main() -> Result<()> {
     let cli_opt = CliOpt::from_args();
 
-    let tty = atty::is(atty::Stream::Stdin)
-        || atty::is(atty::Stream::Stdout)
-        || atty::is(atty::Stream::Stderr);
+    let tty = io::stdin().is_terminal() || io::stdout().is_terminal() || io::stderr().is_terminal();
     if tty && !cli_opt.allow_tty {
         return Err(anyhow::anyhow!(
             "Refusing to start in a terminal without --allow-tty. Did you mean drbd-reactorctl?"

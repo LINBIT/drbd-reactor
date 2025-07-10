@@ -27,7 +27,6 @@ tinytemplate = "1"
 serde_json = "1"
 shell-words = "1"
 crossbeam-channel = ">= 0.4"
-atty = ">= 0.2"
 agentx = ">= 0.1"
 # drbd-reactorctl
 clap = "2" # jammy has 2, noble has 2 and 3

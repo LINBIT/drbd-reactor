@@ -107,7 +107,6 @@ version = "1.9.0"
 dependencies = [
  "agentx",
  "anyhow",
- "atty",
  "clap",
  "colored",
  "crossbeam-channel",
