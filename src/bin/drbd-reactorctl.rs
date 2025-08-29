@@ -14,7 +14,7 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use clap::{crate_authors, crate_version, App, AppSettings, Arg, ArgMatches, Shell, SubCommand};
+use clap::{crate_version, App, AppSettings, Arg, ArgMatches, Shell, SubCommand};
 use colored::Colorize;
 use regex::Regex;
 use serde::Deserialize;
@@ -1211,7 +1211,7 @@ fn do_remote(cluster: &ClusterConf) -> Result<bool> {
 
 fn get_app() -> App<'static, 'static> {
     App::new("drbd-reactorctl")
-        .author(crate_authors!("\n"))
+        .author("Roland Kammerer <roland.kammerer@linbit.com>\nMoritz Wanzenböck <moritz.wanzenboeck@linbit.com>")
         .version(crate_version!())
         .about("Controls a local drbd-reactor daemon")
         .setting(AppSettings::VersionlessSubcommands)
