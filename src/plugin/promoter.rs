@@ -247,16 +247,10 @@ fn process_drbd_event(
                     res.sleep_before_promote_factor,
                 );
 
-                // no saturating_sub on old rust
                 let min_sleep = Duration::from_secs(MIN_SECS_PROMOTE);
                 let calc_sleep = Duration::from_millis(sleep_millis);
-                let final_sleep = if calc_sleep >= min_sleep {
-                    Duration::from_secs(0)
-                } else {
-                    min_sleep - calc_sleep
-                };
 
-                if last_start.elapsed() < final_sleep {
+                if last_start.elapsed() + calc_sleep < min_sleep {
                     debug!("got may_promote but start interval for '{}' too fast", name);
                     return;
                 }
@@ -265,7 +259,7 @@ fn process_drbd_event(
                     "run: resource '{}' may promote after {}ms",
                     name, sleep_millis
                 );
-                if sleep_millis > 0 {
+                if !calc_sleep.is_zero() {
                     thread::sleep(calc_sleep);
                 }
 
