@@ -336,6 +336,33 @@ then preferred nodes are only taken into account when a service can be
 startet, but it will not fall back to a more preferred node when the service
 is already running on a lower priority node and a higher priority nodes joins
 later.
+.Sh TWO NODE CLUSTERS WITH FENCING
+If possible the promoter plugin should be used in setups that allow for DRBD
+quorum. Two node clusters with properly configured fencing are the exception.
+We only support fencing as split-brain avoidance mechanism in two node
+clusters, everything else should use DRBD quorum. The policy gets auto
+detected as follows:
+.Bl -bullet -compact
+.It
+if DRBD quorum is something other than
+.Dq off ,
+.Sy quorum
+is used
+.It
+if DRBD quorum is
+.Dq off
+and DRBD fencing is something other than
+.Dq dont-care ,
+.Sy fencing
+is used
+.El
+Before a secondary attempts to promote, it has to give the primary some time
+to fence the secondary. This should usually be fast (i.e., remotely switching
+off power). In
+.Sy fencing
+mode the value of
+.Sy fencing-promote-delay
+is used to sleep the given number of seconds before the promote attempt.
 .Sh FILES
 .Bl -tag -compact
 .It Pa /usr/lib/ocf/resource.d/

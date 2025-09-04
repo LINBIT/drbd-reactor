@@ -42,10 +42,13 @@ statistics-poll-interval = 60
 ## what should be used to execute services. systemd is the default.
 ## 'shell' should only be used on non systemd/Windows systems.
 # runner = "systemd"
+
 ## if the runner is systemd, generate inter service dependencies as this:
 # dependencies-as = "Requires"
+
 ## if the runner is systemd, generate service dependencies in the final target unit as this:
 # target-as = "Requires"
+
 ## What should be started when the resource is promotable.
 ## the promoter assumes the item is a systemd unit if the runner is "systemd" (the default)
 ## if the runner is "shell", the start list is exected via a shell (e.g., sh -c).
@@ -53,16 +56,25 @@ statistics-poll-interval = 60
 ## if unset/empty, services from 'start' will be stopped in reverse order if the runner is "shell".
 ## if the runner is "systemd", it always starts and stops the auto-generated implicit target unit.
 # stop = []
+
 ## systemd OnFailure action that is executed on DRBD demote failures
 ## if unset, or set to "none", then no action is executed
 # on-drbd-demote-failure = "reboot"
+
 ## if set (the default), "secondary --force" is used for demotion
 # secondary-force = true
+
 ## if set, resources are started on preferred nodes if possible. node names need to match uname -n
 # preferred-nodes = ["nodeA", "nodeB"]
 ## when to take preferred nodes into account. "always" or on "start-only".
 ## start-only: avoids jumping back to lower priority node if higher priority node joins later
 # preferred-nodes-policy = "always"
+
+## drbd-reactor automatically detects the split-brain avoidance policy. if it is detected to be "fencing", a node
+## will wait this number of seconds before it tries to promote. This is ignored if the split-brain avoidance
+## policy is detected to be "quorum".
+# fencing-promote-delay = 5
+
 ## on-quorum-loss policy
 ## what to do if a the currentl DRBD Primary node loses quorum
 ## by default we shutdown the services (and maybe trigger a demote failure action).

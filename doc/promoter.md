@@ -327,3 +327,15 @@ the service (if it can). If `preferred-nodes-policy` is set to `always` the syst
 If it is set to `start-only`, then preferred nodes are only taken into account when a service can be startet,
 but it will not fall back to a more preferred node when the service is already running on a lower priority
 node and a higher priority nodes joins later.
+
+# Two node clusters with fencing
+If possible the promoter plugin should be used in setups that allow for DRBD quorum. Two node clusters with
+properly configured fencing are the exception. We only support fencing as split-brain avoidance mechanism in
+two node clusters, everything else should use DRBD quorum. The policy gets auto detected as follows:
+
+- if DRBD quorum is something other than "off", `quorum` is used
+- if DRBD quorum is "off" and DRBD fencing is something other than "dont-care", `fencing` is used
+
+Before a secondary attempts to promote, it has to give the primary some time to fence the secondary. This
+should usually be fast (i.e., remotely switching off power). In `fencing` mode the value of
+`fencing-promote-delay` is used to sleep the given number of seconds before the promote attempt.
