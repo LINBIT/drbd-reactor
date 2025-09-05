@@ -206,7 +206,7 @@ INFO: To resume normal operation, execute:
 - systemctl start drbd-services@linstor_db.target # on this node
 - drbd-reactorctl enable /etc/drbd-reactor.d/linstor_db.toml.disabled # on all cluster nodes
 .Ed
-The command show will generate all the usual overrides and then start the
+The command will generate all the usual overrides and then start the
 implicit service responsible for DRBD device promotion and all the services
 (with their overrides) in the start list until and including the one given on
 the command line. After you are done, follow the instructions that
