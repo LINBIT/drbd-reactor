@@ -653,11 +653,8 @@ fn generate_systemd_templates(
     for action in actions {
         let action = action.trim();
         let deps = match target_requires.last() {
-            Some(prev) => vec![
-                format!("drbd-promote@{}.service", escaped_name),
-                prev.to_string(),
-            ],
-            None => vec![format!("drbd-promote@{}.service", escaped_name)],
+            Some(prev) => vec![prev.to_string()],
+            None => Vec::new(),
         };
 
         let (service_name, env) = match ocf_pattern.captures(action) {
@@ -691,7 +688,7 @@ fn generate_systemd_templates(
         systemd_write_unit(
             prefix,
             SYSTEMD_CONF,
-            systemd_unit(&escaped_name, &deps, systemd_settings, &env)?,
+            promote_unit(&escaped_name, &deps, systemd_settings, &env)?,
         )?;
 
         // we would not need to keep the order here, as it does not matter
@@ -764,7 +761,7 @@ OnFailureJobMode=replace-irreversibly
 }
 
 // does not do further escaping, caller needs to do it
-fn systemd_unit(
+fn promote_unit(
     name: &str,
     deps: &[String],
     systemd_settings: &SystemdSettings,
@@ -772,7 +769,10 @@ fn systemd_unit(
 ) -> Result<String> {
     const UNIT_TEMPLATE: &str = r"[Unit]
 Description=drbd-reactor controlled %N
-PartOf = drbd-services@{name}.target
+PartOf = drbd-services@{name | unescaped}.target
+
+BindsTo = drbd-promote@{name | unescaped}.service
+After = drbd-promote@{name | unescaped}.service
 {{ for dep in deps }}
 {strictness} = {dep | unescaped}
 After = {dep}
