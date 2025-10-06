@@ -2,3 +2,6 @@
 
 %:
 	dh $@ --with systemd --with bash-completion
+
+override_dh_clean:
+	dh_clean --exclude=Cargo.toml.orig
