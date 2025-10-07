@@ -1,3 +1,23 @@
+drbd-reactor (1.10.0~rc.1-1) experimental; urgency=medium
+
+  [ Moritz Wanzenböck ]
+  * ci: add CVE scan
+  * remove atty dependency
+  * deps: bump crossbeam-channel
+  * debian: do not clean Cargo.toml.orig
+
+  [ Roland Kammerer ]
+  * example: add tmpcontroller.sh
+  * ctl: don't use clap crate_authors!()
+  * promoter: simplify sleep calculation
+  * doc: minor drbd-reactorctl(1) fix
+  * nix: add clippy
+  * promoter: add support for 2 node cluster
+  * update .gitignore
+  * promoter: generate stronger promote service dep
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 07 Oct 2025 11:15:32 +0200
+
 drbd-reactor (1.9.0-1) experimental; urgency=medium
 
   * New upstream release
