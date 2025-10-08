@@ -596,10 +596,10 @@ fn status(
                     continue;
                 }
                 let target = systemd::escaped_services_target(&drbd_res);
-                let primary = match drbd::get_primary(&drbd_res)? {
-                    PrimaryOn::Local => "this node".to_string(),
-                    PrimaryOn::Remote(r) => format!("node '{}'", r),
-                    PrimaryOn::None => "<unknown>".to_string(),
+                let primary = match drbd::get_primary(&drbd_res) {
+                    Ok(PrimaryOn::Local) => "this node".to_string(),
+                    Ok(PrimaryOn::Remote(r)) => format!("node '{}'", r),
+                    Ok(PrimaryOn::None) | Err(_) => "<unknown>".to_string(),
                 };
                 println!("Promoter: Currently active on {}", primary);
                 // target itself and the implicit one
