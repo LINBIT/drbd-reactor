@@ -1309,7 +1309,7 @@ pub fn get_primary(drbd_resource: &str) -> anyhow::Result<PrimaryOn> {
         .output()?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
-            "'drbdsetup show' not executed successfully"
+            "'drbdsetup status' not executed successfully"
         ));
     }
 
