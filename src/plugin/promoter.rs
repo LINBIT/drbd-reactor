@@ -1104,6 +1104,10 @@ fn get_split_brain_avoidance_policy(
         SplitBrainAvoidancePolicy::Quorum
     };
     sb_avoidance.insert(resname.into(), split_brain_avoidance_policy.clone());
+    info!(
+        "Detected split-brain avoidance policy: '{}'",
+        split_brain_avoidance_policy
+    );
 
     // we detected the sb avoidance policy for the first time, also check the rest of the
     // resource
