@@ -1,3 +1,12 @@
+drbd-reactor (1.10.0-1) experimental; urgency=medium
+
+  [ Roland Kammerer ]
+  * drbd: fix error message
+  * ctl: improve status output
+  * promoter: print detected sb avoidance
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 14 Oct 2025 13:02:18 +0200
+
 drbd-reactor (1.10.0~rc.1-1) experimental; urgency=medium
 
   [ Moritz Wanzenböck ]
