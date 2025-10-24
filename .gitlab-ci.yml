@@ -1,6 +1,6 @@
 include: e2e-tests/.gitlab-ci.yml
 
-image: "$CI_REGISTRY/linbit/linbit-admin-backend/test-image"
+image: "$LINBIT_DOCKER_REGISTRY/rust/rust-nightly"
 
 workflow:
   rules:
