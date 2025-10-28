@@ -19,6 +19,10 @@ pub struct Config {
     #[serde(default = "default_statistics")]
     pub statistics_poll_interval: u64,
 
+    // seconds
+    #[serde(default = "default_snippets_monitoring")]
+    pub snippets_monitoring_interval: u64,
+
     #[serde(default)]
     pub snippets: Option<PathBuf>,
 
@@ -95,6 +99,10 @@ impl Default for LocalAddress {
 
 fn default_statistics() -> u64 {
     60
+}
+
+fn default_snippets_monitoring() -> u64 {
+    120
 }
 
 fn default_level() -> LevelFilter {

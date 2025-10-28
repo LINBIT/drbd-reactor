@@ -2,7 +2,7 @@ use std::env;
 use std::fmt;
 use std::io::{Error, ErrorKind};
 use std::os::unix::net::UnixDatagram;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::sync::OnceLock;
@@ -12,6 +12,8 @@ use colored::Colorize;
 use shell_words;
 
 use crate::plugin;
+
+pub const SYSTEMD_RUN_PREFIX: &str = "/run/systemd/system";
 
 static NOTIFY_SOCKET_CELL: OnceLock<Option<PathBuf>> = OnceLock::new();
 fn notify_socket() -> &'static Option<PathBuf> {
@@ -159,6 +161,10 @@ pub fn escaped_ocf_parse_to_env(
 
 pub fn escaped_services_target(name: &str) -> String {
     format!("drbd-services@{}.target", escape_name(name))
+}
+
+pub fn escaped_services_target_dir(name: &str) -> PathBuf {
+    Path::new(SYSTEMD_RUN_PREFIX).join(format!("{}.d", escaped_services_target(name)))
 }
 
 // inlined copy from https://crates.io/crates/libsystemd

@@ -217,6 +217,10 @@ fn main() -> Result<()> {
         plugin::start_from_config(cfg.plugins.clone(), &mut started)?;
         debug!("main: started.len()={}", started.len());
 
+        let cfgs = started.keys().cloned().collect();
+        let _monitor_guard =
+            plugin::MonitorGuard::new(cfgs, cfg.snippets.clone(), cfg.snippets_monitoring_interval);
+
         let reason = core
             .run(&e2rx, &started)
             .context("main: core did not exit successfully")?;

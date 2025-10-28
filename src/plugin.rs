@@ -1,14 +1,17 @@
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::hash::Hash;
+use std::path::PathBuf;
 use std::process::{Command, ExitStatus};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use std::{any, thread};
 
 use anyhow::Result;
-use log::{error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 
+use crate::config;
 use crate::drbd::{EventType, PluginUpdate};
 use crate::systemd;
 
@@ -287,6 +290,128 @@ fn deprecate_id(cfg: &PluginCfg) {
         | PluginCfg::UMH(_)
         | PluginCfg::AgentX(_)
         | PluginCfg::Prometheus(_) => (),
+    }
+}
+
+pub struct MonitorGuard {
+    handle: Option<thread::JoinHandle<()>>,
+    sender: crossbeam_channel::Sender<()>,
+}
+
+impl MonitorGuard {
+    pub fn new(
+        cfgs: Vec<PluginCfg>,
+        snippets_path: Option<PathBuf>,
+        snippets_monitoring_interval: u64,
+    ) -> Self {
+        let (guardtx, guardrx) = crossbeam_channel::bounded(1);
+        let handle = thread::spawn(move || {
+            let last_reload = SystemTime::now();
+            let snippets_monitoring_interval = match snippets_monitoring_interval {
+                0 => return,
+                x => Duration::from_secs(std::cmp::max(x, 30)),
+            };
+
+            let ticker = crossbeam_channel::tick(snippets_monitoring_interval);
+            loop {
+                crossbeam_channel::select! {
+                    recv(ticker) -> _ => {
+                        debug!("monitor: starting run");
+                        monitor_run(&cfgs, &snippets_path, last_reload);
+                    },
+                    recv(guardrx) -> _ => {
+                        debug!("monitor: received quit");
+                        return;
+                    }
+                }
+            }
+        });
+
+        MonitorGuard {
+            handle: Some(handle),
+            sender: guardtx,
+        }
+    }
+}
+
+impl Drop for MonitorGuard {
+    fn drop(&mut self) {
+        // thread might have finished already (i.e., monitoring interval was 0)
+        // so ignore send error
+        let _ = self.sender.send(());
+
+        let _ = self.handle.take().expect("valid join handle").join();
+    }
+}
+
+fn monitor_run(cfgs: &Vec<PluginCfg>, snippets_path: &Option<PathBuf>, last_reload: SystemTime) {
+    let snippets_path = match snippets_path {
+        Some(ref p) => p,
+        None => return,
+    };
+    let snippets_paths = match config::files_with_extension_in(&snippets_path, "toml") {
+        Ok(ps) => ps,
+        Err(_) => return,
+    };
+
+    // make sure to generate a reference point.
+    let now = SystemTime::now();
+
+    let lr_elapsed = match now.duration_since(last_reload) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    // generic check that applies to all tomls:
+    for toml_path in snippets_paths {
+        let toml_elapsed = fs::metadata(&toml_path)
+            .and_then(|md| md.modified())
+            .and_then(|m| Ok(now.duration_since(m)));
+        let toml_elapsed = match toml_elapsed {
+            Ok(Ok(d)) => d,
+            _ => continue,
+        };
+        if toml_elapsed < Duration::from_secs(20) {
+            // give tools some time
+            continue;
+        }
+        if lr_elapsed > toml_elapsed {
+            warn!("toml file {:?} is newer than last service reload. 'systemctl reload drbd-reactor' required", toml_path);
+        }
+    }
+
+    // plugin specific checks:
+    for cfg in cfgs {
+        match cfg {
+            PluginCfg::Promoter(p) => {
+                for (res, _) in p
+                    .resources
+                    .iter()
+                    .filter(|&(_, v)| v.runner == promoter::Runner::Systemd)
+                {
+                    let target_path =
+                        systemd::escaped_services_target_dir(&res).join(promoter::SYSTEMD_CONF);
+                    let target_elapsed = fs::metadata(&target_path)
+                        .and_then(|md| md.modified())
+                        .and_then(|m| Ok(now.duration_since(m)));
+                    let target_elapsed = match target_elapsed {
+                        Ok(Ok(d)) => d,
+                        _ => continue,
+                    };
+                    if target_elapsed < Duration::from_secs(20) {
+                        // give tools some time
+                        continue;
+                    }
+                    if target_elapsed < lr_elapsed {
+                        warn!("systemd target unit {:?} is older than last service reload. 'systemctl reload drbd-reactor' required", target_path);
+                    }
+                }
+            }
+            PluginCfg::Debugger(_)
+            | PluginCfg::UMH(_)
+            | PluginCfg::Prometheus(_)
+            | PluginCfg::AgentX(_) => (),
+        }
     }
 }
 

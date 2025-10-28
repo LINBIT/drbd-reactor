@@ -8,6 +8,14 @@
 # IMPORTANT: this path gets path-joined with "*.toml" and the result is then subject to glob expansion
 snippets = "/etc/drbd-reactor.d"
 
+# An interval in seconds in which drbd-reactor checks if sippets (i.e., plugins) are in sync with
+# drbd-reactor. If 'drbd-rectorctl edit' is used it makes sure that the plugin and reactor states are in sync.
+# If people use their editor of choice this isn't the case if they don't reload the daemon. If snippets are
+# detected to be out of sync, messages are written to the syslog. Reactor does not auto-reload snippets.
+#
+# A value of 0 disables monitoring
+snippets-monitoring-interval = 120
+
 # DRBD statistcs (bytes written, out-of-sync,...) are recalculated every given seconds.
 # Note that this applies to statistics only, main events like resource/disk/connection states get updated
 # whenever such an event occurs. The default should be fine for most situations, but if you decide for very

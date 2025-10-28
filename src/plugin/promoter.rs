@@ -152,7 +152,9 @@ impl super::Plugin for Promoter {
         for (name, res) in cfg.resources {
             if res.stop_services_on_exit {
                 let shutdown = || -> Result<()> {
-                    fs::remove_file(escaped_services_target_dir(&name).join(SYSTEMD_BEFORE_CONF))?;
+                    fs::remove_file(
+                        systemd::escaped_services_target_dir(&name).join(SYSTEMD_BEFORE_CONF),
+                    )?;
                     systemd::daemon_reload()?;
                     stop_actions(&name, &res.stop, &res.runner)
                 };
@@ -612,8 +614,7 @@ fn drbd_backing_device_ready(dev: &str) -> bool {
         }
 }
 
-const SYSTEMD_PREFIX: &str = "/run/systemd/system";
-const SYSTEMD_CONF: &str = "reactor.conf";
+pub const SYSTEMD_CONF: &str = "reactor.conf";
 const SYSTEMD_BEFORE_CONF: &str = "reactor-50-before.conf";
 pub const OCF_PATTERN: &str = r"^ocf:(\S+):(\S+)\s+((?s).*)$";
 
@@ -626,13 +627,13 @@ fn generate_systemd_templates(
     let escaped_name = systemd::escape_name(name);
 
     if let Some(content) = drbd_promote(systemd_settings, secondary_force)? {
-        let prefix =
-            Path::new(SYSTEMD_PREFIX).join(format!("drbd-promote@{}.service.d", escaped_name));
+        let prefix = Path::new(systemd::SYSTEMD_RUN_PREFIX)
+            .join(format!("drbd-promote@{}.service.d", escaped_name));
         systemd_write_unit(prefix, SYSTEMD_CONF, content)?;
     }
 
     if systemd_settings.failure_action != SystemdFailureAction::None {
-        let prefix = Path::new(SYSTEMD_PREFIX).join(format!(
+        let prefix = Path::new(systemd::SYSTEMD_RUN_PREFIX).join(format!(
             "drbd-demote-or-escalate@{}.service.d",
             escaped_name
         ));
@@ -677,7 +678,7 @@ fn generate_systemd_templates(
             ));
         }
 
-        let prefix = Path::new(SYSTEMD_PREFIX).join(format!("{}.d", service_name));
+        let prefix = Path::new(systemd::SYSTEMD_RUN_PREFIX).join(format!("{}.d", service_name));
         if service_name.ends_with(".mount") {
             systemd_write_unit(
                 prefix.clone(),
@@ -714,10 +715,14 @@ fn generate_systemd_templates(
 
     // target and the extra Before= override
     if let Some(content) = systemd_target_requires(&target_requires, systemd_settings)? {
-        systemd_write_unit(escaped_services_target_dir(name), SYSTEMD_CONF, content)?;
+        systemd_write_unit(
+            systemd::escaped_services_target_dir(name),
+            SYSTEMD_CONF,
+            content,
+        )?;
     }
     systemd_write_unit(
-        escaped_services_target_dir(name),
+        systemd::escaped_services_target_dir(name),
         SYSTEMD_BEFORE_CONF,
         "[Unit]\nBefore=drbd-reactor.service\n".to_string(),
     )
@@ -1068,10 +1073,6 @@ fn get_sleep_before_promote_ms(
 
     // convert to ms and scale by factor
     sleep_s * 1000 * (factor as u64)
-}
-
-fn escaped_services_target_dir(name: &str) -> PathBuf {
-    Path::new(SYSTEMD_PREFIX).join(format!("{}.d", systemd::escaped_services_target(name)))
 }
 
 fn get_split_brain_avoidance_policy(
