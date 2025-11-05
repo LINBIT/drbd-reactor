@@ -48,7 +48,7 @@ In this repository, we provide an [example dashboard](/example/grafana-dashboard
 that showcases some of the generic use cases that can be accomplished with
 these metrics.
 
-The json files can simply be imported into your Grafana instance.
+The dashboard is published in the Grafana dashboard registry: [DRBD Grafana Dashboard](https://grafana.com/grafana/dashboards/14339-drbd/)
 
 ---
 
