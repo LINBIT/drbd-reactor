@@ -88,9 +88,7 @@ test:cve:
   stage: check
   needs:
   - job: test:sbom
-  image:
-    name: docker.io/aquasec/trivy:latest
-    entrypoint: [ "" ]
+  image: ${LINBIT_DOCKER_REGISTRY}/trivy:latest
   script:
     - trivy --version
     - trivy -q sbom --exit-code 0 --format template --template "@/contrib/html.tpl" -o cve-scan.html sbom/*.json
