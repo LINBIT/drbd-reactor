@@ -8,7 +8,16 @@ The plugin is enabled by adding a `prometheus` section to drbd-reactor's configu
 ```
 [[prometheus]]
 enums = true
+address = ":9942"
 ```
+
+## Configuration
+
+- `enums` (boolean, default: `false`): If set to true, various metrics that are represented as strings
+  (e.g., resource state) are also exported as enumerated integer values. This allows
+  easier graphing and alerting on these metrics.
+- `address` (string, default: `":9942"`): The address and port to bind the Prometheus HTTP endpoint to.
+  The default port of `9942` is [registered with the Prometheus organization](https://github.com/prometheus/prometheus/wiki/Default-port-allocations). 
 
 ## Metrics
 

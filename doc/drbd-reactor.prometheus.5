@@ -11,6 +11,14 @@ is the prometheus plugin for
 .Pp
 This plugin provides a prometheus compatible http endpoint serving DRBD
 metrics.
+.Sh CONFIGURATION
+The following configuration options are supported:
+.Ss address
+The address the prometheus exporter should bind to. (default:
+.Dq :9942 )
+.Ss enums
+Boolean indicating whether or not to export enum values as labels. (default:
+.Sy false )
 .Sh METRICS
 .Bl -bullet -compact
 .It
