@@ -670,7 +670,7 @@ fn generate_systemd_templates(
         // likely this might happen when people think that they can use something like "/mnt/data"
         // for their mount units (which is allowed in systemctl start). we don't allow that, people
         // have to use proper names.
-        if service_name.contains("/") {
+        if service_name.contains('/') {
             return Err(anyhow::anyhow!(
                 "generate_systemd_templates: Service name '{}' contains a '/'; If this is a mount unit please use \"systemd-escape --path --suffix=mount '{}'\"",
                 service_name,

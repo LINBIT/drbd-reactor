@@ -344,7 +344,7 @@ impl Drop for MonitorGuard {
     }
 }
 
-fn monitor_run(cfgs: &Vec<PluginCfg>, snippets_path: &Option<PathBuf>, last_reload: SystemTime) {
+fn monitor_run(cfgs: &[PluginCfg], snippets_path: &Option<PathBuf>, last_reload: SystemTime) {
     let snippets_path = match snippets_path {
         Some(ref p) => p,
         None => return,
@@ -366,7 +366,7 @@ fn monitor_run(cfgs: &Vec<PluginCfg>, snippets_path: &Option<PathBuf>, last_relo
     for toml_path in snippets_paths {
         let toml_elapsed = fs::metadata(&toml_path)
             .and_then(|md| md.modified())
-            .and_then(|m| Ok(now.duration_since(m)));
+            .map(|m| now.duration_since(m));
         let toml_elapsed = match toml_elapsed {
             Ok(Ok(d)) => d,
             _ => continue,
@@ -393,7 +393,7 @@ fn monitor_run(cfgs: &Vec<PluginCfg>, snippets_path: &Option<PathBuf>, last_relo
                         systemd::escaped_services_target_dir(&res).join(promoter::SYSTEMD_CONF);
                     let target_elapsed = fs::metadata(&target_path)
                         .and_then(|md| md.modified())
-                        .and_then(|m| Ok(now.duration_since(m)));
+                        .map(|m| now.duration_since(m));
                     let target_elapsed = match target_elapsed {
                         Ok(Ok(d)) => d,
                         _ => continue,
