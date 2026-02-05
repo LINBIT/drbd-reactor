@@ -96,8 +96,18 @@ impl super::Plugin for Promoter {
             }
             if let Some(res) = cfg.resources.get(name) {
                 // startup is usually always racy, but pretend nodes started at the same time and
-                // calculate a position in the preferred nodes. This also helps tests.
-                let sleep_s = get_preferred_nodes_sleep_s(&res.preferred_nodes);
+                // calculate a position in the preferred nodes. We also try to avoid starting on a
+                // Diskless node.
+                let mut sleep_s = 0;
+                let sleep_disk_s = match get_backing_devices(&name) {
+                    Ok(devices) if devices.contains(&"none".into()) => 6, // Diskless
+                    _ => 0,
+                };
+                debug!("initial sleep disk state: '{sleep_disk_s}'");
+                sleep_s += sleep_disk_s;
+                let sleep_pref_nodes_s = get_preferred_nodes_sleep_s(&res.preferred_nodes);
+                debug!("initial sleep preferred-nodes: '{sleep_pref_nodes_s}'");
+                sleep_s += sleep_pref_nodes_s;
                 thread::sleep(time::Duration::from_secs(sleep_s));
 
                 try_start_stop_actions(name, &res.start, &res.stop, &res.runner);
