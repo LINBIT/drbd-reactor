@@ -8,6 +8,8 @@ use std::str::FromStr;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+use crate::utils;
+
 common_matchable![Vec<Connection>, Vec<Device>];
 make_matchable![
     #[derive(Default, Debug, Serialize, Clone, PartialEq, Deserialize)]
@@ -1296,9 +1298,32 @@ fn split_version(pattern: regex::Regex, stdout: Vec<u8>) -> anyhow::Result<Versi
 
 #[derive(PartialEq)]
 pub enum PrimaryOn {
-    Local,
+    Local(String),
     Remote(String),
     None,
+}
+impl Serialize for PrimaryOn {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+impl PrimaryOn {
+    pub fn terminal(&self, _verbose: bool) -> anyhow::Result<String> {
+        Ok(match self {
+            Self::Local(_) => "this node".to_string(),
+            Self::Remote(p) => format!("node '{}'", p),
+            Self::None => "<unknown>".to_string(),
+        })
+    }
+}
+impl fmt::Display for PrimaryOn {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Local(l) => write!(f, "{}", l),
+            Self::Remote(r) => write!(f, "{}", r),
+            Self::None => write!(f, "unknown"),
+        }
+    }
 }
 
 pub fn get_primary(drbd_resource: &str) -> anyhow::Result<PrimaryOn> {
@@ -1334,7 +1359,7 @@ pub fn get_primary(drbd_resource: &str) -> anyhow::Result<PrimaryOn> {
 
     // is it me?
     if resources[0].role == Role::Primary {
-        return Ok(PrimaryOn::Local);
+        return Ok(PrimaryOn::Local(utils::uname_n()?));
     }
 
     // a peer?

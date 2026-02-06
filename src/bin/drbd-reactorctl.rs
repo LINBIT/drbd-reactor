@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
+use std::fmt::Write as fmtWrite;
 use std::fs;
 use std::io::{self, Write};
 use std::io::{BufRead, BufReader};
@@ -166,24 +167,28 @@ fn main() -> Result<()> {
         }
         ("status", Some(status_matches)) => {
             let verbose = status_matches.is_present("verbose");
+            let format = match status_matches.is_present("json") {
+                true => Format::Json,
+                false => Format::Terminal,
+            };
             let resources = status_matches.values_of("resource").unwrap_or_default();
             let resources: Vec<String> = resources.map(String::from).collect::<Vec<_>>();
             status(
                 expand_snippets(&snippets_path, status_matches, false),
-                verbose,
                 &resources,
                 &cluster,
             )
+            .and_then(|s| Ok(print!("{}", s.format(&format, verbose)?)))
         }
         _ => {
             // pretend it is status
             let args: ArgMatches = Default::default();
             status(
                 expand_snippets(&snippets_path, &args, false),
-                false,
                 &vec![],
                 &cluster,
             )
+            .and_then(|s| Ok(print!("{}", s.format(&Format::Terminal, false)?)))
         }
     }
 }
@@ -577,16 +582,17 @@ fn reload_service() -> Result<()> {
 
 fn status(
     snippets_paths: Vec<PathBuf>,
-    verbose: bool,
     resources: &Vec<String>,
     cluster: &ClusterConf,
-) -> Result<()> {
+) -> Result<Status> {
+    let mut status = Status {
+        ..Default::default()
+    };
     if do_remote(cluster)? {
-        return Ok(());
+        return Ok(status);
     }
 
     for snippet in snippets_paths {
-        println!("{}:", snippet.display());
         let conf = read_config(&snippet)?;
         let plugins = conf.plugins;
         for promoter in plugins.promoter {
@@ -596,75 +602,57 @@ fn status(
                     continue;
                 }
                 let target = systemd::escaped_services_target(&drbd_res);
-                let primary = match drbd::get_primary(&drbd_res) {
-                    Ok(PrimaryOn::Local) => "this node".to_string(),
-                    Ok(PrimaryOn::Remote(r)) => format!("node '{}'", r),
-                    Ok(PrimaryOn::None) | Err(_) => "<unknown>".to_string(),
-                };
-                println!("Promoter: Currently active on {}", primary);
+                let primary_on = drbd::get_primary(&drbd_res)?;
                 // target itself and the implicit one
                 let promote_service = promote_service(&drbd_res);
-                if verbose {
-                    // systemctl status in this case returns != 0 if service not started
-                    // but we expect that on n-1 nodes and we don't want to fail in this case
-                    let _ = systemctl(vec!["status".into(), "--no-pager".into(), target]);
-                    let _ = systemctl(vec!["status".into(), "--no-pager".into(), promote_service]);
-                } else {
-                    println!("{} {}", status_dot(&target)?, target);
-                    println!("{} ├─ {}", status_dot(&promote_service)?, promote_service);
+                let mut dependencies = Vec::new();
+                let target = SystemdUnit::from_str(&target)?;
+                dependencies.push(SystemdUnit::from_str(&promote_service)?);
+                let state = target.status.clone();
+
+                for start in config.start {
+                    let service_name = service_name(&start, &drbd_res)?;
+                    dependencies.push(SystemdUnit::from_str(&service_name)?);
                 }
-                for (i, start) in config.start.iter().enumerate() {
-                    let service_name = service_name(start, &drbd_res)?;
-                    if verbose {
-                        // systemctl status in this case returns != 0 if service not started
-                        // but we expect that on n-1 nodes and we don't want to fail in this case
-                        let _ = systemctl(vec!["status".into(), "--no-pager".into(), service_name]);
-                    } else {
-                        let sep = if i == config.start.len() - 1 {
-                            "└─"
-                        } else {
-                            "├─"
-                        };
-                        println!(
-                            "{} {} {} {}",
-                            status_dot(&service_name)?,
-                            sep,
-                            service_name,
-                            freezer_state(&service_name)?
-                        );
-                    }
-                }
+
+                status.promoter.push(PromoterStatus {
+                    drbd_resource: drbd_res.clone(),
+                    path: snippet.clone(),
+                    primary_on,
+                    target,
+                    dependencies,
+                    status: state,
+                });
             }
         }
         for prometheus in plugins.prometheus {
-            println!(
-                "Prometheus: listening on {}",
-                prometheus.address.to_string().bold().green()
-            );
-            if verbose {
-                for addr in prometheus.address.to_socket_addrs()? {
-                    let status = match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
-                        Ok(_) => format!("{}", "success".bold().green()),
-                        Err(e) => format!("{} ({})", "failed".bold().red(), e),
-                    };
-                    println!("TCP Connect ({}): {}", addr, status);
-                }
-            }
+            status.prometheus.push(PrometheusStatus {
+                path: snippet.clone(),
+                address: prometheus.address.clone(),
+                status: UnitActiveState::Active,
+            })
         }
         for _ in plugins.debugger {
-            println!("Debugger: {}", "started".bold().green());
+            status.debugger.push(DebuggerStatus {
+                path: snippet.clone(),
+                status: UnitActiveState::Active,
+            })
         }
         for _ in plugins.umh {
-            println!("UMH: {}", "started".bold().green());
+            status.umh.push(UMHStatus {
+                path: snippet.clone(),
+                status: UnitActiveState::Active,
+            })
         }
         for agentx in plugins.agentx {
-            println!(
-                "AgentX: connecting to main agent at {}",
-                agentx.address.bold().green()
-            );
+            status.agentx.push(AgentXStatus {
+                path: snippet.clone(),
+                address: agentx.address.clone(),
+                status: UnitActiveState::Active,
+            })
         }
     }
-    Ok(())
+    Ok(status)
 }
 
 fn cat(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
@@ -731,7 +719,7 @@ fn evict_resource(drbd_resource: &str, delay: u32) -> Result<()> {
             println!("Active on '{}', nothing to do on this node, ignoring", r,);
             return Ok(());
         }
-        PrimaryOn::Local => (), // we continue
+        PrimaryOn::Local(_) => (), // we continue
     };
 
     let target = systemd::escaped_services_target(drbd_resource);
@@ -767,7 +755,7 @@ fn evict_resource(drbd_resource: &str, delay: u32) -> Result<()> {
     }
 
     match drbd::get_primary(drbd_resource)? {
-        PrimaryOn::Local => {
+        PrimaryOn::Local(_) => {
             println!("Local node still DRBD Primary, not all services stopped in time locally");
         }
         PrimaryOn::Remote(r) => println!("Node '{}' took over", r),
@@ -1155,7 +1143,7 @@ fn do_remote(cluster: &ClusterConf) -> Result<bool> {
     }
 
     // remote execution (except local node)
-    let me = utils::uname_n()?;
+    let me = utils::uname_n_once();
 
     // check if we can reach all nodes, otherwise we might run into some inconsistent cluster state
     // that is obviously not a 100% guarantee, but IMO a check worth having
@@ -1163,7 +1151,7 @@ fn do_remote(cluster: &ClusterConf) -> Result<bool> {
     io::stdout().flush()?;
     let mut cmds = Vec::new();
     for node in &nodes {
-        if node.hostname == me {
+        if node.hostname == *me {
             continue;
         }
         let userhost = format!("{}@{}", node.user, node.hostname);
@@ -1180,7 +1168,7 @@ fn do_remote(cluster: &ClusterConf) -> Result<bool> {
     let orig_args: Vec<String> = env::args().skip(1).collect();
     cmds.clear();
     for node in &nodes {
-        let is_me = me == node.hostname;
+        let is_me = *me == node.hostname;
         let mut node_args = Vec::new();
         if !is_me {
             node_args.push("ssh".to_string());
@@ -1271,6 +1259,11 @@ fn get_app() -> App<'static, 'static> {
                         .help("Verbose output")
                         .short("v")
                         .long("verbose"),
+                )
+                .arg(
+                    Arg::with_name("json")
+                        .help("Json output")
+                        .long("json"),
                 )
                 .arg(
                     Arg::with_name("resource")
@@ -1472,29 +1465,18 @@ fn systemctl(args: Vec<String>) -> Result<()> {
     systemctl_out_err(args, Stdio::inherit(), Stdio::inherit())
 }
 
-fn status_dot(unit: &str) -> Result<String> {
-    let prop = systemd::show_property(unit, "ActiveState")?;
-    let state = UnitActiveState::from_str(&prop)?;
-    Ok(format!("{}", state))
-}
-
-fn freezer_state(unit: &str) -> Result<String> {
-    // we can not always expect a value on older systemd that did not have freeze support
-    // in that case we get an Err() which we discard.
-    let prop = match systemd::show_property(unit, "FreezerState") {
-        Ok(x) => x,
-        Err(_) => return Ok("".into()),
-    };
-    let state = UnitFreezerState::from_str(&prop)?;
-    Ok(format!("{}", state))
-}
-
 // most of that inspired by systemc/src/basic/unit-def.c
 enum UnitFreezerState {
     Running,
     Freezing,
     Frozen,
     Thawing,
+    Unknown,
+}
+impl Serialize for UnitFreezerState {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
 }
 impl FromStr for UnitFreezerState {
     type Err = Error;
@@ -1505,6 +1487,7 @@ impl FromStr for UnitFreezerState {
             "freezing" => Ok(Self::Freezing),
             "frozen" => Ok(Self::Frozen),
             "thawing" => Ok(Self::Thawing),
+            "unknown" => Ok(Self::Unknown),
             _ => Err(Error::new(
                 ErrorKind::InvalidData,
                 "unknown systemd FreezerState",
@@ -1516,11 +1499,230 @@ impl FromStr for UnitFreezerState {
 impl fmt::Display for UnitFreezerState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Running => write!(f, ""),
-            Self::Freezing => write!(f, "({})", "freezing".blue()),
-            Self::Frozen => write!(f, "({})", "frozen".blue()),
-            Self::Thawing => write!(f, "(thawing)"),
+            Self::Running => write!(f, "running"),
+            Self::Freezing => write!(f, "freezing"),
+            Self::Frozen => write!(f, "frozen"),
+            Self::Thawing => write!(f, "thawing"),
+            Self::Unknown => write!(f, "unknown"),
         }
+    }
+}
+
+impl UnitFreezerState {
+    fn terminal(&self, _verbose: bool) -> Result<String> {
+        Ok(match self {
+            Self::Running => "".to_string(),
+            Self::Freezing => "freezing".blue().to_string(),
+            Self::Frozen => "frozen".blue().to_string(),
+            Self::Thawing => "thawing".to_string(),
+            Self::Unknown => "unknown".to_string(),
+        })
+    }
+}
+
+enum Format {
+    Terminal,
+    Json,
+}
+impl FromStr for Format {
+    type Err = Error;
+
+    fn from_str(input: &str) -> Result<Self, Error> {
+        match input {
+            "text" => Ok(Self::Terminal),
+            "json" => Ok(Self::Json),
+            _ => Err(Error::new(ErrorKind::InvalidData, "unknown format")),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SystemdUnit {
+    name: String,
+    status: UnitActiveState,
+    freezer: UnitFreezerState,
+}
+impl FromStr for SystemdUnit {
+    type Err = Error;
+
+    fn from_str(unit: &str) -> Result<Self, Error> {
+        let prop = systemd::show_property(unit, "ActiveState")
+            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+        let status = UnitActiveState::from_str(&prop)?;
+
+        let prop = systemd::show_property(unit, "FreezerState").unwrap_or("unknown".to_string());
+        let freezer = UnitFreezerState::from_str(&prop)?;
+
+        Ok(Self {
+            name: unit.to_string(),
+            status,
+            freezer,
+        })
+    }
+}
+
+#[derive(Default, Serialize)]
+struct Status {
+    promoter: Vec<PromoterStatus>,
+    prometheus: Vec<PrometheusStatus>,
+    debugger: Vec<DebuggerStatus>,
+    umh: Vec<UMHStatus>,
+    agentx: Vec<AgentXStatus>,
+}
+
+impl Status {
+    fn format(&self, fmt: &Format, verbose: bool) -> Result<String> {
+        match fmt {
+            Format::Terminal => self.terminal(verbose),
+            Format::Json => self.json(),
+        }
+    }
+    fn terminal(&self, verbose: bool) -> Result<String> {
+        let mut w = String::new();
+
+        for p in &self.promoter {
+            write!(w, "{}", p.terminal(verbose)?)?;
+        }
+        for p in &self.prometheus {
+            write!(w, "{}", p.terminal(verbose)?)?;
+        }
+        for p in &self.debugger {
+            write!(w, "{}", p.terminal(verbose)?)?;
+        }
+        for p in &self.umh {
+            write!(w, "{}", p.terminal(verbose)?)?;
+        }
+        for p in &self.agentx {
+            write!(w, "{}", p.terminal(verbose)?)?;
+        }
+
+        Ok(w)
+    }
+    fn json(&self) -> Result<String> {
+        Ok(serde_json::to_string(self)?)
+    }
+}
+
+#[derive(Serialize)]
+struct PromoterStatus {
+    drbd_resource: String,
+    path: PathBuf,
+    primary_on: PrimaryOn,
+    target: SystemdUnit,
+    dependencies: Vec<SystemdUnit>,
+    status: UnitActiveState,
+}
+
+impl PromoterStatus {
+    fn terminal(&self, verbose: bool) -> Result<String> {
+        let mut w = String::new();
+        writeln!(w, "{}:", self.path.display())?;
+        writeln!(
+            w,
+            "Promoter: Resource {} currently active on {}",
+            self.drbd_resource,
+            self.primary_on.terminal(verbose)?
+        )?;
+
+        writeln!(
+            w,
+            "{} {}",
+            self.target.status.terminal(verbose)?,
+            self.target.name
+        )?;
+
+        for (i, unit) in self.dependencies.iter().enumerate() {
+            let sep = if i == self.dependencies.len() - 1 {
+                "└─"
+            } else {
+                "├─"
+            };
+            write!(
+                w,
+                "{} {} {}",
+                unit.status.terminal(verbose)?,
+                sep,
+                unit.name
+            )?;
+            match unit.freezer {
+                UnitFreezerState::Running | UnitFreezerState::Unknown => writeln!(w)?,
+                _ => writeln!(w, "({})", unit.freezer.terminal(verbose)?)?,
+            };
+        }
+
+        Ok(w)
+    }
+}
+
+#[derive(Serialize)]
+struct PrometheusStatus {
+    path: PathBuf,
+    address: config::LocalAddress,
+    status: UnitActiveState,
+}
+impl PrometheusStatus {
+    fn terminal(&self, verbose: bool) -> Result<String> {
+        let mut w = String::new();
+        writeln!(
+            w,
+            "Prometheus: listening on {}",
+            self.address.to_string().bold().green()
+        )?;
+
+        if verbose {
+            for addr in self.address.to_socket_addrs()? {
+                let status = match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+                    Ok(_) => format!("{}", "success".bold().green()),
+                    Err(e) => format!("{} ({})", "failed".bold().red(), e),
+                };
+                writeln!(w, "TCP Connect ({}): {}", addr, status)?;
+            }
+        }
+
+        Ok(w)
+    }
+}
+#[derive(Serialize)]
+struct DebuggerStatus {
+    path: PathBuf,
+    status: UnitActiveState,
+}
+impl DebuggerStatus {
+    fn terminal(&self, _verbose: bool) -> Result<String> {
+        let mut w = String::new();
+        writeln!(w, "Debugger: {}", "started".bold().green())?;
+        Ok(w)
+    }
+}
+
+#[derive(Serialize)]
+struct UMHStatus {
+    path: PathBuf,
+    status: UnitActiveState,
+}
+impl UMHStatus {
+    fn terminal(&self, _verbose: bool) -> Result<String> {
+        let mut w = String::new();
+        writeln!(w, "UMH: {}", "started".bold().green())?;
+        Ok(w)
+    }
+}
+
+#[derive(Serialize)]
+struct AgentXStatus {
+    path: PathBuf,
+    address: String,
+    status: UnitActiveState,
+}
+impl AgentXStatus {
+    fn terminal(&self, _verbose: bool) -> Result<String> {
+        let mut w = String::new();
+        writeln!(
+            w,
+            "AgentX: connecting to main agent at {}",
+            self.address.bold().green()
+        )?;
+        Ok(w)
     }
 }
 

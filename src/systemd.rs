@@ -74,7 +74,7 @@ pub fn show_property(unit: &str, property: &str) -> Result<String> {
 }
 
 // most of that inspired by systemc/src/basic/unit-def.c
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum UnitActiveState {
     Active,
     Reloading,
@@ -83,6 +83,11 @@ pub enum UnitActiveState {
     Activating,
     Deactivating,
     Maintenance,
+}
+impl serde::Serialize for UnitActiveState {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
 }
 impl FromStr for UnitActiveState {
     type Err = Error;
@@ -106,14 +111,27 @@ impl FromStr for UnitActiveState {
 impl fmt::Display for UnitActiveState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Active => write!(f, "{}", "●".bold().green()),
-            Self::Reloading => write!(f, "{}", "↻".bold().green()),
-            Self::Inactive => write!(f, "○"),
-            Self::Failed => write!(f, "{}", "×".bold().red()),
-            Self::Activating => write!(f, "{}", "●".bold()),
-            Self::Deactivating => write!(f, "{}", "●".bold()),
-            Self::Maintenance => write!(f, "○"),
+            Self::Active => write!(f, "active"),
+            Self::Reloading => write!(f, "reloading"),
+            Self::Inactive => write!(f, "inactive"),
+            Self::Failed => write!(f, "failed"),
+            Self::Activating => write!(f, "activating"),
+            Self::Deactivating => write!(f, "deactivating"),
+            Self::Maintenance => write!(f, "maintenance"),
         }
+    }
+}
+impl UnitActiveState {
+    pub fn terminal(&self, _verbose: bool) -> Result<String> {
+        Ok(match self {
+            Self::Active => "●".bold().green().to_string(),
+            Self::Reloading => "↻".bold().green().to_string(),
+            Self::Inactive => "○".to_string(),
+            Self::Failed => "×".bold().red().to_string(),
+            Self::Activating => "●".bold().to_string(),
+            Self::Deactivating => "●".bold().to_string(),
+            Self::Maintenance => "○".to_string(),
+        })
     }
 }
 

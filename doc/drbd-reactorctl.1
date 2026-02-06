@@ -21,6 +21,7 @@
 .Nm status
 .Op Fl -resource
 .Op Fl -verbose
+.Op Fl -json
 .Op Ar
 .Nm evict
 .Op Fl -delay
@@ -130,6 +131,8 @@ colors follow the ones from
 In case of a promoter plugin limit to these DRBD resources.
 .It Fl -verbose
 verbose output depending on the plugin type.
+.It Fl -json
+output machine parsable json output.
 .El
 .Ss evict
 Evicts a promoter resource from the currently active node.

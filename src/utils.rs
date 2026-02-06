@@ -2,6 +2,7 @@ use anyhow::Result;
 use libc::c_char;
 use std::ffi::CStr;
 use std::io;
+use std::sync::OnceLock;
 
 // inspired by https://crates.io/crates/uname
 // inlined because currently not packaged in Ubuntu Focal
@@ -17,4 +18,10 @@ pub fn uname_n() -> Result<String> {
     } else {
         Err(anyhow::anyhow!(io::Error::last_os_error()))
     }
+}
+
+static UNAME: OnceLock<String> = OnceLock::new();
+
+pub fn uname_n_once() -> &'static String {
+    UNAME.get_or_init(|| uname_n().unwrap_or("unknown".to_string()))
 }
