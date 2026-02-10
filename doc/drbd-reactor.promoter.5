@@ -363,6 +363,16 @@ off power). In
 mode the value of
 .Sy fencing-promote-delay
 is used to sleep the given number of seconds before the promote attempt.
+.Sh LOCAL DISK FAILURE
+If the local DRBD disk on a Primary node gets detached
+(i.e., becomes Diskless), the behavior is controlled by the
+.Sy on-disk-detach
+policy. By default the policy is set to
+.Dq ignore ,
+which means no action is taken. If set to
+.Dq fail-over ,
+the promoter will stop services if an UpToDate peer is
+found, triggering a failover to that peer.
 .Sh FILES
 .Bl -tag -compact
 .It Pa /usr/lib/ocf/resource.d/

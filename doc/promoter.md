@@ -217,6 +217,13 @@ details.
 
 The peers will see replication links go down, the resource becomes promotable. See above.
 
+## Local disk failure
+
+If the local DRBD disk on a Primary node gets detached (i.e., becomes Diskless), the behavior is controlled
+by the `on-disk-detach` policy. By default the policy is set to `ignore`, which means no action is taken.
+If set to `fail-over`, the promoter will stop services if an UpToDate peer is found, triggering a failover
+to that peer.
+
 ## Service failure
 
 If service failure is detected by the service itself, by a monitoring loop in the `ocf.rs` wrapper service, or

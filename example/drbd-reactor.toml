@@ -94,6 +94,13 @@ statistics-poll-interval = 60
 ## AND your service can handle to be frozen, setting on-quorum-loss to "freeze" might be an option.
 # on-quorum-loss = "shutdown"
 
+## on-disk-detach policy
+## what to do if the local DRBD disk on a Primary node gets detached (i.e., becomes Diskless).
+## by default we ignore the event ("ignore").
+## if set to "fail-over", the promoter will stop services if an UpToDate peer is found,
+## triggering a failover to that peer.
+# on-disk-detach = "ignore"
+
 # Configure a user mode helper filter
 # [[umh]]
 ## Filter type

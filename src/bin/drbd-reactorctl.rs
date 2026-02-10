@@ -1751,6 +1751,7 @@ start = ["$service.mount", "$service.service"]
 # stop = []
 # on-drbd-demote-failure = "reboot"
 # stop-services-on-exit = false
+# on-disk-detach = "ignore"
 #
 # for more complex setups like HA iSCSI targets, NFS exports, or NVMe-oF targets consider
 # https://github.com/LINBIT/linstor-gateway which uses LINSTOR and drbd-reactor"###;

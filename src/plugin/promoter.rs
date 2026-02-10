@@ -219,6 +219,8 @@ pub struct PromoterOptResource {
     pub secondary_force: bool,
     #[serde(default)]
     pub on_quorum_loss: QuorumLossPolicy,
+    #[serde(default)]
+    pub on_disk_detach: DiskDetachPolicy,
     #[serde(default = "default_fence_delay")]
     pub fencing_promote_delay: u64,
 }
@@ -343,6 +345,43 @@ fn process_drbd_event(
                 if let Err(e) = freeze_actions(&name, State::Thaw, &res.runner) {
                     warn!("Thawing '{}' failed: {}", name, e);
                 }
+            } else if u.old.disk_state != DiskState::Diskless
+                && u.new.disk_state == DiskState::Diskless
+                && !u.old.client
+                && !u.new.client
+                && u.resource.role == Role::Primary
+            {
+                info!("resource '{}' lost local disk", name);
+                if res.on_disk_detach == DiskDetachPolicy::Ignore {
+                    info!(
+                        "resource '{}' on-disk-detach policy is '{}', not taking action",
+                        name, res.on_disk_detach
+                    );
+                    return;
+                }
+                info!(
+                    "resource '{}' on-disk-detach policy is '{}', checking for UpToDate peer",
+                    name, res.on_disk_detach
+                );
+                for pd in u
+                    .resource
+                    .connections
+                    .iter()
+                    .flat_map(|c| c.peerdevices.iter())
+                {
+                    // check if we find an UpToDate peer
+                    if pd.peer_client == false && pd.peer_disk_state == DiskState::UpToDate {
+                        info!("resource '{}' lost local disk, found UpToDate peer", name);
+                        if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
+                            warn!("Stopping '{}' failed: {}", name, e);
+                        }
+                        return;
+                    }
+                }
+                info!(
+                    "resource '{}' lost local disk, did not find UpToDate peer",
+                    name
+                );
             }
         }
         PluginUpdate::PeerDevice(u) => {
@@ -958,6 +997,27 @@ impl fmt::Display for QuorumLossPolicy {
         match self {
             Self::Shutdown => write!(f, "shutdown"),
             Self::Freeze => write!(f, "freeze"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
+pub enum DiskDetachPolicy {
+    #[serde(rename = "ignore")]
+    Ignore,
+    #[serde(rename = "fail-over")]
+    FailOver,
+}
+impl Default for DiskDetachPolicy {
+    fn default() -> Self {
+        Self::Ignore
+    }
+}
+impl fmt::Display for DiskDetachPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Ignore => write!(f, "ignore"),
+            Self::FailOver => write!(f, "fail-over"),
         }
     }
 }
