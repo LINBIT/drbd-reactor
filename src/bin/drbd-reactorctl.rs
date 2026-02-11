@@ -1745,10 +1745,6 @@ fn info(text: &str) {
 const PROMOTER_TEMPLATE: &str = r###"[[promoter]]
 [promoter.resources.$resname]
 start = ["$service.mount", "$service.service"]
-# runner = "systemd"
-## if unset/empty, services from 'start' will be stopped in reverse order if runner is shell
-## if runner is systemd it just stops the implicitly generated systemd.target
-# stop = []
 # on-drbd-demote-failure = "reboot"
 # stop-services-on-exit = false
 # on-disk-detach = "ignore"
