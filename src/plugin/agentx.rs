@@ -74,14 +74,14 @@ impl super::Plugin for AgentX {
                 | PluginUpdate::ResourceOnly(EventType::Change, u) => match self.metrics.lock() {
                     Ok(mut m) => m.update(u),
                     Err(e) => {
-                        error!("run: could not lock metrics: {}", e);
+                        error!("run: could not lock metrics: {e}");
                         return Err(anyhow::anyhow!("Tried accessing a poisoned lock"));
                     }
                 },
                 PluginUpdate::ResourceOnly(EventType::Destroy, u) => match self.metrics.lock() {
                     Ok(mut m) => m.delete(&u.name),
                     Err(e) => {
-                        error!("run: could not lock metrics: {}", e);
+                        error!("run: could not lock metrics: {e}");
                         return Err(anyhow::anyhow!("Tried accessing a poisoned lock"));
                     }
                 },
@@ -202,14 +202,14 @@ fn agentx_handler(
                 let mut s = match stream.write() {
                     Ok(s) => s,
                     Err(e) => {
-                        warn!("agentx_handler: could not lock tcp stream: '{}'", e);
+                        warn!("agentx_handler: could not lock tcp stream: '{e}'");
                         continue;
                     }
                 };
                 *s = match TcpStream::connect(address) {
                     Ok(s) => s,
                     Err(e) => {
-                        warn!("agentx_handler: could not connect stream '{}'", e);
+                        warn!("agentx_handler: could not connect stream '{e}'");
                         continue;
                     }
                 };
@@ -217,7 +217,7 @@ fn agentx_handler(
         }
 
         if let Err(e) = agentx_handler_process_loop(&stream, metrics, agent_timeout) {
-            warn!("agentx_handler_process_loop: '{}'", e);
+            warn!("agentx_handler_process_loop: '{e}'");
         }
     }
 

@@ -53,12 +53,12 @@ pub fn map_status(status: std::result::Result<ExitStatus, std::io::Error>) -> Re
                 Err(anyhow::anyhow!("Return code not status success"))
             }
         }
-        Err(e) => Err(anyhow::anyhow!("Could not execute: {}", e)),
+        Err(e) => Err(anyhow::anyhow!("Could not execute: {e}")),
     }
 }
 
 pub fn system(action: &str) -> Result<()> {
-    info!("system: sh -c {}", action);
+    info!("system: sh -c {action}");
     map_status(Command::new("sh").arg("-c").arg(action).status())
 }
 
@@ -218,7 +218,7 @@ pub fn start_from_config(
             }
             systemd_reload = true;
         }
-        systemd::notify(&format!("EXTEND_TIMEOUT_USEC={}\n", extend))?;
+        systemd::notify(&format!("EXTEND_TIMEOUT_USEC={extend}\n"))?;
         if systemd_reload {
             // reset, especially after the first promoter
             extend = extend_default;
@@ -265,11 +265,11 @@ pub fn start_from_config(
 /// Useful to convert the Result of a thread handle `.join()` into a readable error message.
 fn thread_panic_error(original: Box<dyn any::Any + Send>) -> anyhow::Error {
     if let Some(&s) = original.downcast_ref::<&str>() {
-        return anyhow::anyhow!("plugin panicked: {}", s);
+        return anyhow::anyhow!("plugin panicked: {s}");
     }
 
     if let Some(s) = original.downcast_ref::<String>() {
-        return anyhow::anyhow!("plugin panicked: {}", s);
+        return anyhow::anyhow!("plugin panicked: {s}");
     }
 
     anyhow::anyhow!("plugin panicked with unrecoverable error message")

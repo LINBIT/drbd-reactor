@@ -64,7 +64,7 @@ fn process_events2(
         .expect("events:: process_events2: stdin set to Stdio::piped()");
     thread::spawn(move || loop {
         if let Err(e) = stdin.write_all("n\n".as_bytes()) {
-            warn!("process_events2: could not update statistics: {}", e);
+            warn!("process_events2: could not update statistics: {e}");
             break;
         }
         thread::sleep(statistics_poll);
@@ -96,10 +96,7 @@ fn process_events2(
 
         match parse_events2_line(line) {
             Ok(update) => tx.send(update)?,
-            Err(e) => debug!(
-                "process_events2: could not parse line '{}', because {}",
-                line, e
-            ),
+            Err(e) => debug!("process_events2: could not parse line '{line}', because {e}"),
         }
         buf.clear();
     }
@@ -116,8 +113,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
         Ok(et) => et,
         Err(_) => {
             return Err(anyhow::anyhow!(
-                "events: parse_events2_line: unknown events type: {}",
-                verb
+                "events: parse_events2_line: unknown events type: {verb}"
             ));
         }
     };
@@ -139,7 +135,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("may_promote", v) => resource.may_promote = str_to_bool(v),
                 ("promotion_score", v) => resource.promotion_score = v.parse::<_>()?,
                 _ => {
-                    debug!("events: process_events2: resource: unknown keyword '{}'", k)
+                    debug!("events: process_events2: resource: unknown keyword '{k}'")
                 }
             };
         }
@@ -168,7 +164,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("blocked", v) => device.blocked = v.into(),
                 ("open", v) => device.open = str_to_bool(v),
                 _ => {
-                    debug!("events: process_events2: device: unknown keyword '{}'", k)
+                    debug!("events: process_events2: device: unknown keyword '{k}'")
                 }
             };
         }
@@ -188,10 +184,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("ap-in-flight", v) => conn.ap_in_flight = v.parse::<_>()?,
                 ("rs-in-flight", v) => conn.rs_in_flight = v.parse::<_>()?,
                 _ => {
-                    debug!(
-                        "events: process_events2: connection: unknown keyword '{}'",
-                        k
-                    )
+                    debug!("events: process_events2: connection: unknown keyword '{k}'")
                 }
             };
         }
@@ -221,10 +214,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("eta", _) => (),
                 ("dbdt1", _) => (),
                 _ => {
-                    debug!(
-                        "events: process_events2: peer-device: unknown keyword '{}'",
-                        k
-                    )
+                    debug!("events: process_events2: peer-device: unknown keyword '{k}'")
                 }
             };
         }
@@ -242,7 +232,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
                 ("peer", v) => path.peer = v.into(),
                 ("established", v) => path.established = str_to_bool(v),
                 _ => {
-                    debug!("events: process_events2: path: unknown keyword '{}'", k)
+                    debug!("events: process_events2: path: unknown keyword '{k}'")
                 }
             }
         }
@@ -250,8 +240,7 @@ fn parse_events2_line(line: &str) -> Result<EventUpdate> {
     }
 
     Err(anyhow::anyhow!(
-        "events: process_events2: unknown keyword '{}'",
-        what
+        "events: process_events2: unknown keyword '{what}'"
     ))
 }
 

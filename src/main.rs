@@ -199,7 +199,7 @@ fn main() -> Result<()> {
     let statistics_poll = Duration::from_secs(cfg.statistics_poll_interval);
     thread::spawn(move || {
         if let Err(e) = events2(e2tx, statistics_poll) {
-            error!("main: events2 processing failed: {}", e);
+            error!("main: events2 processing failed: {e}");
             std::process::exit(1);
         }
     });
@@ -210,7 +210,7 @@ fn main() -> Result<()> {
     loop {
         match get_config(&cli_opt.config) {
             Ok(new) => cfg = new,
-            Err(e) => warn!("main: failed to reload config, reusing old: {}", e),
+            Err(e) => warn!("main: failed to reload config, reusing old: {e}"),
         };
         debug!("main: configuration: {:#?}", cfg);
 
@@ -288,8 +288,7 @@ fn min_drbd_versions() -> Result<()> {
     };
     if drbd_versions.utils < want {
         return Err(anyhow::anyhow!(
-            "drbdsetup minimum version ('{}') not fulfilled by '{}'",
-            want,
+            "drbdsetup minimum version ('{want}') not fulfilled by '{}'",
             drbd_versions.utils
         ));
     }
@@ -309,9 +308,7 @@ fn min_drbd_versions() -> Result<()> {
     };
     if kmod < want {
         return Err(anyhow::anyhow!(
-            "DRBD kernel module minimum version ('{}') not fulfilled by '{}'",
-            want,
-            kmod
+            "DRBD kernel module minimum version ('{want}') not fulfilled by '{kmod}'"
         ));
     }
 
@@ -354,10 +351,7 @@ fn read_config(config_file: &PathBuf) -> Result<config::Config> {
     content.push_str("\n# Content from snippets:\n");
     content.push_str(&snippets);
     config = toml::from_str(&content).with_context(|| {
-        format!(
-            "Could not parse config files including snippets; content: {}",
-            content
-        )
+        format!("Could not parse config files including snippets; content: {content}")
     })?;
 
     Ok(config)

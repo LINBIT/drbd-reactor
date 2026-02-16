@@ -52,7 +52,7 @@ fn unspecified_ser<S>(port: &u16, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    serializer.serialize_str(&format!(":{}", port))
+    serializer.serialize_str(&format!(":{port}"))
 }
 
 fn unspecified_de<'de, D>(deserializer: D) -> Result<u16, D::Error>
@@ -86,7 +86,7 @@ impl fmt::Display for LocalAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LocalAddress::Explicit(socket) => socket.fmt(f),
-            LocalAddress::Unspecified(port) => write!(f, ":{}", port),
+            LocalAddress::Unspecified(port) => write!(f, ":{port}"),
         }
     }
 }

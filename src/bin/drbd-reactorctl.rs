@@ -215,14 +215,14 @@ fn ask(question: &str, default: bool) -> Result<bool> {
             "" => return Ok(default),
             "y" | "yes" => return Ok(true),
             "n" | "no" => return Ok(false),
-            x => println!("Unknown answer '{}', use 'y' or 'n'", x),
+            x => println!("Unknown answer '{x}', use 'y' or 'n'"),
         }
     }
 }
 
 fn edit_editor(tmppath: &Path, editor: &str, type_opt: &str, force: bool) -> Result<()> {
     let len_err =
-        || -> Result<()> { Err(anyhow::anyhow!("Expected excactly one {} plugin", type_opt)) };
+        || -> Result<()> { Err(anyhow::anyhow!("Expected excactly one {type_opt} plugin")) };
 
     plugin::map_status(Command::new(editor).arg(tmppath).status())?;
 
@@ -270,7 +270,7 @@ fn edit_editor(tmppath: &Path, editor: &str, type_opt: &str, force: bool) -> Res
             return len_err();
         }
     } else {
-        return Err(anyhow::anyhow!("Unknown type ('{}') to edit", type_opt));
+        return Err(anyhow::anyhow!("Unknown type ('{type_opt}') to edit"));
     }
 
     Ok(())
@@ -342,7 +342,7 @@ fn edit(
                 "agentx" => AGENTX_TEMPLATE,
                 "umh" => UMH_TEMPLATE,
                 "debugger" => DEBUGGER_TEMPLATE,
-                x => return Err(anyhow::anyhow!("Unknown type ('{}') to edit", x)),
+                x => return Err(anyhow::anyhow!("Unknown type ('{x}') to edit")),
             };
             tmpfile.write_all(template.as_bytes())?;
             tmpfile.flush()?;
@@ -428,8 +428,7 @@ fn start_until_list(config: promoter::PromoterOptResource, until: &str) -> Resul
             match config.start.iter().position(|s| s == until) {
                 Some(n) => Ok(config.start.into_iter().take(n + 1).collect()),
                 None => Err(anyhow::anyhow!(
-                    "Could not find unit '{}' in start list",
-                    until
+                    "Could not find unit '{until}' in start list"
                 )),
             }
         }
@@ -922,10 +921,7 @@ fn read_config(snippet_path: &Path) -> Result<config::Config> {
     let content = config::read_snippets(&[snippet_path])
         .with_context(|| "Could not read config snippets".to_string())?;
     let config = toml::from_str(&content).with_context(|| {
-        format!(
-            "Could not parse config files including snippets; content: {}",
-            content
-        )
+        format!("Could not parse config files including snippets; content: {content}")
     })?;
 
     Ok(config)
@@ -1046,7 +1042,7 @@ fn cfg_dir() -> Result<PathBuf> {
 }
 
 fn read_ctl_config(context: &str, additional_content: Option<&str>) -> Result<Config> {
-    let cfg_file = cfg_dir()?.join(format!("{}.toml", context));
+    let cfg_file = cfg_dir()?.join(format!("{context}.toml"));
 
     // it is fine if the default.toml symlink does not exist
     if context == "default" && !cfg_file.exists() {
@@ -1061,12 +1057,8 @@ fn read_ctl_config(context: &str, additional_content: Option<&str>) -> Result<Co
         content.push_str(ac);
     }
 
-    toml::from_str(&content).with_context(|| {
-        format!(
-            "Could not parse drbd-reactorctl config file; content: {}",
-            content
-        )
-    })
+    toml::from_str(&content)
+        .with_context(|| format!("Could not parse drbd-reactorctl config file; content: {content}"))
 }
 
 fn read_nodes(cluster: &ClusterConf) -> Result<Vec<Node>> {

@@ -54,8 +54,7 @@ pub fn get(name: &str) -> Result<Resource> {
     let [resource]: [Resource; 1] = serde_json::from_str(&stdout)?;
     if resource.resource != name {
         return Err(anyhow::anyhow!(
-            "res name to check ('{}') and drbdsetup show output ('{}') did not match",
-            name,
+            "res name to check ('{name}') and drbdsetup show output ('{}') did not match",
             resource.resource
         ));
     }

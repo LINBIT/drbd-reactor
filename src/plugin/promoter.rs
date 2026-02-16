@@ -35,7 +35,7 @@ impl Promoter {
         let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
         trace!("Executing adjust_resources({:?})'", &names);
         if let Err(e) = adjust_resources(&names) {
-            warn!("Could not adjust '{:?}': {}", names, e);
+            warn!("Could not adjust '{names:?}': {e}");
         }
         trace!("Executed adjust_resources({:?})'", &names);
 
@@ -147,7 +147,7 @@ impl super::Plugin for Promoter {
                             match get_split_brain_avoidance_policy(&name, &mut sb_avoidance, &cfg) {
                                 Ok(policy) => process_drbd_event(&update, &cfg, &mut last_start, &mut may_promote, &policy),
                                 Err(e) => {
-                                    error!("IGNORING resource '{}': {}", name, e);
+                                    error!("IGNORING resource '{name}': {e}");
                                     continue;
                                 }
                             };
@@ -169,7 +169,7 @@ impl super::Plugin for Promoter {
                     stop_actions(&name, &res.stop, &res.runner)
                 };
                 if let Err(e) = shutdown() {
-                    warn!("Stopping '{}' failed: {}", name, e);
+                    warn!("Stopping '{name}' failed: {e}");
                 }
             }
         }
@@ -236,7 +236,7 @@ fn default_fence_delay() -> u64 {
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
-    info!("systemd_stop: systemctl stop {}", unit);
+    info!("systemd_stop: systemctl stop {unit}");
     plugin::map_status(
         Command::new("systemctl")
             .stdin(Stdio::null())
@@ -279,14 +279,11 @@ fn process_drbd_event(
                 let calc_sleep = Duration::from_millis(sleep_millis);
 
                 if last_start.elapsed() + calc_sleep < min_sleep {
-                    debug!("got may_promote but start interval for '{}' too fast", name);
+                    debug!("got may_promote but start interval for '{name}' too fast");
                     return;
                 }
 
-                info!(
-                    "run: resource '{}' may promote after {}ms",
-                    name, sleep_millis
-                );
+                info!("run: resource '{name}' may promote after {sleep_millis}ms");
                 if !calc_sleep.is_zero() {
                     thread::sleep(calc_sleep);
                 }
@@ -308,12 +305,9 @@ fn process_drbd_event(
                 //
                 // we could send a stop in any case, but that would also send stops (which should not matter)
                 // in case of a normal stop when quorum was lost but the policy was Shutdown
-                info!(
-                    "resource '{}' got forced to Secondary while frozen, stopping services",
-                    name
-                );
+                info!("resource '{name}' got forced to Secondary while frozen, stopping services");
                 if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                    warn!("Stopping '{}' failed: {}", name, e);
+                    warn!("Stopping '{name}' failed: {e}");
                 }
             }
         }
@@ -323,16 +317,16 @@ fn process_drbd_event(
             }
 
             if u.old.quorum && !u.new.quorum {
-                info!("run: resource '{}' lost quorum", name);
+                info!("run: resource '{name}' lost quorum");
                 match res.on_quorum_loss {
                     QuorumLossPolicy::Freeze => {
                         if let Err(e) = freeze_actions(&name, State::Freeze, &res.runner) {
-                            warn!("Freezing '{}' failed: {}", name, e);
+                            warn!("Freezing '{name}' failed: {e}");
                         }
                     }
                     QuorumLossPolicy::Shutdown => {
                         if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                            warn!("Stopping '{}' failed: {}", name, e);
+                            warn!("Stopping '{name}' failed: {e}");
                         }
                     }
                 }
@@ -341,9 +335,9 @@ fn process_drbd_event(
                 && res.on_quorum_loss == QuorumLossPolicy::Freeze
                 && u.resource.role == Role::Primary
             {
-                info!("resource '{}' gained quorum, thawing Primary", name);
+                info!("resource '{name}' gained quorum, thawing Primary");
                 if let Err(e) = freeze_actions(&name, State::Thaw, &res.runner) {
-                    warn!("Thawing '{}' failed: {}", name, e);
+                    warn!("Thawing '{name}' failed: {e}");
                 }
             } else if u.old.disk_state != DiskState::Diskless
                 && u.new.disk_state == DiskState::Diskless
@@ -351,17 +345,17 @@ fn process_drbd_event(
                 && !u.new.client
                 && u.resource.role == Role::Primary
             {
-                info!("resource '{}' lost local disk", name);
+                info!("resource '{name}' lost local disk");
                 if res.on_disk_detach == DiskDetachPolicy::Ignore {
                     info!(
-                        "resource '{}' on-disk-detach policy is '{}', not taking action",
-                        name, res.on_disk_detach
+                        "resource '{name}' on-disk-detach policy is '{}', not taking action",
+                        res.on_disk_detach
                     );
                     return;
                 }
                 info!(
-                    "resource '{}' on-disk-detach policy is '{}', checking for UpToDate peer",
-                    name, res.on_disk_detach
+                    "resource '{name}' on-disk-detach policy is '{}', checking for UpToDate peer",
+                    res.on_disk_detach
                 );
                 for pd in u
                     .resource
@@ -371,17 +365,14 @@ fn process_drbd_event(
                 {
                     // check if we find an UpToDate peer
                     if pd.peer_client == false && pd.peer_disk_state == DiskState::UpToDate {
-                        info!("resource '{}' lost local disk, found UpToDate peer", name);
+                        info!("resource '{name}' lost local disk, found UpToDate peer");
                         if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                            warn!("Stopping '{}' failed: {}", name, e);
+                            warn!("Stopping '{name}' failed: {e}");
                         }
                         return;
                     }
                 }
-                info!(
-                    "resource '{}' lost local disk, did not find UpToDate peer",
-                    name
-                );
+                info!("resource '{name}' lost local disk, did not find UpToDate peer");
             }
         }
         PluginUpdate::PeerDevice(u) => {
@@ -401,7 +392,7 @@ fn process_drbd_event(
             let peer_name = match u.resource.get_peerdevice(u.peer_node_id, u.volume) {
                 Some(pd) => pd.conn_name.clone(),
                 None => {
-                    warn!("Could not find peer device for resource '{}'", name);
+                    warn!("Could not find peer device for resource '{name}'");
                     return;
                 }
             };
@@ -409,10 +400,7 @@ fn process_drbd_event(
                 Some(pos) => pos,
                 None => {
                     // not in the list, it can not be better
-                    debug!(
-                        "Peer '{}' was not found in preferred_nodes, continue",
-                        peer_name
-                    );
+                    debug!("Peer '{peer_name}' was not found in preferred_nodes, continue");
                     return;
                 }
             };
@@ -420,7 +408,7 @@ fn process_drbd_event(
             let node_name = match utils::uname_n() {
                 Ok(node_name) => node_name,
                 Err(e) => {
-                    warn!("Could not determine 'uname -n': {}", e);
+                    warn!("Could not determine 'uname -n': {e}");
                     return;
                 }
             };
@@ -430,9 +418,9 @@ fn process_drbd_event(
             };
 
             if peer_pos < node_pos {
-                info!("run: resource '{}' has a new preferred node ('{}'), stopping services locally ('{}')", name, peer_name, node_name);
+                info!("run: resource '{name}' has a new preferred node ('{peer_name}'), stopping services locally ('{node_name}')");
                 if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
-                    warn!("Stopping '{}' failed: {}", name, e);
+                    warn!("Stopping '{name}' failed: {e}");
                 }
             }
         }
@@ -453,7 +441,7 @@ fn systemd_start(unit: &str) -> Result<()> {
         .arg(unit)
         .status();
 
-    info!("systemd_start: systemctl start {}", unit);
+    info!("systemd_start: systemctl start {unit}");
     plugin::map_status(
         Command::new("systemctl")
             .stdin(Stdio::null())
@@ -465,8 +453,7 @@ fn systemd_start(unit: &str) -> Result<()> {
     // still, we might catch it already here, otherwise we will check for the actual state in the "ticker"
     if !systemd::is_active(unit)? {
         return Err(anyhow::anyhow!(
-            "systemd_start: unit '{}' is not active",
-            unit
+            "systemd_start: unit '{unit}' is not active"
         ));
     }
 
@@ -486,8 +473,7 @@ fn systemd_freeze_thaw(unit: &str, to: State) -> Result<()> {
         }
     };
     info!(
-        "systemd_freeze_thaw: systemctl {} {}",
-        action,
+        "systemd_freeze_thaw: systemctl {action} {}",
         services.join(" ")
     );
 
@@ -499,7 +485,7 @@ fn systemd_freeze_thaw(unit: &str, to: State) -> Result<()> {
                 .arg(service_name.clone())
                 .status(),
         ) {
-            warn!("systemd_freeze_thaw: 'systemctl {} {}' failed ('{}'), this might be fine if there is no process in that unit", action, service_name, e);
+            warn!("systemd_freeze_thaw: 'systemctl {action} {service_name}' failed ('{e}'), this might be fine if there is no process in that unit");
         }
     }
 
@@ -527,9 +513,9 @@ fn action(what: &str, to: State, how: &Runner) -> Result<()> {
 
 fn try_start_stop_actions(name: &str, start: &[String], stop: &[String], how: &Runner) {
     if let Err(e) = start_actions(name, start, how) {
-        warn!("Starting '{}' failed: {}", name, e);
+        warn!("Starting '{name}' failed: {e}");
         if let Err(e) = stop_actions(name, stop, how) {
-            warn!("Stopping '{}' failed: {}", name, e);
+            warn!("Stopping '{name}' failed: {e}");
         }
     }
 }
@@ -547,10 +533,7 @@ fn start_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
 }
 
 fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
-    info!(
-        "stop_actions (could trigger 'on-drbd-demote-failure' actions if configured): {}",
-        name
-    );
+    info!("stop_actions (could trigger 'on-drbd-demote-failure' actions if configured): {name}");
 
     match how {
         Runner::Shell => {
@@ -561,7 +544,7 @@ fn stop_actions(name: &str, actions: &[String], how: &Runner) -> Result<()> {
         }
         Runner::Systemd => {
             let target = systemd::escaped_services_target(name);
-            info!("stop_actions: stopping '{}'", target);
+            info!("stop_actions: stopping '{target}'");
             persist_journal();
             action(&target, State::Stop, how)
         }
@@ -575,10 +558,7 @@ fn freeze_actions(name: &str, to: State, how: &Runner) -> Result<()> {
         )),
         Runner::Systemd => {
             let target = systemd::escaped_services_target(name);
-            info!(
-                "freeze_actions: freezing/thawing services in target '{}'",
-                target
-            );
+            info!("freeze_actions: freezing/thawing services in target '{target}'");
             action(&target, to, how)
         }
     }
@@ -592,8 +572,7 @@ fn get_backing_devices(resname: &str) -> Result<Vec<String>> {
         .output()?;
     if !shlldev.status.success() {
         return Err(anyhow::anyhow!(
-            "'drbdadm sh-ll-dev {}' not executed successfully, stdout: '{}', stderr: '{}'",
-            resname,
+            "'drbdadm sh-ll-dev {resname}' not executed successfully, stdout: '{}', stderr: '{}'",
             String::from_utf8(shlldev.stdout).unwrap_or("<Could not convert stdout>".to_string()),
             String::from_utf8(shlldev.stderr).unwrap_or("<Could not convert stderr>".to_string())
         ));
@@ -614,8 +593,7 @@ fn get_target_services(target: &str) -> Result<Vec<String>> {
         .output()?;
     if !deps.status.success() {
         return Err(anyhow::anyhow!(
-            "'systemctl list-dependencies --no-pager --plain {}' not executed successfully, stdout: '{}', stderr: '{}'",
-            target,
+            "'systemctl list-dependencies --no-pager --plain {target}' not executed successfully, stdout: '{}', stderr: '{}'",
             String::from_utf8(deps.stdout).unwrap_or("<Could not convert stdout>".to_string()),
             String::from_utf8(deps.stderr).unwrap_or("<Could not convert stderr>".to_string())
         ));
@@ -634,14 +612,11 @@ fn get_target_services(target: &str) -> Result<Vec<String>> {
 fn adjust_resources(to_start: &[String]) -> Result<()> {
     for res in to_start {
         for dev in get_backing_devices(res)? {
-            info!(
-                "adjust_resources: waiting for backing device '{}' to become ready",
-                dev
-            );
+            info!("adjust_resources: waiting for backing device '{dev}' to become ready");
             while !drbd_backing_device_ready(&dev) {
                 thread::sleep(Duration::from_secs(2));
             }
-            info!("adjust_resources: backing device '{}' now ready", dev);
+            info!("adjust_resources: backing device '{dev}' now ready");
         }
 
         plugin::map_status(
@@ -677,15 +652,13 @@ fn generate_systemd_templates(
 
     if let Some(content) = drbd_promote(systemd_settings, secondary_force)? {
         let prefix = Path::new(systemd::SYSTEMD_RUN_PREFIX)
-            .join(format!("drbd-promote@{}.service.d", escaped_name));
+            .join(format!("drbd-promote@{escaped_name}.service.d"));
         systemd_write_unit(prefix, SYSTEMD_CONF, content)?;
     }
 
     if systemd_settings.failure_action != SystemdFailureAction::None {
-        let prefix = Path::new(systemd::SYSTEMD_RUN_PREFIX).join(format!(
-            "drbd-demote-or-escalate@{}.service.d",
-            escaped_name
-        ));
+        let prefix = Path::new(systemd::SYSTEMD_RUN_PREFIX)
+            .join(format!("drbd-demote-or-escalate@{escaped_name}.service.d"));
         let mut content = format!(
             "[Unit]\nFailureAction={}\nConflicts=drbd-promote@%i.service\n",
             systemd_settings.failure_action
@@ -721,13 +694,11 @@ fn generate_systemd_templates(
         // have to use proper names.
         if service_name.contains('/') {
             return Err(anyhow::anyhow!(
-                "generate_systemd_templates: Service name '{}' contains a '/'; If this is a mount unit please use \"systemd-escape --path --suffix=mount '{}'\"",
-                service_name,
-                service_name
+                "generate_systemd_templates: Service name '{service_name}' contains a '/'; If this is a mount unit please use \"systemd-escape --path --suffix=mount '{service_name}'\""
             ));
         }
 
-        let prefix = Path::new(systemd::SYSTEMD_RUN_PREFIX).join(format!("{}.d", service_name));
+        let prefix = Path::new(systemd::SYSTEMD_RUN_PREFIX).join(format!("{service_name}.d"));
         if service_name.ends_with(".mount") {
             systemd_write_unit(
                 prefix.clone(),
@@ -747,8 +718,7 @@ fn generate_systemd_templates(
         // and we use .last() below
         if target_requires.contains(&service_name) {
             return Err(anyhow::anyhow!(
-                "generate_systemd_templates: Service name '{}' already used",
-                service_name
+                "generate_systemd_templates: Service name '{service_name}' already used"
             ));
         }
         target_requires.push(service_name.clone());
@@ -893,11 +863,11 @@ fn systemd_target_requires(
 }
 
 fn systemd_write_unit(prefix: PathBuf, unit: &str, content: String) -> Result<()> {
-    let content = format!("# Auto-generated by drbd-reactor, DO NOT EDIT\n{}", content);
+    let content = format!("# Auto-generated by drbd-reactor, DO NOT EDIT\n{content}");
 
     let path = prefix.join(unit);
-    let tmp_path = prefix.join(format!("{}.tmp", unit));
-    info!("systemd_write_unit: creating {:?}", path);
+    let tmp_path = prefix.join(format!("{unit}.tmp"));
+    info!("systemd_write_unit: creating {path:?}");
 
     fs::create_dir_all(&prefix)?;
     {
@@ -1092,17 +1062,11 @@ fn get_sleep_before_promote_ms(
             Ok(devices) if devices.contains(&"none".into()) => 6, // Diskless
             _ => 0,
         });
-    debug!(
-        "sleep disk state ({}): '{}'",
-        split_brain_avoidance_policy, sleep_disk_s
-    );
+    debug!("sleep disk state ({split_brain_avoidance_policy}): '{sleep_disk_s}'");
     sleep_s += sleep_disk_s;
 
     let sleep_pref_nodes = get_preferred_nodes_sleep_s(preferred_nodes);
-    debug!(
-        "sleep preferred-nodes ({}): '{}'",
-        split_brain_avoidance_policy, sleep_pref_nodes
-    );
+    debug!("sleep preferred-nodes ({split_brain_avoidance_policy}): '{sleep_pref_nodes}'");
     sleep_s += sleep_pref_nodes;
 
     #[allow(clippy::collapsible_if)]
@@ -1120,10 +1084,7 @@ fn get_sleep_before_promote_ms(
             })
             .max()
             .unwrap_or(0);
-        debug!(
-            "sleep connection state ({}): '{}'",
-            split_brain_avoidance_policy, sleep_fencing_s
-        );
+        debug!("sleep connection state ({split_brain_avoidance_policy}): '{sleep_fencing_s}'");
         sleep_s += sleep_fencing_s;
     } else if split_brain_avoidance_policy == &SplitBrainAvoidancePolicy::Quorum {
         if *on_quorum_loss == QuorumLossPolicy::Freeze && resource.role == Role::Secondary {
@@ -1133,10 +1094,7 @@ fn get_sleep_before_promote_ms(
             // the Secondaries might joint it, and it might thaw, and then
             // promotion on these Secondaries fails intentionally
             let sleep_freeze = 2;
-            debug!(
-                "sleep freeze-policy ({}): '{}'",
-                on_quorum_loss, sleep_freeze
-            );
+            debug!("sleep freeze-policy ({on_quorum_loss}): '{sleep_freeze}'");
             sleep_s += sleep_freeze;
         }
     }
@@ -1164,9 +1122,7 @@ fn get_split_brain_avoidance_policy(
         for conn in &res.connections {
             if conn.net.fencing == fencing_off {
                 return Err(anyhow!(
-                    "quorum is '{}', but also fencing is '{}'",
-                    quorum_off,
-                    fencing_off
+                    "quorum is '{quorum_off}', but also fencing is '{fencing_off}'"
                 ));
             }
         }
@@ -1175,10 +1131,7 @@ fn get_split_brain_avoidance_policy(
         SplitBrainAvoidancePolicy::Quorum
     };
     sb_avoidance.insert(resname.into(), split_brain_avoidance_policy.clone());
-    info!(
-        "Detected split-brain avoidance policy: '{}'",
-        split_brain_avoidance_policy
-    );
+    info!("Detected split-brain avoidance policy: '{split_brain_avoidance_policy}'");
 
     // we detected the sb avoidance policy for the first time, also check the rest of the
     // resource
@@ -1189,7 +1142,7 @@ fn get_split_brain_avoidance_policy(
         .on_quorum_loss;
 
     if let Err(e) = check_resource(&res, on_quorum_loss, &split_brain_avoidance_policy) {
-        warn!("Could not execute DRBD options check: {}", e);
+        warn!("Could not execute DRBD options check: {e}");
     }
 
     Ok(split_brain_avoidance_policy)
@@ -1277,7 +1230,7 @@ fn get_preferred_nodes_sleep_s(preferred_nodes: &[String]) -> u64 {
             None => preferred_nodes.len(),
         },
         Err(e) => {
-            warn!("Could not determine 'uname -n': {}", e);
+            warn!("Could not determine 'uname -n': {e}");
             0
         }
     };

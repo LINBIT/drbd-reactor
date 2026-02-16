@@ -70,7 +70,7 @@ fn _main() -> Result<ExitCode> {
     match action.as_str() {
         "stop" => stop(agent, &ocf_resource_instance, &notify_socket),
         "start-and-monitor" => start_and_monitor(agent, &ocf_resource_instance, &notify_socket),
-        _ => Err(anyhow::anyhow!("Action '{}' not implemented", action)),
+        _ => Err(anyhow::anyhow!("Action '{action}' not implemented")),
     }
 }
 
@@ -86,17 +86,17 @@ fn stop(
     }
 
     let ai = agent_instance(agent, ocf_resource_instance);
-    let msg = format!("{}: about to exec stop", ai);
+    let msg = format!("{ai}: about to exec stop");
     info!("{}", msg);
     if let Some(socket) = notify_socket {
-        systemd_notify(socket, &format!("STOPPING=1\nSTATUS={}", msg))?;
+        systemd_notify(socket, &format!("STOPPING=1\nSTATUS={msg}"))?;
     }
 
     let code = Command::new(agent)
         .arg("stop")
         .status()?
         .code()
-        .ok_or(anyhow::anyhow!("{},stop: could not get exit code", ai))?;
+        .ok_or(anyhow::anyhow!("{ai},stop: could not get exit code"))?;
     Ok(ExitCode::new(code))
 }
 
@@ -110,12 +110,12 @@ fn start_and_monitor(
         .arg("start")
         .status()?
         .code()
-        .ok_or(anyhow::anyhow!("{},start: could not get exit code", ai))?;
+        .ok_or(anyhow::anyhow!("{ai},start: could not get exit code"))?;
     if code != OCF_SUCCESS {
-        let msg = format!("{},s-a-m,start: FAILED with exit code {}", ai, code);
+        let msg = format!("{ai},s-a-m,start: FAILED with exit code {code}");
         error!("{}", msg);
         if let Some(socket) = notify_socket {
-            systemd_notify(socket, &format!("STATUS={}", msg))?;
+            systemd_notify(socket, &format!("STATUS={msg}"))?;
         }
         return Ok(ExitCode::new(code));
     }
@@ -126,18 +126,17 @@ fn start_and_monitor(
         Ok(i) => i,
         Err(_) => 30,
     };
-    let msg = format!("{}: monitoring every {} seconds", ai, monitor_interval);
+    let msg = format!("{ai}: monitoring every {monitor_interval} seconds");
     info!("{}", msg);
     if let Some(socket) = notify_socket {
-        systemd_notify(socket, &format!("READY=1\nSTATUS={}", msg))?;
+        systemd_notify(socket, &format!("READY=1\nSTATUS={msg}"))?;
     }
 
     sleep_max(monitor_interval);
     while !TERMINATE.load(Ordering::Relaxed) {
         let output = Command::new(agent).arg("monitor").output()?;
         let code = output.status.code().ok_or(anyhow::anyhow!(
-            "{},start-and-monitor: could not get status",
-            ai
+            "{ai},start-and-monitor: could not get status"
         ))?;
 
         if code == OCF_SUCCESS {
@@ -146,10 +145,10 @@ fn start_and_monitor(
         }
 
         // we failed: write logs and print stdout and stderr and bye
-        let msg = format!("{},s-a-m,monitor: FAILED with exit code {}", ai, code);
+        let msg = format!("{ai},s-a-m,monitor: FAILED with exit code {code}");
         error!("{}", msg);
         if let Some(socket) = notify_socket {
-            systemd_notify(socket, &format!("STATUS={}", msg))?;
+            systemd_notify(socket, &format!("STATUS={msg}"))?;
         }
         error!(
             "stdout: '{}'; stderr: '{}'",
@@ -198,7 +197,7 @@ fn systemd_done() -> bool {
 
 fn systemd_notify(socket: &str, msg: &str) -> Result<()> {
     let sock = UnixDatagram::unbound()?;
-    let msg_complete = format!("{}\n", msg);
+    let msg_complete = format!("{msg}\n");
     if sock.send_to(msg_complete.as_bytes(), socket)? != msg_complete.len() {
         Err(anyhow::anyhow!(
             "systemd notify: could not completely write '{}' to '{}",
@@ -217,5 +216,5 @@ fn agent_instance(agent: &Path, instance: &str) -> String {
     }
     .to_string_lossy();
 
-    format!("{}:{}", base, instance)
+    format!("{base}:{instance}")
 }

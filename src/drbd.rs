@@ -44,7 +44,7 @@ impl FromStr for BackingDevice {
 impl fmt::Display for BackingDevice {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.0 {
-            Some(bd) => write!(f, "{}", bd),
+            Some(bd) => write!(f, "{bd}"),
             None => write!(f, "none"),
         }
     }
@@ -1253,7 +1253,7 @@ pub fn get_drbd_versions() -> anyhow::Result<DRBDVersion> {
         .output()
     {
         Ok(x) => x,
-        Err(e) => return Err(anyhow::anyhow!("failed running drbdadm --version: {}", e)),
+        Err(e) => return Err(anyhow::anyhow!("failed running drbdadm --version: {e}")),
     };
 
     if !version.status.success() {
@@ -1279,8 +1279,7 @@ fn split_version(pattern: regex::Regex, stdout: Vec<u8>) -> anyhow::Result<Versi
         .lines()
         .find_map(|line| pattern.captures(line))
         .ok_or(anyhow::anyhow!(
-            "Could not determine version from pattern '{}'",
-            pattern
+            "Could not determine version from pattern '{pattern}'"
         ))?;
 
     let version = u32::from_str_radix(&version[1], 16)?;
@@ -1311,7 +1310,7 @@ impl PrimaryOn {
     pub fn terminal(&self, _verbose: bool) -> anyhow::Result<String> {
         Ok(match self {
             Self::Local(_) => "this node".to_string(),
-            Self::Remote(p) => format!("node '{}'", p),
+            Self::Remote(p) => format!("node '{p}'"),
             Self::None => "<unknown>".to_string(),
         })
     }
@@ -1319,8 +1318,8 @@ impl PrimaryOn {
 impl fmt::Display for PrimaryOn {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Local(l) => write!(f, "{}", l),
-            Self::Remote(r) => write!(f, "{}", r),
+            Self::Local(l) => write!(f, "{l}"),
+            Self::Remote(r) => write!(f, "{r}"),
             Self::None => write!(f, "unknown"),
         }
     }

@@ -84,7 +84,7 @@ fn spawn_command(
     filter_env: &HashMap<String, String>,
     user_env: &BTreeMap<String, String>,
 ) {
-    debug!("spawn_command: starting handler '{}'", cmd);
+    debug!("spawn_command: starting handler '{cmd}'");
 
     let common_env = common_env();
 
@@ -102,7 +102,7 @@ fn spawn_command(
     {
         Ok(c) => c,
         Err(e) => {
-            warn!("spawn_command: could not execute handler: {}", e);
+            warn!("spawn_command: could not execute handler: {e}");
             return;
         }
     };
@@ -114,13 +114,10 @@ fn spawn_command(
             let out = std::str::from_utf8(&output.stdout).unwrap_or("<Could not convert stdout>");
             let err = std::str::from_utf8(&output.stderr).unwrap_or("<Could not convert stderr>");
             if !out.is_empty() || !err.is_empty() {
-                debug!(
-                    "spawn_command: handler stdout: '{}'; stderr: '{}'",
-                    out, err
-                );
+                debug!("spawn_command: handler stdout: '{out}'; stderr: '{err}'");
             }
         }
-        Err(e) => warn!("spawn_command: could not execute handler: {}", e),
+        Err(e) => warn!("spawn_command: could not execute handler: {e}"),
     });
 }
 

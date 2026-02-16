@@ -32,11 +32,10 @@ pub fn notify(msg: &str) -> Result<()> {
     };
 
     let sock = UnixDatagram::unbound()?;
-    let msg_complete = format!("{}\n", msg);
+    let msg_complete = format!("{msg}\n");
     if sock.send_to(msg_complete.as_bytes(), socket)? != msg_complete.len() {
         Err(anyhow::anyhow!(
-            "systemd notify: could not completely write '{}' to '{}",
-            msg,
+            "systemd notify: could not completely write '{msg}' to '{}",
             socket.display()
         ))
     } else {
@@ -57,7 +56,7 @@ pub fn show_property(unit: &str, property: &str) -> Result<String> {
     let output = Command::new("systemctl")
         .stdin(Stdio::null())
         .arg("show")
-        .arg(format!("--property={}", property))
+        .arg(format!("--property={property}"))
         .arg(unit)
         .output()?;
     let output = std::str::from_utf8(&output.stdout)?;
@@ -65,11 +64,8 @@ pub fn show_property(unit: &str, property: &str) -> Result<String> {
     let mut split = output.splitn(2, '=');
     match (split.next(), split.next()) {
         (Some(k), Some(v)) if k == property => Ok(v.trim().to_string()),
-        (Some(_), Some(_)) => Err(anyhow::anyhow!(
-            "Property did not start with '{}='",
-            property
-        )),
-        _ => Err(anyhow::anyhow!("Could not get property '{}'", property)),
+        (Some(_), Some(_)) => Err(anyhow::anyhow!("Property did not start with '{property}='")),
+        _ => Err(anyhow::anyhow!("Could not get property '{property}'")),
     }
 }
 
@@ -154,15 +150,15 @@ pub fn escaped_ocf_parse_to_env(
     }
 
     let ra_name = &args[0];
-    let ra_name = format!("{}_{}", ra_name, name);
+    let ra_name = format!("{ra_name}_{name}");
     let escaped_ra_name = escape_name(&ra_name);
-    let service_name = format!("ocf.rs@{}.service", escaped_ra_name);
+    let service_name = format!("ocf.rs@{escaped_ra_name}.service");
     let mut env = Vec::with_capacity(args.len() - 1);
     for item in &args[1..] {
         let mut split = item.splitn(2, '=');
         let add = match (split.next(), split.next()) {
-            (Some(k), Some(v)) => format!("OCF_RESKEY_{}={}", k, escape_env(v)),
-            (Some(k), None) => format!("OCF_RESKEY_{}=", k),
+            (Some(k), Some(v)) => format!("OCF_RESKEY_{k}={}", escape_env(v)),
+            (Some(k), None) => format!("OCF_RESKEY_{k}="),
             _ => continue, // skip empty items
         };
         env.push(add)
@@ -208,7 +204,7 @@ fn escape_byte(b: u8, index: usize) -> String {
         '/' => '-'.to_string(),
         ':' | '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => c.to_string(),
         '.' if index > 0 => c.to_string(),
-        _ => format!(r#"\x{:02x}"#, b),
+        _ => format!(r#"\x{b:02x}"#),
     }
 }
 
@@ -225,7 +221,7 @@ fn escape_env(name: &str) -> String {
             let c = char::from(b);
             match c {
                 '.' | '/' | ':' | '_' | '0'..='9' | 'a'..='z' | 'A'..='Z' => c.to_string(),
-                _ => format!(r#"\x{:02x}"#, b),
+                _ => format!(r#"\x{b:02x}"#),
             }
         })
         .collect();
