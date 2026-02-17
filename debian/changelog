@@ -1,3 +1,26 @@
+drbd-reactor (1.11.0~rc.1-1) experimental; urgency=medium
+
+  [ Christoph Böhmwalder ]
+  * grafana: add $resource variable to dashboard
+  * doc: add configuration options for prometheus exporter
+
+  [ Moritz Wanzenböck ]
+  * ci: replace gitlab internal registry image
+  * ci: use custom trivy image
+
+  [ Roland Kammerer ]
+  * doc: add info about systemd symbols
+  * core: add toml/target monitoring
+  * fix minor linter warnings
+  * .gitignore: add claude and untracked
+  * ctl: add json output for status command
+  * promoter: fix initial startup on diskless
+  * promoter: add on-disk-detach policy for local disk failure
+  * ctl: rm runner from template
+  * all: switch to captured identifiers
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Tue, 17 Feb 2026 09:36:37 +0100
+
 drbd-reactor (1.10.0-1) experimental; urgency=medium
 
   [ Roland Kammerer ]
