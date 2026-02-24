@@ -94,6 +94,12 @@ statistics-poll-interval = 60
 ## AND your service can handle to be frozen, setting on-quorum-loss to "freeze" might be an option.
 # on-quorum-loss = "shutdown"
 
+## adjust-resource-on-start
+## if set (the default), "drbdadm adjust" is run on the resource when the plugin starts.
+## The plugin waits for backing devices to be available before running adjust.
+## Set to false to skip this step, e.g., if drbdadm adjust is managed externally.
+# adjust-resource-on-start = true
+
 ## on-disk-detach policy
 ## what to do if the local DRBD disk on a Primary node gets detached (i.e., becomes Diskless).
 ## by default we ignore the event ("ignore").

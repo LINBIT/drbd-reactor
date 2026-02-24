@@ -363,6 +363,22 @@ off power). In
 mode the value of
 .Sy fencing-promote-delay
 is used to sleep the given number of seconds before the promote attempt.
+.Sh ADJUSTING RESOURCES ON START
+When the promoter plugin starts, it runs
+.Sy drbdadm adjust
+on all configured resources by default. This ensures that the DRBD resource
+configuration on disk matches the running kernel state. The plugin waits for
+the backing devices to become available before running
+.Sy adjust .
+.Pp
+This behavior can be disabled per resource by setting
+.Sy adjust-resource-on-start
+to
+.Sy false .
+Disabling it may be useful if
+.Sy drbdadm adjust
+is managed externally, or if its execution during startup causes undesirable
+side effects in a specific setup.
 .Sh LOCAL DISK FAILURE
 If the local DRBD disk on a Primary node gets detached
 (i.e., becomes Diskless), the behavior is controlled by the

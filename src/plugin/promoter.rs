@@ -32,12 +32,18 @@ pub struct Promoter {
 
 impl Promoter {
     pub fn new(cfg: PromoterConfig) -> Result<Self> {
-        let names = cfg.resources.keys().cloned().collect::<Vec<String>>();
-        trace!("Executing adjust_resources({:?})'", &names);
-        if let Err(e) = adjust_resources(&names) {
-            warn!("Could not adjust '{names:?}': {e}");
+        let to_adjust: Vec<_> = cfg
+            .resources
+            .iter()
+            .filter(|(_, cfg)| cfg.adjust_resource_on_start)
+            .map(|(name, _)| name.clone())
+            .collect();
+
+        trace!("Executing adjust_resources({:?})'", &to_adjust);
+        if let Err(e) = adjust_resources(&to_adjust) {
+            warn!("Could not adjust '{to_adjust:?}': {e}");
         }
-        trace!("Executed adjust_resources({:?})'", &names);
+        trace!("Executed adjust_resources({:?})'", &to_adjust);
 
         for (name, res) in &cfg.resources {
             // deprecated settings
@@ -223,6 +229,8 @@ pub struct PromoterOptResource {
     pub on_disk_detach: DiskDetachPolicy,
     #[serde(default = "default_fence_delay")]
     pub fencing_promote_delay: u64,
+    #[serde(default = "default_adjust_resource_on_start")]
+    pub adjust_resource_on_start: bool,
 }
 
 fn default_promote_sleep() -> u32 {
@@ -233,6 +241,10 @@ fn default_secondary_force() -> bool {
 }
 fn default_fence_delay() -> u64 {
     5
+}
+
+fn default_adjust_resource_on_start() -> bool {
+    true
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {

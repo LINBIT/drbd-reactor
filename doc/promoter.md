@@ -70,6 +70,16 @@ scripts and started in order (no explicit targets or anything) and stopped in re
 `stop`. This can be used on systems without systemd and might be useful for Windows systems in the future. If
 you can, use the default systemd method, it is the preferred one.
 
+## Adjusting resources on start
+
+When the promoter plugin starts, it runs `drbdadm adjust` on all configured resources by default. This ensures
+that the DRBD resource configuration on disk matches the running kernel state. The plugin waits for the
+backing devices to become available before running `adjust`.
+
+This behavior can be disabled per resource by setting `adjust-resource-on-start` to `false`. Disabling it
+may be useful if `drbdadm adjust` is managed externally, or if its execution during startup causes
+undesirable side effects in a specific setup.
+
 ## Service dependencies
 Let's get back to our simple example with `start = [ "a.service", "b.service", "c.service" ]`. As we noted in
 the previous section we generate a dependency chain for these services (i.e., all depend on `drbd-promote@`
