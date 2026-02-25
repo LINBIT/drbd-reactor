@@ -1,3 +1,10 @@
+drbd-reactor (1.11.0-1) experimental; urgency=medium
+
+  [ Moritz Wanzenböck ]
+  * promoter: add adjust-resource-on-start setting
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Wed, 25 Feb 2026 14:25:13 +0100
+
 drbd-reactor (1.11.0~rc.1-1) experimental; urgency=medium
 
   [ Christoph Böhmwalder ]
