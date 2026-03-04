@@ -382,7 +382,7 @@ impl Metrics {
         for (name, resource) in &self.resources {
             let mut vol_to_minor = HashMap::new();
 
-            for d in &resource.devices {
+            for d in resource.devices.values() {
                 vol_to_minor.insert(d.volume, d.minor);
                 let minor = d.minor as u32;
 

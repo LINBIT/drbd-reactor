@@ -1056,7 +1056,7 @@ fn get_sleep_before_promote_ms(
     let mut sleep_s = 0;
     let sleep_disk_s = resource
         .devices
-        .iter()
+        .values()
         .map(|d| match d.disk_state {
             DiskState::Diskless => 6,
             DiskState::Attaching => 6,
@@ -1269,20 +1269,23 @@ mod tests {
         // be careful to only use a Resource *with* devices filter out the unwarp_or_else?
         let mut r = Resource {
             name: "test".to_string(),
-            devices: vec![
-                Device {
+            devices: BTreeMap::from([
+                (0, Device {
+                    volume: 0,
                     disk_state: DiskState::Diskless,
                     ..Default::default()
-                },
-                Device {
+                }),
+                (1, Device {
+                    volume: 1,
                     disk_state: DiskState::Failed,
                     ..Default::default()
-                },
-                Device {
+                }),
+                (2, Device {
+                    volume: 2,
                     disk_state: DiskState::UpToDate,
                     ..Default::default()
-                },
-            ],
+                }),
+            ]),
             connections: vec![Connection {
                 connection: ConnectionState::NetworkFailure,
                 ..Default::default()

@@ -317,7 +317,7 @@ impl Metrics {
                 writeln!(m, "{k}{{{common}}} {}", c.rs_in_flight * 512)?; // 512 byte sectors
             }
 
-            for d in &r.devices {
+            for d in r.devices.values() {
                 let mut common = String::new();
                 write!(
                     common,

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use drbd_reactor::drbd::{Connection, Device, PeerDevice, Resource, Role};
 
 #[test]
@@ -11,7 +13,7 @@ fn resource_update() {
         may_promote: true,
         promotion_score: 23,
         force_io_failures: false,
-        devices: vec![],
+        devices: BTreeMap::new(),
         connections: vec![],
     };
     r.update(&update);
@@ -33,9 +35,9 @@ fn get_device_update() -> Resource {
     r.update_device(&d0);
     r.update_device(&d1);
     assert_eq!(r.devices.len(), 2);
-    assert_eq!(r.devices[0].volume, 0);
-    assert_eq!(r.devices[1].volume, 1);
-    assert_eq!(r.devices[1].minor, 0);
+    assert_eq!(r.devices[&0].volume, 0);
+    assert_eq!(r.devices[&1].volume, 1);
+    assert_eq!(r.devices[&1].minor, 0);
 
     let d1_mod = Device {
         volume: 1,
@@ -45,8 +47,8 @@ fn get_device_update() -> Resource {
 
     r.update_device(&d1_mod);
     assert_eq!(r.devices.len(), 2);
-    assert_eq!(r.devices[1].volume, 1);
-    assert_eq!(r.devices[1].minor, 1);
+    assert_eq!(r.devices[&1].volume, 1);
+    assert_eq!(r.devices[&1].minor, 1);
 
     r
 }
@@ -61,7 +63,7 @@ fn device_delete() {
     let mut r = get_device_update();
     r.delete_device(1);
     assert_eq!(r.devices.len(), 1);
-    assert_eq!(r.devices[0].volume, 0);
+    assert!(r.devices.contains_key(&0));
 
     r.delete_device(0);
     assert_eq!(r.devices.len(), 0);

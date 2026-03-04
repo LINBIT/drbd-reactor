@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use drbd_reactor::drbd::{
     Connection, Device, EventType, Path, PeerDevice, PluginUpdate, Resource, Role,
 };
@@ -12,7 +14,7 @@ fn get_resource_update() {
         may_promote: true,
         promotion_score: 23,
         force_io_failures: false,
-        devices: vec![],
+        devices: BTreeMap::new(),
         connections: vec![],
     };
 
@@ -45,7 +47,7 @@ fn get_device_update() {
         ..Default::default()
     };
     let ds = d.clone();
-    r.devices.push(d);
+    r.devices.insert(d.volume, d);
 
     // update with existing
     assert!(r.get_device_update(&EventType::Exists, &ds).is_none());

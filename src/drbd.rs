@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::io::{Error, ErrorKind};
 use std::process::{Command, Stdio};
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils;
 
-common_matchable![Vec<Connection>, Vec<Device>];
+common_matchable![Vec<Connection>, BTreeMap<i32, Device>];
 make_matchable![
     #[derive(Default, Debug, Serialize, Clone, PartialEq, Deserialize)]
     #[serde(rename_all = "kebab-case")]
@@ -22,7 +22,7 @@ make_matchable![
         pub force_io_failures: bool,
         pub may_promote: bool,
         pub promotion_score: i32,
-        pub devices: Vec<Device>,
+        pub devices: BTreeMap<i32, Device>,
         pub connections: Vec<Connection>,
     },
     ResourcePattern
@@ -783,22 +783,15 @@ impl Resource {
     }
 
     fn get_device(&self, volume_id: i32) -> Option<&Device> {
-        self.devices.iter().find(|c| c.volume == volume_id)
-    }
-
-    fn get_device_mut(&mut self, volume_id: i32) -> Option<&mut Device> {
-        self.devices.iter_mut().find(|c| c.volume == volume_id)
+        self.devices.get(&volume_id)
     }
 
     pub fn update_device(&mut self, device: &Device) {
-        match self.get_device_mut(device.volume) {
-            Some(existing) => *existing = device.clone(),
-            None => self.devices.push(device.clone()),
-        }
+        self.devices.insert(device.volume, device.clone());
     }
 
     pub fn delete_device(&mut self, volume_id: i32) {
-        self.devices.retain(|x| x.volume != volume_id)
+        self.devices.remove(&volume_id);
     }
 
     fn update_or_delete_device(&mut self, et: &EventType, device: &Device) {
@@ -1172,7 +1165,7 @@ impl Resource {
             resource_name: r.name.clone(),
         }));
 
-        for d in &self.devices {
+        for d in self.devices.values() {
             if let Some(u) = r.get_device_update(&EventType::Exists, d) {
                 updates.push(u);
             }

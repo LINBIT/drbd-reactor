@@ -261,6 +261,7 @@ fn str_to_bool(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn string_to_bool() {
@@ -284,7 +285,7 @@ mod tests {
                 may_promote: true,
                 promotion_score: 23,
                 force_io_failures: false,
-                devices: vec![],
+                devices: BTreeMap::new(),
                 connections: vec![],
             },
         );
