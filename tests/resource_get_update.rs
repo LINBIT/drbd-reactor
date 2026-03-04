@@ -164,7 +164,16 @@ fn get_path_update() {
 
     assert!(r.get_path_update(&EventType::Change, &p).is_none());
     // but updates resource state
-    assert_eq!(r.connections[0].paths[0].peer_node_id, 1);
+    assert_eq!(r.connections[0].paths.len(), 1);
+    assert_eq!(
+        r.connections[0]
+            .paths
+            .values()
+            .next()
+            .unwrap()
+            .peer_node_id,
+        1
+    );
 
     assert!(r.get_path_update(&EventType::Destroy, &p).is_none());
     assert!(r.connections[0].paths.is_empty());

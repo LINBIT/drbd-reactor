@@ -365,7 +365,7 @@ mod tests {
                 ap_in_flight: 1,
                 rs_in_flight: 1,
                 peerdevices: BTreeMap::new(),
-                paths: vec![],
+                paths: BTreeMap::new(),
             },
         );
         assert_eq!(up, expected);

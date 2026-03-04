@@ -104,7 +104,37 @@ pub struct Connection {
     pub ap_in_flight: u64,
     pub rs_in_flight: u64,
     pub peerdevices: BTreeMap<i32, PeerDevice>,
-    pub paths: Vec<Path>,
+    #[serde(with = "paths_serde")]
+    pub paths: BTreeMap<(String, String), Path>,
+}
+
+mod paths_serde {
+    use super::*;
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S>(
+        paths: &BTreeMap<(String, String), Path>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let vec: Vec<&Path> = paths.values().collect();
+        vec.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<BTreeMap<(String, String), Path>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let vec: Vec<Path> = Vec::deserialize(deserializer)?;
+        Ok(vec
+            .into_iter()
+            .map(|p| ((p.local.clone(), p.peer.clone()), p))
+            .collect())
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -910,7 +940,7 @@ impl Resource {
                 // conn is just an update for the rest of the struct fields.
                 let mut conn = conn.clone();
                 conn.peerdevices = existing.peerdevices.clone();
-                conn.paths = existing.paths.to_vec();
+                conn.paths = existing.paths.clone();
                 self.update_or_delete_connection(et, &conn);
                 if old == new && *et != EventType::Destroy {
                     return None;
@@ -1043,6 +1073,7 @@ impl Resource {
     }
 
     pub fn update_path(&mut self, path: &Path) {
+        let key = (path.local.clone(), path.peer.clone());
         match self.get_connection_mut(path.peer_node_id) {
             None => {
                 let mut conn = Connection {
@@ -1050,27 +1081,18 @@ impl Resource {
                     ..Default::default()
                 };
 
-                conn.paths.push(path.clone());
+                conn.paths.insert(key, path.clone());
                 self.connections.push(conn)
             }
             Some(conn) => {
-                match conn
-                    .paths
-                    .iter_mut()
-                    .find(|p| p.local == path.local && p.peer == path.peer)
-                {
-                    Some(pa) => *pa = path.clone(),
-                    None => conn.paths.push(path.clone()),
-                }
+                conn.paths.insert(key, path.clone());
             }
         }
     }
 
     pub fn delete_path(&mut self, peer_node_id: i32, local: &str, peer: &str) {
         if let Some(conn) = self.get_connection_mut(peer_node_id) {
-            conn.paths.retain(|x| {
-                !(x.peer_node_id == peer_node_id && x.local == local && x.peer == peer)
-            });
+            conn.paths.remove(&(local.to_string(), peer.to_string()));
         }
     }
 
@@ -1152,7 +1174,7 @@ impl Resource {
                 updates.push(u);
             }
 
-            for p in &c.paths {
+            for p in c.paths.values() {
                 if let Some(u) = r.get_path_update(&EventType::Exists, p) {
                     updates.push(u);
                 }
