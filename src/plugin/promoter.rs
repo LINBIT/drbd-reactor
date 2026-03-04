@@ -372,7 +372,7 @@ fn process_drbd_event(
                 for pd in u
                     .resource
                     .connections
-                    .iter()
+                    .values()
                     .flat_map(|c| c.peerdevices.values())
                 {
                     // check if we find an UpToDate peer
@@ -1089,7 +1089,7 @@ fn get_sleep_before_promote_ms(
         // if we unwrap there, we assume it was the initial up and don't sleep
         let sleep_fencing_s = resource
             .connections
-            .iter()
+            .values()
             .map(|c| match c.connection {
                 ConnectionState::Connected => 0,
                 _ => fencing_promote_delay_s,
@@ -1270,26 +1270,39 @@ mod tests {
         let mut r = Resource {
             name: "test".to_string(),
             devices: BTreeMap::from([
-                (0, Device {
-                    volume: 0,
-                    disk_state: DiskState::Diskless,
-                    ..Default::default()
-                }),
-                (1, Device {
-                    volume: 1,
-                    disk_state: DiskState::Failed,
-                    ..Default::default()
-                }),
-                (2, Device {
-                    volume: 2,
-                    disk_state: DiskState::UpToDate,
-                    ..Default::default()
-                }),
+                (
+                    0,
+                    Device {
+                        volume: 0,
+                        disk_state: DiskState::Diskless,
+                        ..Default::default()
+                    },
+                ),
+                (
+                    1,
+                    Device {
+                        volume: 1,
+                        disk_state: DiskState::Failed,
+                        ..Default::default()
+                    },
+                ),
+                (
+                    2,
+                    Device {
+                        volume: 2,
+                        disk_state: DiskState::UpToDate,
+                        ..Default::default()
+                    },
+                ),
             ]),
-            connections: vec![Connection {
-                connection: ConnectionState::NetworkFailure,
-                ..Default::default()
-            }],
+            connections: BTreeMap::from([(
+                0,
+                Connection {
+                    peer_node_id: 0,
+                    connection: ConnectionState::NetworkFailure,
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         };
         assert_eq!(

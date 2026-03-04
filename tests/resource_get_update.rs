@@ -15,7 +15,7 @@ fn get_resource_update() {
         promotion_score: 23,
         force_io_failures: false,
         devices: BTreeMap::new(),
-        connections: vec![],
+        connections: BTreeMap::new(),
     };
 
     // update with self
@@ -84,7 +84,7 @@ fn get_connection_update() {
     };
     c.peerdevices.insert(pd.volume, pd);
     let cs = c.clone();
-    r.connections.push(c);
+    r.connections.insert(c.peer_node_id, c);
 
     // update with existing
     assert!(r.get_connection_update(&EventType::Exists, &cs).is_none());
@@ -102,7 +102,7 @@ fn get_connection_update() {
         _ => panic!("not a connection update"),
     }
     //check that updated did not delete existing pd
-    assert!(r.connections[0].peerdevices.len() == 1);
+    assert!(r.connections[&1].peerdevices.len() == 1);
 
     // destroy still needs to be an update
     assert!(r.get_connection_update(&EventType::Destroy, &u).is_some());
@@ -124,7 +124,7 @@ fn get_peerdevice_update() {
 
     let pds = pd.clone();
     c.peerdevices.insert(pd.volume, pd);
-    r.connections.push(c);
+    r.connections.insert(c.peer_node_id, c);
 
     // update with existing
     assert!(r.get_peerdevice_update(&EventType::Exists, &pds).is_none());
@@ -155,7 +155,7 @@ fn get_path_update() {
         ..Default::default()
     };
 
-    r.connections.push(c);
+    r.connections.insert(c.peer_node_id, c);
 
     let p = Path {
         peer_node_id: 1,
@@ -164,9 +164,9 @@ fn get_path_update() {
 
     assert!(r.get_path_update(&EventType::Change, &p).is_none());
     // but updates resource state
-    assert_eq!(r.connections[0].paths.len(), 1);
+    assert_eq!(r.connections[&1].paths.len(), 1);
     assert_eq!(
-        r.connections[0]
+        r.connections[&1]
             .paths
             .values()
             .next()
@@ -176,5 +176,5 @@ fn get_path_update() {
     );
 
     assert!(r.get_path_update(&EventType::Destroy, &p).is_none());
-    assert!(r.connections[0].paths.is_empty());
+    assert!(r.connections[&1].paths.is_empty());
 }

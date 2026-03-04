@@ -14,7 +14,7 @@ fn resource_update() {
         promotion_score: 23,
         force_io_failures: false,
         devices: BTreeMap::new(),
-        connections: vec![],
+        connections: BTreeMap::new(),
     };
     r.update(&update);
 
@@ -83,9 +83,9 @@ fn get_connection_update() -> Resource {
     r.update_connection(&c0);
     r.update_connection(&c1);
     assert_eq!(r.connections.len(), 2);
-    assert_eq!(r.connections[0].peer_node_id, 1);
-    assert!(!r.connections[0].congested);
-    assert_eq!(r.connections[1].peer_node_id, 2);
+    assert_eq!(r.connections[&1].peer_node_id, 1);
+    assert!(!r.connections[&1].congested);
+    assert_eq!(r.connections[&2].peer_node_id, 2);
 
     let c0_mod = Connection {
         peer_node_id: 1,
@@ -95,8 +95,8 @@ fn get_connection_update() -> Resource {
 
     r.update_connection(&c0_mod);
     assert_eq!(r.connections.len(), 2);
-    assert_eq!(r.connections[0].peer_node_id, 1);
-    assert!(r.connections[0].congested);
+    assert_eq!(r.connections[&1].peer_node_id, 1);
+    assert!(r.connections[&1].congested);
 
     r
 }
@@ -112,7 +112,7 @@ fn connection_delete() {
 
     r.delete_connection(1);
     assert_eq!(r.connections.len(), 1);
-    assert_eq!(r.connections[0].peer_node_id, 2);
+    assert!(r.connections.contains_key(&2));
 
     r.delete_connection(2);
     assert_eq!(r.connections.len(), 0);
@@ -147,17 +147,17 @@ fn get_peerdevice_update() -> Resource {
     r.update_peerdevice(&pd20);
     r.update_peerdevice(&pd21);
     assert_eq!(r.connections.len(), 2);
-    assert_eq!(r.connections[0].peerdevices.len(), 2);
-    assert_eq!(r.connections[1].peerdevices.len(), 2);
-    assert_eq!(r.connections[0].peerdevices[&0].peer_node_id, 1);
-    assert_eq!(r.connections[0].peerdevices[&0].volume, 0);
-    assert_eq!(r.connections[0].peerdevices[&1].peer_node_id, 1);
-    assert_eq!(r.connections[0].peerdevices[&1].volume, 1);
-    assert_eq!(r.connections[1].peerdevices[&0].peer_node_id, 2);
-    assert_eq!(r.connections[1].peerdevices[&0].volume, 0);
-    assert_eq!(r.connections[1].peerdevices[&0].sent, 0);
-    assert_eq!(r.connections[1].peerdevices[&1].peer_node_id, 2);
-    assert_eq!(r.connections[1].peerdevices[&1].volume, 1);
+    assert_eq!(r.connections[&1].peerdevices.len(), 2);
+    assert_eq!(r.connections[&2].peerdevices.len(), 2);
+    assert_eq!(r.connections[&1].peerdevices[&0].peer_node_id, 1);
+    assert_eq!(r.connections[&1].peerdevices[&0].volume, 0);
+    assert_eq!(r.connections[&1].peerdevices[&1].peer_node_id, 1);
+    assert_eq!(r.connections[&1].peerdevices[&1].volume, 1);
+    assert_eq!(r.connections[&2].peerdevices[&0].peer_node_id, 2);
+    assert_eq!(r.connections[&2].peerdevices[&0].volume, 0);
+    assert_eq!(r.connections[&2].peerdevices[&0].sent, 0);
+    assert_eq!(r.connections[&2].peerdevices[&1].peer_node_id, 2);
+    assert_eq!(r.connections[&2].peerdevices[&1].volume, 1);
 
     let pd20_mod = PeerDevice {
         peer_node_id: 2,
@@ -168,9 +168,9 @@ fn get_peerdevice_update() -> Resource {
 
     r.update_peerdevice(&pd20_mod);
     assert_eq!(r.connections.len(), 2);
-    assert_eq!(r.connections[0].peerdevices.len(), 2);
-    assert_eq!(r.connections[1].peerdevices.len(), 2);
-    assert_eq!(r.connections[1].peerdevices[&0].sent, 23);
+    assert_eq!(r.connections[&1].peerdevices.len(), 2);
+    assert_eq!(r.connections[&2].peerdevices.len(), 2);
+    assert_eq!(r.connections[&2].peerdevices[&0].sent, 23);
 
     r
 }
@@ -187,10 +187,10 @@ fn peerdevice_delete() {
     r.delete_peerdevice(1, 0);
     r.delete_peerdevice(2, 1);
     assert_eq!(r.connections.len(), 2);
-    assert_eq!(r.connections[0].peerdevices.len(), 1);
-    assert_eq!(r.connections[1].peerdevices.len(), 1);
-    assert!(r.connections[0].peerdevices.contains_key(&1));
-    assert_eq!(r.connections[0].peerdevices[&1].peer_node_id, 1);
-    assert!(r.connections[1].peerdevices.contains_key(&0));
-    assert_eq!(r.connections[1].peerdevices[&0].peer_node_id, 2);
+    assert_eq!(r.connections[&1].peerdevices.len(), 1);
+    assert_eq!(r.connections[&2].peerdevices.len(), 1);
+    assert!(r.connections[&1].peerdevices.contains_key(&1));
+    assert_eq!(r.connections[&1].peerdevices[&1].peer_node_id, 1);
+    assert!(r.connections[&2].peerdevices.contains_key(&0));
+    assert_eq!(r.connections[&2].peerdevices[&0].peer_node_id, 2);
 }

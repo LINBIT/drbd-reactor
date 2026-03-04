@@ -522,7 +522,7 @@ impl Metrics {
                     let id = gen_id(&resource_prefix, &[MIB::PeerNumberOfPeers as u32, minor]);
                     pd_states.insert(id, 0);
                 }
-                for c in &resource.connections {
+                for c in resource.connections.values() {
                     for pd in c.peerdevices.values() {
                         let minor = match vol_to_minor.get(&pd.volume) {
                             Some(m) => m,

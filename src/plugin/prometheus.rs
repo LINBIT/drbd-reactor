@@ -239,7 +239,7 @@ impl Metrics {
             writeln!(m, "{k}{{name=\"{name}\"}} {}", r.force_io_failures as i32)?;
 
             // connection
-            for c in &r.connections {
+            for c in r.connections.values() {
                 let mut common = String::new();
                 write!(common, "name=\"{name}\"")?;
                 write!(common, ",conn_name=\"{}\"", c.conn_name)?;

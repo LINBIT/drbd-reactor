@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils;
 
-common_matchable![Vec<Connection>, BTreeMap<i32, Device>];
+common_matchable![BTreeMap<i32, Connection>, BTreeMap<i32, Device>];
 make_matchable![
     #[derive(Default, Debug, Serialize, Clone, PartialEq, Deserialize)]
     #[serde(rename_all = "kebab-case")]
@@ -23,7 +23,7 @@ make_matchable![
         pub may_promote: bool,
         pub promotion_score: i32,
         pub devices: BTreeMap<i32, Device>,
-        pub connections: Vec<Connection>,
+        pub connections: BTreeMap<i32, Connection>,
     },
     ResourcePattern
 ];
@@ -887,22 +887,15 @@ impl Resource {
     }
 
     pub fn get_connection(&self, peer_node_id: i32) -> Option<&Connection> {
-        self.connections
-            .iter()
-            .find(|c| c.peer_node_id == peer_node_id)
+        self.connections.get(&peer_node_id)
     }
 
     pub fn get_connection_mut(&mut self, peer_node_id: i32) -> Option<&mut Connection> {
-        self.connections
-            .iter_mut()
-            .find(|c| c.peer_node_id == peer_node_id)
+        self.connections.get_mut(&peer_node_id)
     }
 
     pub fn update_connection(&mut self, conn: &Connection) {
-        match self.get_connection_mut(conn.peer_node_id) {
-            Some(existing) => *existing = conn.clone(),
-            None => self.connections.push(conn.clone()),
-        }
+        self.connections.insert(conn.peer_node_id, conn.clone());
     }
 
     fn update_or_delete_connection(&mut self, et: &EventType, conn: &Connection) {
@@ -976,7 +969,7 @@ impl Resource {
     }
 
     pub fn delete_connection(&mut self, peer_node_id: i32) {
-        self.connections.retain(|x| x.peer_node_id != peer_node_id)
+        self.connections.remove(&peer_node_id);
     }
 
     pub fn get_peerdevice(&self, peer_node_id: i32, peer_volume_id: i32) -> Option<&PeerDevice> {
@@ -992,11 +985,13 @@ impl Resource {
                     ..Default::default()
                 };
 
-                conn.peerdevices.insert(peerdevice.volume, peerdevice.clone());
-                self.connections.push(conn)
+                conn.peerdevices
+                    .insert(peerdevice.volume, peerdevice.clone());
+                self.connections.insert(peerdevice.peer_node_id, conn);
             }
             Some(conn) => {
-                conn.peerdevices.insert(peerdevice.volume, peerdevice.clone());
+                conn.peerdevices
+                    .insert(peerdevice.volume, peerdevice.clone());
             }
         }
     }
@@ -1082,7 +1077,7 @@ impl Resource {
                 };
 
                 conn.paths.insert(key, path.clone());
-                self.connections.push(conn)
+                self.connections.insert(path.peer_node_id, conn);
             }
             Some(conn) => {
                 conn.paths.insert(key, path.clone());
@@ -1169,7 +1164,7 @@ impl Resource {
             }
         }
 
-        for c in &self.connections {
+        for c in self.connections.values() {
             if let Some(u) = r.get_connection_update(&EventType::Exists, c) {
                 updates.push(u);
             }

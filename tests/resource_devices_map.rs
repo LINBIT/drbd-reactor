@@ -29,9 +29,7 @@ fn insert_is_retrievable() {
     r.update_device(&d);
 
     // Retrievable via get_device_update with same state => None (no change)
-    assert!(r
-        .get_device_update(&EventType::Exists, &d)
-        .is_none());
+    assert!(r.get_device_update(&EventType::Exists, &d).is_none());
 }
 
 #[test]
@@ -106,9 +104,7 @@ fn get_device_update_no_change() {
     let d = make_device(0, 10);
     r.update_device(&d);
 
-    assert!(r
-        .get_device_update(&EventType::Exists, &d)
-        .is_none());
+    assert!(r.get_device_update(&EventType::Exists, &d).is_none());
 }
 
 #[test]
@@ -122,9 +118,7 @@ fn get_device_update_with_change() {
         disk_state: DiskState::UpToDate,
         ..Default::default()
     };
-    let up = r
-        .get_device_update(&EventType::Change, &modified)
-        .unwrap();
+    let up = r.get_device_update(&EventType::Change, &modified).unwrap();
     match up {
         PluginUpdate::Device(du) => {
             assert_eq!(du.event_type, EventType::Change);

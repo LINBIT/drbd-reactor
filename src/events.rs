@@ -286,7 +286,7 @@ mod tests {
                 promotion_score: 23,
                 force_io_failures: false,
                 devices: BTreeMap::new(),
-                connections: vec![],
+                connections: BTreeMap::new(),
             },
         );
         assert_eq!(up, expected);

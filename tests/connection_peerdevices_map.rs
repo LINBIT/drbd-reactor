@@ -38,9 +38,7 @@ fn insert_is_retrievable() {
     r.update_peerdevice(&pd);
 
     // Same state => no update
-    assert!(r
-        .get_peerdevice_update(&EventType::Exists, &pd)
-        .is_none());
+    assert!(r.get_peerdevice_update(&EventType::Exists, &pd).is_none());
 }
 
 #[test]
@@ -65,9 +63,7 @@ fn update_in_place() {
         peer_client: true,
         ..Default::default()
     };
-    let up = r
-        .get_peerdevice_update(&EventType::Exists, &probe)
-        .unwrap();
+    let up = r.get_peerdevice_update(&EventType::Exists, &probe).unwrap();
     match up {
         PluginUpdate::PeerDevice(pdu) => {
             assert_eq!(pdu.peer_node_id, 1);
@@ -121,9 +117,7 @@ fn get_peerdevice_update_no_change() {
     let pd = make_peerdevice(1, 0);
     r.update_peerdevice(&pd);
 
-    assert!(r
-        .get_peerdevice_update(&EventType::Exists, &pd)
-        .is_none());
+    assert!(r.get_peerdevice_update(&EventType::Exists, &pd).is_none());
 }
 
 #[test]
@@ -158,9 +152,7 @@ fn get_peerdevice_update_destroy() {
     let pd = make_peerdevice(1, 0);
     r.update_peerdevice(&pd);
 
-    let up = r
-        .get_peerdevice_update(&EventType::Destroy, &pd)
-        .unwrap();
+    let up = r.get_peerdevice_update(&EventType::Destroy, &pd).unwrap();
     match up {
         PluginUpdate::PeerDevice(pdu) => {
             assert_eq!(pdu.event_type, EventType::Destroy);
