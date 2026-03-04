@@ -523,7 +523,7 @@ impl Metrics {
                     pd_states.insert(id, 0);
                 }
                 for c in &resource.connections {
-                    for pd in &c.peerdevices {
+                    for pd in c.peerdevices.values() {
                         let minor = match vol_to_minor.get(&pd.volume) {
                             Some(m) => m,
                             None => {

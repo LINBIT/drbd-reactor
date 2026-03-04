@@ -364,7 +364,7 @@ mod tests {
                 congested: true,
                 ap_in_flight: 1,
                 rs_in_flight: 1,
-                peerdevices: vec![],
+                peerdevices: BTreeMap::new(),
                 paths: vec![],
             },
         );

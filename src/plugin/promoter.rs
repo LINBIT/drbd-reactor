@@ -373,7 +373,7 @@ fn process_drbd_event(
                     .resource
                     .connections
                     .iter()
-                    .flat_map(|c| c.peerdevices.iter())
+                    .flat_map(|c| c.peerdevices.values())
                 {
                     // check if we find an UpToDate peer
                     if pd.peer_client == false && pd.peer_disk_state == DiskState::UpToDate {

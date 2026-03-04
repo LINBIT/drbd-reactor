@@ -262,7 +262,7 @@ impl Metrics {
                     }
                 }
 
-                for pd in &c.peerdevices {
+                for pd in c.peerdevices.values() {
                     let (k, m) = type_gauge("drbd_peerdevice_outofsync_bytes",
                                             "Number of bytes currently out of sync with this peer, according to the bitmap that DRBD has for it",
                                             &mut metrics);

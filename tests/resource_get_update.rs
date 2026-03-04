@@ -82,7 +82,7 @@ fn get_connection_update() {
         volume: 1,
         ..Default::default()
     };
-    c.peerdevices.push(pd);
+    c.peerdevices.insert(pd.volume, pd);
     let cs = c.clone();
     r.connections.push(c);
 
@@ -123,7 +123,7 @@ fn get_peerdevice_update() {
     };
 
     let pds = pd.clone();
-    c.peerdevices.push(pd);
+    c.peerdevices.insert(pd.volume, pd);
     r.connections.push(c);
 
     // update with existing

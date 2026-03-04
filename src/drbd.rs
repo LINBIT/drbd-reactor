@@ -103,7 +103,7 @@ pub struct Connection {
     pub congested: bool,
     pub ap_in_flight: u64,
     pub rs_in_flight: u64,
-    pub peerdevices: Vec<PeerDevice>,
+    pub peerdevices: BTreeMap<i32, PeerDevice>,
     pub paths: Vec<Path>,
 }
 
@@ -909,7 +909,7 @@ impl Resource {
                 // we want to preserve the existing pds/paths in the existing connection
                 // conn is just an update for the rest of the struct fields.
                 let mut conn = conn.clone();
-                conn.peerdevices = existing.peerdevices.to_vec();
+                conn.peerdevices = existing.peerdevices.clone();
                 conn.paths = existing.paths.to_vec();
                 self.update_or_delete_connection(et, &conn);
                 if old == new && *et != EventType::Destroy {
@@ -950,24 +950,8 @@ impl Resource {
     }
 
     pub fn get_peerdevice(&self, peer_node_id: i32, peer_volume_id: i32) -> Option<&PeerDevice> {
-        match self.get_connection(peer_node_id) {
-            Some(conn) => conn.peerdevices.iter().find(|c| c.volume == peer_volume_id),
-            None => None,
-        }
-    }
-
-    pub fn get_peerdevice_mut(
-        &mut self,
-        peer_node_id: i32,
-        peer_volume_id: i32,
-    ) -> Option<&mut PeerDevice> {
-        match self.get_connection_mut(peer_node_id) {
-            Some(conn) => conn
-                .peerdevices
-                .iter_mut()
-                .find(|c| c.volume == peer_volume_id),
-            None => None,
-        }
+        self.get_connection(peer_node_id)
+            .and_then(|conn| conn.peerdevices.get(&peer_volume_id))
     }
 
     pub fn update_peerdevice(&mut self, peerdevice: &PeerDevice) {
@@ -978,26 +962,18 @@ impl Resource {
                     ..Default::default()
                 };
 
-                conn.peerdevices.push(peerdevice.clone());
+                conn.peerdevices.insert(peerdevice.volume, peerdevice.clone());
                 self.connections.push(conn)
             }
             Some(conn) => {
-                match conn
-                    .peerdevices
-                    .iter_mut()
-                    .find(|c| c.volume == peerdevice.volume)
-                {
-                    Some(pd) => *pd = peerdevice.clone(),
-                    None => conn.peerdevices.push(peerdevice.clone()),
-                }
+                conn.peerdevices.insert(peerdevice.volume, peerdevice.clone());
             }
         }
     }
 
     pub fn delete_peerdevice(&mut self, peer_node_id: i32, peerdevice_volume_id: i32) {
         if let Some(conn) = self.get_connection_mut(peer_node_id) {
-            conn.peerdevices
-                .retain(|x| x.volume != peerdevice_volume_id);
+            conn.peerdevices.remove(&peerdevice_volume_id);
         }
     }
 
@@ -1182,7 +1158,7 @@ impl Resource {
                 }
             }
 
-            for pd in &c.peerdevices {
+            for pd in c.peerdevices.values() {
                 if let Some(u) = r.get_peerdevice_update(&EventType::Exists, pd) {
                     updates.push(u);
                 }
