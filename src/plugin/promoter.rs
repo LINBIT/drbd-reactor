@@ -676,7 +676,7 @@ fn generate_systemd_templates(
             systemd_settings.failure_action
         );
         if secondary_force {
-            content.push_str("\n[Service]\nExecStart=\nExecStart=/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force-or-escalate %I\n")
+            content.push_str("\n[Service]\nExecStart=\nExecStart=/usr/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force-or-escalate %I\n")
         }
         systemd_write_unit(prefix, SYSTEMD_CONF, content)?;
     }
@@ -780,7 +780,7 @@ fn drbd_promote(
     const PROMOTE_TEMPLATE: &str = r"[Service]
 {{ if secondary_force -}}
 ExecStop=
-ExecStop=/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force %I
+ExecStop=/usr/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force %I
 {{ endif -}}
 [Unit]
 {{ if needs_on_failure -}}
@@ -1407,7 +1407,7 @@ mod tests {
 
         let expected = r"[Service]
 ExecStop=
-ExecStop=/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force %I
+ExecStop=/usr/lib/drbd/scripts/drbd-service-shim.sh secondary-secondary-force %I
 [Unit]
 OnFailure=drbd-demote-or-escalate@%i.service
 OnFailureJobMode=replace-irreversibly
