@@ -221,9 +221,19 @@ fn main() -> Result<()> {
         let _monitor_guard =
             plugin::MonitorGuard::new(cfgs, cfg.snippets.clone(), cfg.snippets_monitoring_interval);
 
-        let reason = core
-            .run(&e2rx, &started)
-            .context("main: core did not exit successfully")?;
+        let reason = match core.run(&e2rx, &started) {
+            Ok(reason) => reason,
+            Err(e) => {
+                // A plugin likely crashed, causing a disconnected channel.
+                // Stop all plugins and report their errors before exiting.
+                for (_, plugin) in started.drain() {
+                    if let Err(plugin_err) = plugin.stop() {
+                        error!("main: plugin error: {:#}", plugin_err);
+                    }
+                }
+                return Err(e.context("main: core did not exit successfully"));
+            }
+        };
 
         match reason {
             CoreExit::Stop => {
