@@ -84,7 +84,7 @@ currently under development by somebody else.
 
 We have to be a bit careful introducing new dependencies as we want to provide `drbd-reactor` via a
 [PPA](https://launchpad.net/~linbit/+archive/ubuntu/linbit-drbd9-stack). So please use only dependencies that
-are packaged as `librust-` package in Ubuntu Focal. We might relax that, but that would need to be a very very
+are packaged as `librust-` package in Ubuntu Jammy. We might relax that, but that would need to be a very very
 convincing argument. Again, talk to us early.
 
 # Current implementation considerations
