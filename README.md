@@ -3,7 +3,7 @@
 `drbd-reactor` is a daemon consisting of a core that does DRBD events processing and plugins that can react on
 changes in a DRBD resource.
 
-# Plugins
+## Plugins
 
 | Plugin                           | Purpose                             |
 | -------------------------------- | ------------------------------------|
@@ -13,7 +13,7 @@ changes in a DRBD resource.
 | [prometheus](/doc/prometheus.md) | Prometheus endpoint                 |
 | [agentx](/doc/agentx.md)         | AgentX subagent for SNMP monitoring |
 
-## Implementation
+### Implementation
 
 - [x] debugger
 - [x] promoter
@@ -21,7 +21,7 @@ changes in a DRBD resource.
 - [ ] umh (replacement for kernel called helpers: Under active development)
 - [x] prometheus
 
-# Configuration
+## Configuration
 
 This daemon is configured via a configuration file. The only command line option allowed is the path to the
 configuration. The default location for the config is `/etc/drbd-reactor.toml`. The repository contains an example
@@ -29,7 +29,7 @@ configuration. The default location for the config is `/etc/drbd-reactor.toml`. 
 directory where one places one snippet per plugin instance. Users should  use `drbd-reactorctl` to manage these
 snippets.
 
-## Automatic Reload
+### Automatic Reload
 
 In very dynamic environments it might be favorable to automatically reload the daemon whenever a configuration
 snippet is added or removed. This can be done by using the `drbd-reactor-reload` systemd path unit that is shipped
@@ -40,7 +40,7 @@ cp example/drbd-reactor-reload.{path,service} /etc/systemd/system/
 systemctl enable --now drbd-reactor-reload.path
 ```
 
-# Building
+## Building
 
 This is a Rust application. If you have a Rust toolchain and `cargo` installed (via distribution packages or
 [rustup](https://rustup.rs)) you can build it via:
@@ -49,9 +49,9 @@ This is a Rust application. If you have a Rust toolchain and `cargo` installed (
 cargo build
 ```
 
-# Architecture
+## Architecture
 
-## Core
+### Core
 
 The core consists of 2 threads. The first one is responsible for actual `drbdsetup events2` processing. It
 sends update event structs on a channel to the main thread.
@@ -66,7 +66,7 @@ the relevant information within this event (e.g., the `may_promote`, and `promot
 and `new` structs as easy to consume diffs. A `PluginUpdate` also contains the current, complete state of the
 resource.
 
-## Plugins
+### Plugins
 
 Plugins are maintained in this repository. Every plugin is started as its own thread by the `core`.
 Communication is done via channels where plugins only consume information.
@@ -74,20 +74,20 @@ Communication is done via channels where plugins only consume information.
 The core expose a `PluginUpdate` channel, the plugin decides if it wants to use the diffs from `old` and
 `new`, and/or the complete current state from `resource`.
 
-# Contributions
+## Contributions
 
 Contributions are obviously always welcome! Please talk to us first *before* you start working on a new
 plugin. Please check the state of plugins at the beginning of the document, and don't work on plugins that are
 currently under development by somebody else.
 
-## Dependencies
+### Dependencies
 
 We have to be a bit careful introducing new dependencies as we want to provide `drbd-reactor` via a
 [PPA](https://launchpad.net/~linbit/+archive/ubuntu/linbit-drbd9-stack). So please use only dependencies that
 are packaged as `librust-` package in Ubuntu Jammy. We might relax that, but that would need to be a very very
 convincing argument. Again, talk to us early.
 
-# Current implementation considerations
+## Current implementation considerations
 
 Currently plugins have to filter their `PluginUpdate` stream by themselves. This keeps the core simple, but
 allowing some kind of filtered subscription could make sense. If we don't do that, and keep the "all plugins
