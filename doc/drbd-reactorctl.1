@@ -39,7 +39,6 @@
 .Op Fl -disabled
 .Op Ar
 .Nm ls
-.Op Fl -disabled
 .Op Ar
 .Nm start-until
 .Ar until
@@ -185,11 +184,7 @@ Do not ask for confirmation
 Remove a disabled plugin.
 .El
 .Ss ls
-lists activated plugins.
-.Bl -tag -width Ds
-.It Fl -disabled
-Also list disabled plugins.
-.El
+lists plugins and shows some useful, brief information.
 .Ss start-until
 starts a promoter generated target unit until (including) the given entry name
 in the start list or a given index. Using an index number is especially

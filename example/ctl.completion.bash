@@ -265,7 +265,7 @@ _drbd-reactorctl() {
             return 0
             ;;
         drbd__reactorctl__ls)
-            opts=" -h -V  --disabled --help --version --context --nodes  <configs>... "
+            opts=" -h -V  --help --version --context --nodes  <configs>... "
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

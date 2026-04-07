@@ -37,6 +37,14 @@ static TERMINATE: AtomicBool = AtomicBool::new(false);
 const REACTOR_RELOAD_PATH: &str = "drbd-reactor-reload.path";
 const REACTOR_SERVICE: &str = "drbd-reactor.service";
 
+fn enabled_str(enabled: bool) -> &'static str {
+    if enabled {
+        ""
+    } else {
+        " (disabled)"
+    }
+}
+
 struct ClusterConf<'a> {
     context: &'a str,
     nodes: Vec<&'a str>,
@@ -135,13 +143,11 @@ fn main() -> Result<()> {
                 delay,
             )
         }
-        ("ls", Some(ls_matches)) => {
-            let disabled = ls_matches.is_present("disabled");
-            ls(
-                expand_snippets(&snippets_path, ls_matches, disabled),
-                &cluster,
-            )
-        }
+        ("ls", Some(ls_matches)) => ls(
+            expand_snippets(&snippets_path, ls_matches, false),
+            expand_snippets(&snippets_path, ls_matches, true),
+            &cluster,
+        ),
         ("restart", Some(restart_matches)) => {
             let with_targets = restart_matches.is_present("with_targets");
             let configs = match restart_matches.values_of("configs") {
@@ -581,6 +587,16 @@ fn reload_service() -> Result<()> {
     systemctl(vec!["reload".into(), REACTOR_SERVICE.into()])
 }
 
+fn tagged_snippets<'a, T>(
+    enabled: &'a [T],
+    disabled: &'a [T],
+) -> impl Iterator<Item = (bool, &'a T)> {
+    enabled
+        .iter()
+        .map(|x| (true, x))
+        .chain(disabled.iter().map(|x| (false, x)))
+}
+
 fn status(
     enabled_snippets_paths: Vec<PathBuf>,
     disabled_snippets_paths: Vec<PathBuf>,
@@ -594,11 +610,7 @@ fn status(
         return Ok(status);
     }
 
-    for (enabled, snippet) in enabled_snippets_paths
-        .iter()
-        .map(|x| (true, x))
-        .chain(disabled_snippets_paths.iter().map(|x| (false, x)))
-    {
+    for (enabled, snippet) in tagged_snippets(&enabled_snippets_paths, &disabled_snippets_paths) {
         let conf = read_config(&snippet)?;
         let plugins = conf.plugins;
         for promoter in plugins.promoter {
@@ -860,12 +872,16 @@ fn evict(
     }
 }
 
-fn ls(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
+fn ls(
+    enabled_snippets_paths: Vec<PathBuf>,
+    disabled_snippets_paths: Vec<PathBuf>,
+    cluster: &ClusterConf,
+) -> Result<()> {
     if do_remote(cluster)? {
         return Ok(());
     }
 
-    for snippet in snippets_paths {
+    for (enabled, snippet) in tagged_snippets(&enabled_snippets_paths, &disabled_snippets_paths) {
         println!("{}:", snippet.display());
         if !snippet.exists() {
             warn(&format!(
@@ -887,7 +903,8 @@ fn ls(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
                 let all: usize = start.iter().map(|s| s.len()).sum();
                 // some very rough estimate...
                 let delim = if single > 80 || all > 80 { "\n   " } else { "" };
-                print!("- Promoter: {}; start = [", drbd_res);
+                let state = enabled_str(enabled);
+                print!("- Promoter: {}{}; start = [", drbd_res, state);
                 for (i, s) in start.iter().enumerate() {
                     print!("{}\"{}\"", delim, s);
                     if i < start.len() - 1 {
@@ -1400,12 +1417,7 @@ It is used to clear previous '--keep-masked' operations",
         )
         .subcommand(
             SubCommand::with_name("ls")
-                .about("list absolute path of plugins")
-                .arg(
-                    Arg::with_name("disabled")
-                        .long("disabled")
-                        .help("show disabled plugins"),
-                )
+                .about("List plugins and show some useful, brief information")
                 .arg(
                     Arg::with_name("configs")
                         .help("Configs to list")
@@ -1622,7 +1634,7 @@ impl PromoterStatus {
     fn terminal(&self, verbose: bool) -> Result<String> {
         let mut w = String::new();
         writeln!(w, "{}:", self.path.display())?;
-        let state = if self.enabled { "" } else { " (disabled)" };
+        let state = enabled_str(self.enabled);
         writeln!(
             w,
             "Promoter: Resource {}{} currently active on {}",
