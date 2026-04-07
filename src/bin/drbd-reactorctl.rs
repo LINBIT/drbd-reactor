@@ -175,6 +175,7 @@ fn main() -> Result<()> {
             let resources: Vec<String> = resources.map(String::from).collect::<Vec<_>>();
             status(
                 expand_snippets(&snippets_path, status_matches, false),
+                expand_snippets(&snippets_path, status_matches, true),
                 &resources,
                 &cluster,
             )
@@ -185,6 +186,7 @@ fn main() -> Result<()> {
             let args: ArgMatches = Default::default();
             status(
                 expand_snippets(&snippets_path, &args, false),
+                expand_snippets(&snippets_path, &args, true),
                 &vec![],
                 &cluster,
             )
@@ -580,7 +582,8 @@ fn reload_service() -> Result<()> {
 }
 
 fn status(
-    snippets_paths: Vec<PathBuf>,
+    enabled_snippets_paths: Vec<PathBuf>,
+    disabled_snippets_paths: Vec<PathBuf>,
     resources: &Vec<String>,
     cluster: &ClusterConf,
 ) -> Result<Status> {
@@ -591,7 +594,11 @@ fn status(
         return Ok(status);
     }
 
-    for snippet in snippets_paths {
+    for (enabled, snippet) in enabled_snippets_paths
+        .iter()
+        .map(|x| (true, x))
+        .chain(disabled_snippets_paths.iter().map(|x| (false, x)))
+    {
         let conf = read_config(&snippet)?;
         let plugins = conf.plugins;
         for promoter in plugins.promoter {
@@ -617,6 +624,7 @@ fn status(
                 status.promoter.push(PromoterStatus {
                     drbd_resource: drbd_res.clone(),
                     path: snippet.clone(),
+                    enabled,
                     primary_on,
                     target,
                     dependencies,
@@ -627,6 +635,7 @@ fn status(
         for prometheus in plugins.prometheus {
             status.prometheus.push(PrometheusStatus {
                 path: snippet.clone(),
+                enabled,
                 address: prometheus.address.clone(),
                 status: UnitActiveState::Active,
             })
@@ -634,18 +643,21 @@ fn status(
         for _ in plugins.debugger {
             status.debugger.push(DebuggerStatus {
                 path: snippet.clone(),
+                enabled,
                 status: UnitActiveState::Active,
             })
         }
         for _ in plugins.umh {
             status.umh.push(UMHStatus {
                 path: snippet.clone(),
+                enabled,
                 status: UnitActiveState::Active,
             })
         }
         for agentx in plugins.agentx {
             status.agentx.push(AgentXStatus {
                 path: snippet.clone(),
+                enabled,
                 address: agentx.address.clone(),
                 status: UnitActiveState::Active,
             })
@@ -1599,6 +1611,7 @@ impl Status {
 struct PromoterStatus {
     drbd_resource: String,
     path: PathBuf,
+    enabled: bool,
     primary_on: PrimaryOn,
     target: SystemdUnit,
     dependencies: Vec<SystemdUnit>,
@@ -1609,12 +1622,21 @@ impl PromoterStatus {
     fn terminal(&self, verbose: bool) -> Result<String> {
         let mut w = String::new();
         writeln!(w, "{}:", self.path.display())?;
+        let state = if self.enabled { "" } else { " (disabled)" };
         writeln!(
             w,
-            "Promoter: Resource {} currently active on {}",
+            "Promoter: Resource {}{} currently active on {}",
             self.drbd_resource,
+            state,
             self.primary_on.terminal(verbose)?
         )?;
+
+        if !self.enabled {
+            if let PrimaryOn::Local(_) = &self.primary_on {
+                writeln!(w, "{}", "[WARNING: disabled but Primary]".bold().red())?;
+            }
+            return Ok(w);
+        }
 
         writeln!(
             w,
@@ -1649,6 +1671,7 @@ impl PromoterStatus {
 #[derive(Serialize)]
 struct PrometheusStatus {
     path: PathBuf,
+    enabled: bool,
     address: config::LocalAddress,
     status: UnitActiveState,
 }
@@ -1677,6 +1700,7 @@ impl PrometheusStatus {
 #[derive(Serialize)]
 struct DebuggerStatus {
     path: PathBuf,
+    enabled: bool,
     status: UnitActiveState,
 }
 impl DebuggerStatus {
@@ -1690,6 +1714,7 @@ impl DebuggerStatus {
 #[derive(Serialize)]
 struct UMHStatus {
     path: PathBuf,
+    enabled: bool,
     status: UnitActiveState,
 }
 impl UMHStatus {
@@ -1703,6 +1728,7 @@ impl UMHStatus {
 #[derive(Serialize)]
 struct AgentXStatus {
     path: PathBuf,
+    enabled: bool,
     address: String,
     status: UnitActiveState,
 }
