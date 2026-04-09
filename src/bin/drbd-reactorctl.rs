@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt;
 use std::fmt::Write as fmtWrite;
@@ -36,6 +36,60 @@ static TERMINATE: AtomicBool = AtomicBool::new(false);
 
 const REACTOR_RELOAD_PATH: &str = "drbd-reactor-reload.path";
 const REACTOR_SERVICE: &str = "drbd-reactor.service";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SnippetState {
+    Enabled,
+    Disabled,
+}
+
+impl SnippetState {
+    fn extension(&self) -> &'static str {
+        match self {
+            SnippetState::Enabled => ".toml",
+            SnippetState::Disabled => ".toml.disabled",
+        }
+    }
+
+    fn opposite(&self) -> SnippetState {
+        match self {
+            SnippetState::Enabled => SnippetState::Disabled,
+            SnippetState::Disabled => SnippetState::Enabled,
+        }
+    }
+}
+
+/// Determine the snippet state from a path's extension using string matching.
+/// Checks `.toml.disabled` before `.toml` since the former also ends with the latter.
+fn snippet_state_of(path: &Path) -> Option<SnippetState> {
+    let s = path.to_str()?;
+    if s.ends_with(".toml.disabled") {
+        Some(SnippetState::Disabled)
+    } else if s.ends_with(".toml") {
+        Some(SnippetState::Enabled)
+    } else {
+        None
+    }
+}
+
+/// Replace or append the snippet extension on a path.
+fn with_snippet_extension(path: &Path, state: SnippetState) -> PathBuf {
+    let s = path.to_str().expect("path must be valid UTF-8");
+    let base = if let Some(stripped) = s.strip_suffix(".toml.disabled") {
+        stripped
+    } else if let Some(stripped) = s.strip_suffix(".toml") {
+        stripped
+    } else {
+        s
+    };
+    PathBuf::from(format!("{}{}", base, state.extension()))
+}
+
+/// Get the "opposite" path: foo.toml <-> foo.toml.disabled
+fn opposite_snippet_path(path: &Path) -> Option<PathBuf> {
+    let current = snippet_state_of(path)?;
+    Some(with_snippet_extension(path, current.opposite()))
+}
 
 fn enabled_str(enabled: bool) -> &'static str {
     if enabled {
@@ -97,106 +151,109 @@ fn main() -> Result<()> {
     };
 
     match matches.subcommand() {
-        ("cat", Some(cat_matches)) => cat(
-            expand_snippets(&snippets_path, cat_matches, false),
+        ("cat", Some(m)) => cat(
+            snippets_from_matches(&snippets_path, m, SnippetState::Enabled, true),
             &cluster,
         ),
-        ("disable", Some(disable_matches)) => {
-            let now = disable_matches.is_present("now");
+        ("disable", Some(m)) => {
+            let now = m.is_present("now");
             disable(
-                expand_snippets(&snippets_path, disable_matches, false),
+                snippets_from_matches(&snippets_path, m, SnippetState::Enabled, true),
                 now,
                 &cluster,
             )
         }
-        ("enable", Some(enable_matches)) => enable(
-            expand_snippets(&snippets_path, enable_matches, true),
+        ("enable", Some(m)) => enable(
+            snippets_from_matches(&snippets_path, m, SnippetState::Disabled, true),
             &cluster,
         ),
-        ("edit", Some(edit_matches)) => {
-            let disabled = edit_matches.is_present("disabled");
-            let force = edit_matches.is_present("force");
-            let type_opt = edit_matches
-                .value_of("type")
-                .expect("expected to have a default");
+        ("edit", Some(m)) => {
+            let state = if m.is_present("disabled") {
+                SnippetState::Disabled
+            } else {
+                SnippetState::Enabled
+            };
+            let force = m.is_present("force");
+            let type_opt = m.value_of("type").expect("expected to have a default");
             edit(
-                expand_snippets(&snippets_path, edit_matches, disabled),
+                snippets_from_matches(&snippets_path, m, state, false),
                 &snippets_path,
                 type_opt,
                 force,
                 &cluster,
             )
         }
-        ("evict", Some(evict_matches)) => {
-            let force = evict_matches.is_present("force");
-            let keep_masked = evict_matches.is_present("keep_masked");
-            let unmask = evict_matches.is_present("unmask");
-            let delay = evict_matches
-                .value_of("delay")
-                .expect("expected to have a default");
+        ("evict", Some(m)) => {
+            let force = m.is_present("force");
+            let keep_masked = m.is_present("keep_masked");
+            let unmask = m.is_present("unmask");
+            let delay = m.value_of("delay").expect("expected to have a default");
             let delay = delay.parse().expect("expected to be checked by parser");
             evict(
-                expand_snippets(&snippets_path, evict_matches, false),
+                snippets_from_matches(&snippets_path, m, SnippetState::Enabled, true),
                 force,
                 keep_masked,
                 unmask,
                 delay,
             )
         }
-        ("ls", Some(ls_matches)) => ls(
-            expand_snippets(&snippets_path, ls_matches, false),
-            expand_snippets(&snippets_path, ls_matches, true),
-            &cluster,
-        ),
-        ("restart", Some(restart_matches)) => {
-            let with_targets = restart_matches.is_present("with_targets");
-            let configs = match restart_matches.values_of("configs") {
+        ("ls", Some(m)) => {
+            let cfgs: Option<Vec<String>> = m
+                .values_of("configs")
+                .map(|v| v.map(String::from).collect());
+            let (enabled, disabled) = resolve_and_warn_both(&snippets_path, cfgs.as_deref());
+            ls(enabled, disabled, &cluster)
+        }
+        ("restart", Some(m)) => {
+            let with_targets = m.is_present("with_targets");
+            let configs = match m.values_of("configs") {
                 None => Vec::new(),
-                Some(_) => expand_snippets(&snippets_path, restart_matches, false),
+                Some(_) => snippets_from_matches(&snippets_path, m, SnippetState::Enabled, true),
             };
             restart(configs, with_targets, &cluster)
         }
-        ("rm", Some(rm_matches)) => {
-            let force = rm_matches.is_present("force");
-            let disabled = rm_matches.is_present("disabled");
+        ("rm", Some(m)) => {
+            let force = m.is_present("force");
+            let state = if m.is_present("disabled") {
+                SnippetState::Disabled
+            } else {
+                SnippetState::Enabled
+            };
             rm(
-                expand_snippets(&snippets_path, rm_matches, disabled),
+                snippets_from_matches(&snippets_path, m, state, true),
                 force,
                 &cluster,
             )
         }
-        ("start-until", Some(until_matches)) => {
-            let until = until_matches
+        ("start-until", Some(m)) => {
+            let until = m
                 .value_of("until")
                 .expect("expected to be checked by parser");
-            start_until(expand_snippets(&snippets_path, until_matches, true), until)
+            start_until(
+                snippets_from_matches(&snippets_path, m, SnippetState::Disabled, true),
+                until,
+            )
         }
-        ("status", Some(status_matches)) => {
-            let verbose = status_matches.is_present("verbose");
-            let format = match status_matches.is_present("json") {
+        ("status", Some(m)) => {
+            let verbose = m.is_present("verbose");
+            let format = match m.is_present("json") {
                 true => Format::Json,
                 false => Format::Terminal,
             };
-            let resources = status_matches.values_of("resource").unwrap_or_default();
+            let resources = m.values_of("resource").unwrap_or_default();
             let resources: Vec<String> = resources.map(String::from).collect::<Vec<_>>();
-            status(
-                expand_snippets(&snippets_path, status_matches, false),
-                expand_snippets(&snippets_path, status_matches, true),
-                &resources,
-                &cluster,
-            )
-            .and_then(|s| Ok(print!("{}", s.format(&format, verbose)?)))
+            let cfgs: Option<Vec<String>> = m
+                .values_of("configs")
+                .map(|v| v.map(String::from).collect());
+            let (enabled, disabled) = resolve_and_warn_both(&snippets_path, cfgs.as_deref());
+            status(enabled, disabled, &resources, &cluster)
+                .and_then(|s| Ok(print!("{}", s.format(&format, verbose)?)))
         }
         _ => {
             // pretend it is status
-            let args: ArgMatches = Default::default();
-            status(
-                expand_snippets(&snippets_path, &args, false),
-                expand_snippets(&snippets_path, &args, true),
-                &vec![],
-                &cluster,
-            )
-            .and_then(|s| Ok(print!("{}", s.format(&Format::Terminal, false)?)))
+            let (enabled, disabled) = resolve_and_warn_both(&snippets_path, None);
+            status(enabled, disabled, &vec![], &cluster)
+                .and_then(|s| Ok(print!("{}", s.format(&Format::Terminal, false)?)))
         }
     }
 }
@@ -557,14 +614,16 @@ fn disable(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterCo
 }
 
 fn get_disabled_path(snippet_path: &Path) -> PathBuf {
-    snippet_path.with_extension("toml.disabled")
+    with_snippet_extension(snippet_path, SnippetState::Disabled)
 }
 
 fn get_enabled_path(snippet_path: &Path) -> Result<PathBuf> {
-    match snippet_path.extension().and_then(|p| p.to_str()) {
-        Some("disabled") => Ok(snippet_path.with_extension("")),
-        Some(_) => Err(anyhow::anyhow!(
-            "Expected plugin path '{}' to end in .disabled",
+    match snippet_state_of(snippet_path) {
+        Some(SnippetState::Disabled) => {
+            Ok(with_snippet_extension(snippet_path, SnippetState::Enabled))
+        }
+        Some(SnippetState::Enabled) => Err(anyhow::anyhow!(
+            "Expected plugin path '{}' to end in .toml.disabled",
             snippet_path.display()
         )),
         None => Err(anyhow::anyhow!(
@@ -964,17 +1023,18 @@ fn get_snippets_path(path: &PathBuf) -> Option<PathBuf> {
         .ok()?
 }
 
-fn expand_snippets(snippets_path: &PathBuf, matches: &ArgMatches, disabled: bool) -> Vec<PathBuf> {
-    let expected_extension = match disabled {
-        true => "toml.disabled",
-        false => "toml",
-    };
-
-    let configs: Vec<PathBuf> = match matches.values_of("configs") {
-        Some(configs) => configs.map(PathBuf::from).collect::<Vec<_>>(), // process them in the next stage
+fn resolve_snippets(
+    snippets_path: &Path,
+    configs: Option<&[String]>,
+    state: SnippetState,
+) -> Vec<PathBuf> {
+    let configs = match configs {
+        Some(c) => c,
         None => {
-            // "glob expand"
-            match config::files_with_extension_in(snippets_path, expected_extension) {
+            match config::files_with_extension_in(
+                &snippets_path.to_path_buf(),
+                state.extension().trim_start_matches('.'),
+            ) {
                 Ok(paths) => return paths,
                 Err(e) => {
                     eprintln!(
@@ -989,36 +1049,112 @@ fn expand_snippets(snippets_path: &PathBuf, matches: &ArgMatches, disabled: bool
     };
 
     let mut paths = Vec::new();
-    for config in configs {
+    for config_str in configs {
+        let config = PathBuf::from(config_str);
+
         if config.is_absolute() {
             paths.push(config);
             continue;
         }
 
-        // not absolute
-        let config = match config.extension() {
-            None => config.with_extension(expected_extension),
-            Some(extension) => {
-                if extension == expected_extension {
-                    config
-                } else {
-                    eprintln!(
-                        "File '{}' has an extension, but it is not the expected one ('.{}'), \
-                         ignoring",
-                        config.display(),
-                        expected_extension
-                    );
-                    continue;
-                }
-            }
+        // relative path: check for recognized extension, add one if missing
+        let with_ext = match snippet_state_of(&config) {
+            Some(_) => config,
+            None => with_snippet_extension(&config, state),
         };
 
-        let mut abspath = PathBuf::from(snippets_path);
-        abspath.push(config);
+        let mut abspath = snippets_path.to_path_buf();
+        abspath.push(with_ext);
         paths.push(abspath);
     }
 
     paths
+}
+
+/// Glue between clap's `ArgMatches` and the (clap-free, unit-tested) snippet
+/// resolution core: extract the "configs" argument, resolve it against
+/// `snippets_path` for `state`, and validate the result.
+fn snippets_from_matches(
+    snippets_path: &Path,
+    matches: &ArgMatches,
+    state: SnippetState,
+    require_exists: bool,
+) -> Vec<PathBuf> {
+    let cfgs: Option<Vec<String>> = matches
+        .values_of("configs")
+        .map(|v| v.map(String::from).collect());
+    let resolved = resolve_snippets(snippets_path, cfgs.as_deref(), state);
+    validate_snippets(snippets_path, &resolved, require_exists)
+}
+
+/// Warn once for each snippet that has both its enabled (.toml) and disabled
+/// (.toml.disabled) variant present on disk.
+fn warn_if_both_exist<'a>(paths: impl IntoIterator<Item = &'a PathBuf>) {
+    let mut warned: HashSet<PathBuf> = HashSet::new();
+    for path in paths {
+        if let Some(opposite) = opposite_snippet_path(path) {
+            if opposite.exists() && !warned.contains(path) && !warned.contains(&opposite) {
+                warn(&format!(
+                    "both '{}' and '{}' exist",
+                    path.display(),
+                    opposite.display()
+                ));
+                warned.insert(path.clone());
+                warned.insert(opposite);
+            }
+        }
+    }
+}
+
+fn validate_snippets(
+    snippets_path: &Path,
+    paths: &[PathBuf],
+    require_exists: bool,
+) -> Vec<PathBuf> {
+    let mut valid = Vec::new();
+    for path in paths {
+        if snippet_state_of(path).is_none() {
+            eprintln!(
+                "File '{}' does not have a recognized extension (.toml or .toml.disabled), \
+                 ignoring",
+                path.display()
+            );
+            continue;
+        }
+
+        if !path.starts_with(snippets_path) {
+            eprintln!(
+                "File '{}' is not within snippets path '{}', ignoring",
+                path.display(),
+                snippets_path.display()
+            );
+            continue;
+        }
+
+        if require_exists && !path.is_file() {
+            eprintln!(
+                "File '{}' does not exist or is not a regular file, ignoring",
+                path.display()
+            );
+            continue;
+        }
+
+        valid.push(path.clone());
+    }
+    warn_if_both_exist(&valid);
+    valid
+}
+
+fn resolve_and_warn_both(
+    snippets_path: &Path,
+    configs: Option<&[String]>,
+) -> (Vec<PathBuf>, Vec<PathBuf>) {
+    let enabled = resolve_snippets(snippets_path, configs, SnippetState::Enabled);
+    let disabled = resolve_snippets(snippets_path, configs, SnippetState::Disabled);
+
+    warn_if_both_exist(enabled.iter().chain(disabled.iter()));
+
+    (enabled, disabled)
 }
 
 fn promote_service(drbd_res: &str) -> String {
@@ -1648,7 +1784,7 @@ impl PromoterStatus {
 
         if !self.enabled {
             if let PrimaryOn::Local(_) = &self.primary_on {
-                writeln!(w, "{}", "[WARNING: disabled but Primary]".bold().red())?;
+                writeln!(w, "{}", warn_str("disabled but Primary"))?;
             }
             return Ok(w);
         }
@@ -1759,20 +1895,28 @@ impl AgentXStatus {
     }
 }
 
-fn green(text: &str) {
-    println!("{}", text.bold().green())
+fn green_str(text: &str) -> String {
+    format!("{}", text.bold().green())
 }
 
-fn yellow_prefix(prefix: &str, text: &str) {
-    println!("{} {}", prefix.bold().yellow(), text)
+fn green(text: &str) {
+    println!("{}", green_str(text))
+}
+
+fn warn_str(text: &str) -> String {
+    format!("{} {}", "WARN:".bold().red(), text)
 }
 
 fn warn(text: &str) {
-    yellow_prefix("WARN:", text)
+    println!("{}", warn_str(text))
+}
+
+fn info_str(text: &str) -> String {
+    format!("{} {}", "INFO:".bold().yellow(), text)
 }
 
 fn info(text: &str) {
-    yellow_prefix("INFO:", text)
+    println!("{}", info_str(text))
 }
 
 const PROMOTER_TEMPLATE: &str = r###"[[promoter]]
@@ -1806,3 +1950,307 @@ new.role = "Primary"
 
 const DEBUGGER_TEMPLATE: &str = r###"[[debugger]]
 # NOTE: make sure the log level in your [[log]] section is at least on level 'debug'"###;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn setup_snippets_dir() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("foo.toml"), "[[promoter]]").unwrap();
+        fs::write(dir.path().join("bar.toml.disabled"), "[[promoter]]").unwrap();
+        fs::write(dir.path().join("baz.toml"), "[[promoter]]").unwrap();
+        dir
+    }
+
+    // --- snippet_state_of ---
+
+    #[test]
+    fn snippet_state_of_toml() {
+        assert_eq!(
+            snippet_state_of(Path::new("/etc/drbd-reactor.d/foo.toml")),
+            Some(SnippetState::Enabled)
+        );
+    }
+
+    #[test]
+    fn snippet_state_of_toml_disabled() {
+        assert_eq!(
+            snippet_state_of(Path::new("/etc/drbd-reactor.d/foo.toml.disabled")),
+            Some(SnippetState::Disabled)
+        );
+    }
+
+    #[test]
+    fn snippet_state_of_no_extension() {
+        assert_eq!(snippet_state_of(Path::new("foo")), None);
+    }
+
+    #[test]
+    fn snippet_state_of_wrong_extension() {
+        assert_eq!(snippet_state_of(Path::new("foo.txt")), None);
+    }
+
+    #[test]
+    fn snippet_state_of_dotted_stem() {
+        assert_eq!(
+            snippet_state_of(Path::new("my.service.toml")),
+            Some(SnippetState::Enabled)
+        );
+        assert_eq!(
+            snippet_state_of(Path::new("my.service.toml.disabled")),
+            Some(SnippetState::Disabled)
+        );
+    }
+
+    // --- with_snippet_extension ---
+
+    #[test]
+    fn with_snippet_extension_bare_to_enabled() {
+        assert_eq!(
+            with_snippet_extension(Path::new("foo"), SnippetState::Enabled),
+            PathBuf::from("foo.toml")
+        );
+    }
+
+    #[test]
+    fn with_snippet_extension_bare_to_disabled() {
+        assert_eq!(
+            with_snippet_extension(Path::new("foo"), SnippetState::Disabled),
+            PathBuf::from("foo.toml.disabled")
+        );
+    }
+
+    #[test]
+    fn with_snippet_extension_enabled_to_disabled() {
+        assert_eq!(
+            with_snippet_extension(Path::new("foo.toml"), SnippetState::Disabled),
+            PathBuf::from("foo.toml.disabled")
+        );
+    }
+
+    #[test]
+    fn with_snippet_extension_disabled_to_enabled() {
+        assert_eq!(
+            with_snippet_extension(Path::new("foo.toml.disabled"), SnippetState::Enabled),
+            PathBuf::from("foo.toml")
+        );
+    }
+
+    #[test]
+    fn with_snippet_extension_dotted_stem() {
+        assert_eq!(
+            with_snippet_extension(Path::new("my.service.toml"), SnippetState::Disabled),
+            PathBuf::from("my.service.toml.disabled")
+        );
+        assert_eq!(
+            with_snippet_extension(Path::new("my.service.toml.disabled"), SnippetState::Enabled),
+            PathBuf::from("my.service.toml")
+        );
+    }
+
+    // --- opposite_snippet_path ---
+
+    #[test]
+    fn opposite_of_toml() {
+        assert_eq!(
+            opposite_snippet_path(Path::new("/etc/foo.toml")),
+            Some(PathBuf::from("/etc/foo.toml.disabled"))
+        );
+    }
+
+    #[test]
+    fn opposite_of_toml_disabled() {
+        assert_eq!(
+            opposite_snippet_path(Path::new("/etc/foo.toml.disabled")),
+            Some(PathBuf::from("/etc/foo.toml"))
+        );
+    }
+
+    #[test]
+    fn opposite_of_no_extension() {
+        assert_eq!(opposite_snippet_path(Path::new("foo")), None);
+    }
+
+    // --- resolve_snippets ---
+
+    #[test]
+    fn resolve_bare_name_enabled() {
+        let dir = setup_snippets_dir();
+        let result = resolve_snippets(dir.path(), Some(&["foo".into()]), SnippetState::Enabled);
+        assert_eq!(result, vec![dir.path().join("foo.toml")]);
+    }
+
+    #[test]
+    fn resolve_bare_name_disabled() {
+        let dir = setup_snippets_dir();
+        let result = resolve_snippets(dir.path(), Some(&["foo".into()]), SnippetState::Disabled);
+        assert_eq!(result, vec![dir.path().join("foo.toml.disabled")]);
+    }
+
+    #[test]
+    fn resolve_name_with_toml_extension() {
+        let dir = setup_snippets_dir();
+        let result = resolve_snippets(
+            dir.path(),
+            Some(&["foo.toml".into()]),
+            SnippetState::Enabled,
+        );
+        assert_eq!(result, vec![dir.path().join("foo.toml")]);
+    }
+
+    #[test]
+    fn resolve_name_with_toml_disabled_extension() {
+        // This is the bug fix: .toml.disabled must be accepted
+        let dir = setup_snippets_dir();
+        let result = resolve_snippets(
+            dir.path(),
+            Some(&["bar.toml.disabled".into()]),
+            SnippetState::Disabled,
+        );
+        assert_eq!(result, vec![dir.path().join("bar.toml.disabled")]);
+    }
+
+    #[test]
+    fn resolve_absolute_path_passthrough() {
+        let dir = setup_snippets_dir();
+        let abs = dir.path().join("foo.toml");
+        let result = resolve_snippets(
+            dir.path(),
+            Some(&[abs.to_str().unwrap().into()]),
+            SnippetState::Enabled,
+        );
+        assert_eq!(result, vec![abs]);
+    }
+
+    #[test]
+    fn resolve_no_configs_globs_enabled() {
+        let dir = setup_snippets_dir();
+        let result = resolve_snippets(dir.path(), None, SnippetState::Enabled);
+        assert_eq!(
+            result,
+            vec![dir.path().join("baz.toml"), dir.path().join("foo.toml")]
+        );
+    }
+
+    #[test]
+    fn resolve_no_configs_globs_disabled() {
+        let dir = setup_snippets_dir();
+        let result = resolve_snippets(dir.path(), None, SnippetState::Disabled);
+        assert_eq!(result, vec![dir.path().join("bar.toml.disabled")]);
+    }
+
+    #[test]
+    fn resolve_multiple_configs() {
+        let dir = setup_snippets_dir();
+        let result = resolve_snippets(
+            dir.path(),
+            Some(&["foo".into(), "baz.toml".into()]),
+            SnippetState::Enabled,
+        );
+        assert_eq!(
+            result,
+            vec![dir.path().join("foo.toml"), dir.path().join("baz.toml")]
+        );
+    }
+
+    // --- validate_snippets ---
+
+    #[test]
+    fn validate_rejects_wrong_extension() {
+        let dir = setup_snippets_dir();
+        fs::write(dir.path().join("foo.txt"), "").unwrap();
+        let paths = vec![dir.path().join("foo.txt")];
+        let result = validate_snippets(dir.path(), &paths, false);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn validate_rejects_outside_snippets_path() {
+        let dir = setup_snippets_dir();
+        let paths = vec![PathBuf::from("/tmp/foo.toml")];
+        let result = validate_snippets(dir.path(), &paths, false);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn validate_rejects_nonexistent_when_required() {
+        let dir = setup_snippets_dir();
+        let paths = vec![dir.path().join("nonexistent.toml")];
+        let result = validate_snippets(dir.path(), &paths, true);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn validate_allows_nonexistent_when_not_required() {
+        let dir = setup_snippets_dir();
+        let paths = vec![dir.path().join("newfile.toml")];
+        let result = validate_snippets(dir.path(), &paths, false);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn validate_accepts_existing_file() {
+        let dir = setup_snippets_dir();
+        let paths = vec![dir.path().join("foo.toml")];
+        let result = validate_snippets(dir.path(), &paths, true);
+        assert_eq!(result, paths);
+    }
+
+    #[test]
+    fn validate_warns_when_opposite_exists() {
+        let dir = setup_snippets_dir();
+        // foo.toml already exists, create its opposite too
+        fs::write(dir.path().join("foo.toml.disabled"), "").unwrap();
+        let paths = vec![dir.path().join("foo.toml")];
+        let result = validate_snippets(dir.path(), &paths, true);
+        // Still returned (warning, not rejection)
+        assert_eq!(result.len(), 1);
+    }
+
+    // --- get_disabled_path / get_enabled_path ---
+
+    #[test]
+    fn disabled_path_from_toml() {
+        assert_eq!(
+            get_disabled_path(Path::new("/etc/drbd-reactor.d/foo.toml")),
+            PathBuf::from("/etc/drbd-reactor.d/foo.toml.disabled")
+        );
+    }
+
+    #[test]
+    fn enabled_path_from_disabled() {
+        assert_eq!(
+            get_enabled_path(Path::new("/etc/drbd-reactor.d/foo.toml.disabled")).unwrap(),
+            PathBuf::from("/etc/drbd-reactor.d/foo.toml")
+        );
+    }
+
+    #[test]
+    fn disabled_path_dotted_stem() {
+        assert_eq!(
+            get_disabled_path(Path::new("/etc/drbd-reactor.d/my.service.toml")),
+            PathBuf::from("/etc/drbd-reactor.d/my.service.toml.disabled")
+        );
+    }
+
+    #[test]
+    fn enabled_path_dotted_stem() {
+        assert_eq!(
+            get_enabled_path(Path::new("/etc/drbd-reactor.d/my.service.toml.disabled")).unwrap(),
+            PathBuf::from("/etc/drbd-reactor.d/my.service.toml")
+        );
+    }
+
+    #[test]
+    fn enabled_path_rejects_already_enabled() {
+        assert!(get_enabled_path(Path::new("/etc/drbd-reactor.d/foo.toml")).is_err());
+    }
+
+    #[test]
+    fn enabled_path_rejects_no_extension() {
+        assert!(get_enabled_path(Path::new("/etc/drbd-reactor.d/foo")).is_err());
+    }
+}
