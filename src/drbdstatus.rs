@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::process::{Command, Stdio};
 
@@ -43,7 +43,8 @@ pub fn get(name: &str) -> Result<Resource> {
         .arg("--show-defaults")
         .arg("--json")
         .arg(name)
-        .output()?;
+        .output()
+        .with_context(|| "Could not execute 'drbdsetup'")?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
             "'drbdsetup show' not executed successfully"

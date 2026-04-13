@@ -579,7 +579,8 @@ fn has_autoload() -> Result<bool> {
         .arg("is-active")
         .arg("-q")
         .arg(REACTOR_RELOAD_PATH)
-        .status()?;
+        .status()
+        .with_context(|| "Could not execute 'systemctl'")?;
     Ok(status.success())
 }
 
@@ -947,8 +948,7 @@ fn restart(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterCo
 }
 
 fn read_config(snippet_path: &Path) -> Result<config::Config> {
-    let content = config::read_snippets(&[snippet_path])
-        .with_context(|| "Could not read config snippets".to_string())?;
+    let content = config::read_snippets(&[snippet_path])?;
     let config = toml::from_str(&content).with_context(|| {
         format!("Could not parse config files including snippets; content: {content}")
     })?;
@@ -1099,7 +1099,9 @@ fn read_nodes(cluster: &ClusterConf) -> Result<Vec<Node>> {
     let cfg = match cfg.nodes_script {
         Some(script) => {
             let script = cfg_dir()?.join(script);
-            let output = Command::new(&script).output()?;
+            let output = Command::new(&script)
+                .output()
+                .with_context(|| format!("Could not execute script '{}'", script.display()))?;
             if !output.status.success() {
                 return Err(anyhow::anyhow!(
                     "Script '{}', did not return successfully",
@@ -1138,7 +1140,8 @@ fn pexec(cmds: &[Vec<String>]) -> Result<Vec<Output>> {
         let process = Command::new(&cmd[0])
             .args(&cmd[1..])
             .stdin(Stdio::null())
-            .spawn()?;
+            .spawn()
+            .with_context(|| format!("Could not execute '{}'", cmd[0]))?;
 
         threads.push(thread::spawn(move || process.wait_with_output()));
     }

@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 use std::slice::Iter;
 use std::str::FromStr;
 
+use anyhow::Context;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -1316,7 +1317,8 @@ pub fn get_primary(drbd_resource: &str) -> anyhow::Result<PrimaryOn> {
         .arg("status")
         .arg("--json")
         .arg(drbd_resource)
-        .output()?;
+        .output()
+        .with_context(|| "Could not execute 'drbdsetup'")?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
             "'drbdsetup status' not executed successfully"

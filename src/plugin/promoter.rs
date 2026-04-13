@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{debug, error, info, trace, warn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -581,7 +581,8 @@ fn get_backing_devices(resname: &str) -> Result<Vec<String>> {
         .stdin(Stdio::null())
         .arg("sh-ll-dev")
         .arg(resname)
-        .output()?;
+        .output()
+        .with_context(|| "Could not execute 'drbdadm'")?;
     if !shlldev.status.success() {
         return Err(anyhow::anyhow!(
             "'drbdadm sh-ll-dev {resname}' not executed successfully, stdout: '{}', stderr: '{}'",
@@ -602,7 +603,8 @@ fn get_target_services(target: &str) -> Result<Vec<String>> {
         .arg("--no-pager")
         .arg("--plain")
         .arg(target)
-        .output()?;
+        .output()
+        .with_context(|| "Could not execute 'systemctl'")?;
     if !deps.status.success() {
         return Err(anyhow::anyhow!(
             "'systemctl list-dependencies --no-pager --plain {target}' not executed successfully, stdout: '{}', stderr: '{}'",

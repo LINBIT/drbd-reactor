@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::sync::OnceLock;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use colored::Colorize;
 use shell_words;
 
@@ -58,7 +58,8 @@ pub fn show_property(unit: &str, property: &str) -> Result<String> {
         .arg("show")
         .arg(format!("--property={property}"))
         .arg(unit)
-        .output()?;
+        .output()
+        .with_context(|| "Could not execute 'systemctl'")?;
     let output = std::str::from_utf8(&output.stdout)?;
     // split_once('=') would be more elegant, but we want to support old rustc (e.g., bullseye)
     let mut split = output.splitn(2, '=');

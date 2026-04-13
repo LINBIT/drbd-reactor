@@ -2,7 +2,7 @@ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::{fmt, fs};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::LevelFilter;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
@@ -119,7 +119,12 @@ fn default_log() -> Vec<LogConfig> {
 pub fn read_snippets(path: impl IntoIterator<Item = impl AsRef<Path>>) -> Result<String> {
     let mut s = "\n".to_string();
     for snippet in path {
-        s.push_str(&fs::read_to_string(snippet)?);
+        let snippet = snippet.as_ref();
+        s.push_str(
+            &fs::read_to_string(snippet).with_context(|| {
+                format!("Could not read config snippet '{}'", snippet.display())
+            })?,
+        );
         s.push('\n');
     }
 
