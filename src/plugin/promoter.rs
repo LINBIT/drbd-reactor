@@ -687,6 +687,10 @@ fn generate_systemd_templates(
 
     let ocf_pattern = Regex::new(OCF_PATTERN)?;
 
+    if actions.is_empty() {
+        warn!("Resource '{}' has an empty start list", name);
+    }
+
     for action in actions {
         let action = action.trim();
         let deps = match target_requires.last() {
