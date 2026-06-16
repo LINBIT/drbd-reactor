@@ -506,6 +506,7 @@ pub enum EventUpdate {
     Stop,
     Reload,
     Flush,
+    DumpConfig,
 }
 
 make_matchable![

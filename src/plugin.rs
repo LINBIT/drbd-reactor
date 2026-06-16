@@ -90,6 +90,24 @@ pub enum PluginCfg {
 }
 
 impl PluginCfg {
+    /// Serialize this plugin configuration as a TOML snippet matching the
+    /// on-disk config format, i.e. as an array-of-tables entry such as
+    /// `[[promoter]]`. The config is wrapped under its plugin key so that
+    /// nested tables get the correct path prefix (e.g. `[promoter.resources.x]`).
+    pub fn to_toml(&self) -> Result<String> {
+        let (header, value) = match self {
+            PluginCfg::Promoter(c) => ("promoter", toml::Value::try_from(c)?),
+            PluginCfg::Debugger(c) => ("debugger", toml::Value::try_from(c)?),
+            PluginCfg::UMH(c) => ("umh", toml::Value::try_from(c)?),
+            PluginCfg::Prometheus(c) => ("prometheus", toml::Value::try_from(c)?),
+            PluginCfg::AgentX(c) => ("agentx", toml::Value::try_from(c)?),
+        };
+
+        let mut root = toml::map::Map::new();
+        root.insert(header.to_string(), toml::Value::Array(vec![value]));
+        toml::to_string_pretty(&toml::Value::Table(root)).map_err(Into::into)
+    }
+
     fn plugin_type(&self) -> PluginType {
         match *self {
             PluginCfg::Promoter(_) => PluginType::Change,

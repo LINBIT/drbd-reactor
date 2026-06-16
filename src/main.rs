@@ -7,7 +7,7 @@ use std::{io, sync, thread};
 
 use anyhow::{Context, Result};
 
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use signal_hook::iterator::Signals;
 use structopt::StructOpt;
 
@@ -143,6 +143,16 @@ impl Core {
                 EventUpdate::Stop => return Ok(CoreExit::Stop),
                 EventUpdate::Reload => return Ok(CoreExit::Reload),
                 EventUpdate::Flush => return Ok(CoreExit::Flush),
+                EventUpdate::DumpConfig => {
+                    for cfg in started.keys() {
+                        match cfg.to_toml() {
+                            Ok(toml) => info!("main: plugin config:\n{toml}"),
+                            Err(e) => {
+                                warn!("main: could not serialize plugin config as TOML: {e:#}")
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -254,7 +264,7 @@ fn main() -> Result<()> {
 }
 
 fn setup_signals(events: crossbeam_channel::Sender<EventUpdate>) -> Result<()> {
-    let mut signals = Signals::new(&[libc::SIGHUP, libc::SIGINT, libc::SIGTERM])?;
+    let mut signals = Signals::new(&[libc::SIGHUP, libc::SIGINT, libc::SIGTERM, libc::SIGUSR1])?;
     debug!("signal-handler: set up done");
 
     thread::spawn(move || {
@@ -263,6 +273,7 @@ fn setup_signals(events: crossbeam_channel::Sender<EventUpdate>) -> Result<()> {
             let event = match signal as libc::c_int {
                 libc::SIGHUP => EventUpdate::Reload,
                 libc::SIGINT | libc::SIGTERM => EventUpdate::Stop,
+                libc::SIGUSR1 => EventUpdate::DumpConfig,
                 _ => unreachable!(),
             };
 
