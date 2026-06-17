@@ -1321,7 +1321,9 @@ pub fn get_primary(drbd_resource: &str) -> anyhow::Result<PrimaryOn> {
         .with_context(|| "Could not execute 'drbdsetup'")?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
-            "'drbdsetup status' not executed successfully"
+            "'drbdsetup status --json {drbd_resource}' not executed successfully, stdout: '{}', stderr: '{}'",
+            String::from_utf8(output.stdout).unwrap_or("<Could not convert stdout>".to_string()),
+            String::from_utf8(output.stderr).unwrap_or("<Could not convert stderr>".to_string())
         ));
     }
 

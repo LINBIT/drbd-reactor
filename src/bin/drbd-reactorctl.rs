@@ -680,7 +680,7 @@ fn status(
                     continue;
                 }
                 let target = systemd::escaped_services_target(&drbd_res);
-                let primary_on = drbd::get_primary(&drbd_res)?;
+                let primary_on = drbd::get_primary(&drbd_res).unwrap_or(PrimaryOn::None);
                 // target itself and the implicit one
                 let promote_service = promote_service(&drbd_res);
                 let mut dependencies = Vec::new();
