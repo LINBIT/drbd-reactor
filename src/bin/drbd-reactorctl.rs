@@ -1023,7 +1023,7 @@ fn get_snippets_path(path: &PathBuf) -> Option<PathBuf> {
         .ok()?
 }
 
-fn resolve_snippets(
+fn resolve_snippet_candidates(
     snippets_path: &Path,
     configs: Option<&[String]>,
     state: SnippetState,
@@ -1083,8 +1083,8 @@ fn snippets_from_matches(
     let cfgs: Option<Vec<String>> = matches
         .values_of("configs")
         .map(|v| v.map(String::from).collect());
-    let resolved = resolve_snippets(snippets_path, cfgs.as_deref(), state);
-    validate_snippets(snippets_path, &resolved, require_exists)
+    let resolved = resolve_snippet_candidates(snippets_path, cfgs.as_deref(), state);
+    valid_snippets(snippets_path, &resolved, require_exists)
 }
 
 /// Warn once for each snippet that has both its enabled (.toml) and disabled
@@ -1106,40 +1106,39 @@ fn warn_if_both_exist<'a>(paths: impl IntoIterator<Item = &'a PathBuf>) {
     }
 }
 
-fn validate_snippets(
-    snippets_path: &Path,
-    paths: &[PathBuf],
-    require_exists: bool,
-) -> Vec<PathBuf> {
+fn validate_snippet(snippets_path: &Path, path: &PathBuf, require_exists: bool) -> Result<()> {
+    if snippet_state_of(path).is_none() {
+        return Err(anyhow::anyhow!(
+            "File '{}' does not have a recognized extension (.toml or .toml.disabled), \
+                 ignoring",
+            path.display()
+        ));
+    }
+
+    if !path.starts_with(snippets_path) {
+        return Err(anyhow::anyhow!(
+            "File '{}' is not within snippets path '{}', ignoring",
+            path.display(),
+            snippets_path.display()
+        ));
+    }
+
+    if require_exists && !path.is_file() {
+        return Err(anyhow::anyhow!(
+            "File '{}' does not exist or is not a regular file, ignoring",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+fn valid_snippets(snippets_path: &Path, paths: &[PathBuf], require_exists: bool) -> Vec<PathBuf> {
     let mut valid = Vec::new();
     for path in paths {
-        if snippet_state_of(path).is_none() {
-            eprintln!(
-                "File '{}' does not have a recognized extension (.toml or .toml.disabled), \
-                 ignoring",
-                path.display()
-            );
-            continue;
+        match validate_snippet(snippets_path, path, require_exists) {
+            Ok(()) => valid.push(path.clone()),
+            Err(e) => eprintln!("{:#}", e),
         }
-
-        if !path.starts_with(snippets_path) {
-            eprintln!(
-                "File '{}' is not within snippets path '{}', ignoring",
-                path.display(),
-                snippets_path.display()
-            );
-            continue;
-        }
-
-        if require_exists && !path.is_file() {
-            eprintln!(
-                "File '{}' does not exist or is not a regular file, ignoring",
-                path.display()
-            );
-            continue;
-        }
-
-        valid.push(path.clone());
     }
     warn_if_both_exist(&valid);
     valid
@@ -1149,8 +1148,21 @@ fn resolve_and_warn_both(
     snippets_path: &Path,
     configs: Option<&[String]>,
 ) -> (Vec<PathBuf>, Vec<PathBuf>) {
-    let enabled = resolve_snippets(snippets_path, configs, SnippetState::Enabled);
-    let disabled = resolve_snippets(snippets_path, configs, SnippetState::Disabled);
+    // For explicitly named configs `resolve_snippet_candidates` synthesizes a path for the
+    // requested state regardless of what is actually present on disk (e.g. asking
+    // for the disabled variant yields `foo.toml.disabled` even when only `foo.toml`
+    // exists). Drop the non-existent ones so callers only ever see real snippets,
+    // matching the behavior of the directory-scan (no configs) case.
+    let enabled: Vec<PathBuf> =
+        resolve_snippet_candidates(snippets_path, configs, SnippetState::Enabled)
+            .into_iter()
+            .filter(|p| validate_snippet(snippets_path, p, true).is_ok())
+            .collect();
+    let disabled: Vec<PathBuf> =
+        resolve_snippet_candidates(snippets_path, configs, SnippetState::Disabled)
+            .into_iter()
+            .filter(|p| validate_snippet(snippets_path, p, true).is_ok())
+            .collect();
 
     warn_if_both_exist(enabled.iter().chain(disabled.iter()));
 
@@ -2074,26 +2086,28 @@ mod tests {
         assert_eq!(opposite_snippet_path(Path::new("foo")), None);
     }
 
-    // --- resolve_snippets ---
+    // --- resolve_snippet_candidates ---
 
     #[test]
     fn resolve_bare_name_enabled() {
         let dir = setup_snippets_dir();
-        let result = resolve_snippets(dir.path(), Some(&["foo".into()]), SnippetState::Enabled);
+        let result =
+            resolve_snippet_candidates(dir.path(), Some(&["foo".into()]), SnippetState::Enabled);
         assert_eq!(result, vec![dir.path().join("foo.toml")]);
     }
 
     #[test]
     fn resolve_bare_name_disabled() {
         let dir = setup_snippets_dir();
-        let result = resolve_snippets(dir.path(), Some(&["foo".into()]), SnippetState::Disabled);
+        let result =
+            resolve_snippet_candidates(dir.path(), Some(&["foo".into()]), SnippetState::Disabled);
         assert_eq!(result, vec![dir.path().join("foo.toml.disabled")]);
     }
 
     #[test]
     fn resolve_name_with_toml_extension() {
         let dir = setup_snippets_dir();
-        let result = resolve_snippets(
+        let result = resolve_snippet_candidates(
             dir.path(),
             Some(&["foo.toml".into()]),
             SnippetState::Enabled,
@@ -2105,7 +2119,7 @@ mod tests {
     fn resolve_name_with_toml_disabled_extension() {
         // This is the bug fix: .toml.disabled must be accepted
         let dir = setup_snippets_dir();
-        let result = resolve_snippets(
+        let result = resolve_snippet_candidates(
             dir.path(),
             Some(&["bar.toml.disabled".into()]),
             SnippetState::Disabled,
@@ -2117,7 +2131,7 @@ mod tests {
     fn resolve_absolute_path_passthrough() {
         let dir = setup_snippets_dir();
         let abs = dir.path().join("foo.toml");
-        let result = resolve_snippets(
+        let result = resolve_snippet_candidates(
             dir.path(),
             Some(&[abs.to_str().unwrap().into()]),
             SnippetState::Enabled,
@@ -2128,7 +2142,7 @@ mod tests {
     #[test]
     fn resolve_no_configs_globs_enabled() {
         let dir = setup_snippets_dir();
-        let result = resolve_snippets(dir.path(), None, SnippetState::Enabled);
+        let result = resolve_snippet_candidates(dir.path(), None, SnippetState::Enabled);
         assert_eq!(
             result,
             vec![dir.path().join("baz.toml"), dir.path().join("foo.toml")]
@@ -2138,14 +2152,14 @@ mod tests {
     #[test]
     fn resolve_no_configs_globs_disabled() {
         let dir = setup_snippets_dir();
-        let result = resolve_snippets(dir.path(), None, SnippetState::Disabled);
+        let result = resolve_snippet_candidates(dir.path(), None, SnippetState::Disabled);
         assert_eq!(result, vec![dir.path().join("bar.toml.disabled")]);
     }
 
     #[test]
     fn resolve_multiple_configs() {
         let dir = setup_snippets_dir();
-        let result = resolve_snippets(
+        let result = resolve_snippet_candidates(
             dir.path(),
             Some(&["foo".into(), "baz.toml".into()]),
             SnippetState::Enabled,
@@ -2163,7 +2177,7 @@ mod tests {
         let dir = setup_snippets_dir();
         fs::write(dir.path().join("foo.txt"), "").unwrap();
         let paths = vec![dir.path().join("foo.txt")];
-        let result = validate_snippets(dir.path(), &paths, false);
+        let result = valid_snippets(dir.path(), &paths, false);
         assert!(result.is_empty());
     }
 
@@ -2171,7 +2185,7 @@ mod tests {
     fn validate_rejects_outside_snippets_path() {
         let dir = setup_snippets_dir();
         let paths = vec![PathBuf::from("/tmp/foo.toml")];
-        let result = validate_snippets(dir.path(), &paths, false);
+        let result = valid_snippets(dir.path(), &paths, false);
         assert!(result.is_empty());
     }
 
@@ -2179,7 +2193,7 @@ mod tests {
     fn validate_rejects_nonexistent_when_required() {
         let dir = setup_snippets_dir();
         let paths = vec![dir.path().join("nonexistent.toml")];
-        let result = validate_snippets(dir.path(), &paths, true);
+        let result = valid_snippets(dir.path(), &paths, true);
         assert!(result.is_empty());
     }
 
@@ -2187,7 +2201,7 @@ mod tests {
     fn validate_allows_nonexistent_when_not_required() {
         let dir = setup_snippets_dir();
         let paths = vec![dir.path().join("newfile.toml")];
-        let result = validate_snippets(dir.path(), &paths, false);
+        let result = valid_snippets(dir.path(), &paths, false);
         assert_eq!(result.len(), 1);
     }
 
@@ -2195,7 +2209,7 @@ mod tests {
     fn validate_accepts_existing_file() {
         let dir = setup_snippets_dir();
         let paths = vec![dir.path().join("foo.toml")];
-        let result = validate_snippets(dir.path(), &paths, true);
+        let result = valid_snippets(dir.path(), &paths, true);
         assert_eq!(result, paths);
     }
 
@@ -2205,9 +2219,30 @@ mod tests {
         // foo.toml already exists, create its opposite too
         fs::write(dir.path().join("foo.toml.disabled"), "").unwrap();
         let paths = vec![dir.path().join("foo.toml")];
-        let result = validate_snippets(dir.path(), &paths, true);
+        let result = valid_snippets(dir.path(), &paths, true);
         // Still returned (warning, not rejection)
         assert_eq!(result.len(), 1);
+    }
+
+    // --- resolve_and_warn_both ---
+
+    #[test]
+    fn resolve_and_warn_both_drops_nonexistent_synthesized_paths() {
+        // Only foo.toml exists (no foo.toml.disabled). Asking for "foo"
+        // must not synthesize a non-existent disabled variant.
+        let dir = setup_snippets_dir();
+        let (enabled, disabled) = resolve_and_warn_both(dir.path(), Some(&["foo".into()]));
+        assert_eq!(enabled, vec![dir.path().join("foo.toml")]);
+        assert!(disabled.is_empty());
+    }
+
+    #[test]
+    fn resolve_and_warn_both_keeps_both_when_both_exist() {
+        let dir = setup_snippets_dir();
+        fs::write(dir.path().join("foo.toml.disabled"), "[[promoter]]").unwrap();
+        let (enabled, disabled) = resolve_and_warn_both(dir.path(), Some(&["foo".into()]));
+        assert_eq!(enabled, vec![dir.path().join("foo.toml")]);
+        assert_eq!(disabled, vec![dir.path().join("foo.toml.disabled")]);
     }
 
     // --- get_disabled_path / get_enabled_path ---
