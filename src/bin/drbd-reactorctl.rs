@@ -1748,19 +1748,24 @@ impl Status {
         let mut w = String::new();
 
         for p in &self.promoter {
-            write!(w, "{}", p.terminal(verbose)?)?;
+            writeln!(w, "{}:", p.path.display())?;
+            writeln!(w, "{}", p.terminal(verbose)?)?;
         }
         for p in &self.prometheus {
-            write!(w, "{}", p.terminal(verbose)?)?;
+            writeln!(w, "{}:", p.path.display())?;
+            writeln!(w, "{}", p.terminal(verbose)?)?;
         }
         for p in &self.debugger {
-            write!(w, "{}", p.terminal(verbose)?)?;
+            writeln!(w, "{}:", p.path.display())?;
+            writeln!(w, "{}", p.terminal(verbose)?)?;
         }
         for p in &self.umh {
-            write!(w, "{}", p.terminal(verbose)?)?;
+            writeln!(w, "{}:", p.path.display())?;
+            writeln!(w, "{}", p.terminal(verbose)?)?;
         }
         for p in &self.agentx {
-            write!(w, "{}", p.terminal(verbose)?)?;
+            writeln!(w, "{}:", p.path.display())?;
+            writeln!(w, "{}", p.terminal(verbose)?)?;
         }
 
         Ok(w)
@@ -1784,13 +1789,11 @@ struct PromoterStatus {
 impl PromoterStatus {
     fn terminal(&self, verbose: bool) -> Result<String> {
         let mut w = String::new();
-        writeln!(w, "{}:", self.path.display())?;
         let state = enabled_str(self.enabled);
         writeln!(
             w,
-            "Promoter: Resource {}{} currently active on {}",
+            "Promoter: Resource {}{state} currently active on {}",
             self.drbd_resource,
-            state,
             self.primary_on.terminal(verbose)?
         )?;
 
@@ -1841,9 +1844,10 @@ struct PrometheusStatus {
 impl PrometheusStatus {
     fn terminal(&self, verbose: bool) -> Result<String> {
         let mut w = String::new();
+        let state = enabled_str(self.enabled);
         writeln!(
             w,
-            "Prometheus: listening on {}",
+            "Prometheus{state}: listening on {}",
             self.address.to_string().bold().green()
         )?;
 
@@ -1869,7 +1873,8 @@ struct DebuggerStatus {
 impl DebuggerStatus {
     fn terminal(&self, _verbose: bool) -> Result<String> {
         let mut w = String::new();
-        writeln!(w, "Debugger: {}", "started".bold().green())?;
+        let state = enabled_str(self.enabled);
+        writeln!(w, "Debugger{state}: {}", "started".bold().green())?;
         Ok(w)
     }
 }
@@ -1883,7 +1888,8 @@ struct UMHStatus {
 impl UMHStatus {
     fn terminal(&self, _verbose: bool) -> Result<String> {
         let mut w = String::new();
-        writeln!(w, "UMH: {}", "started".bold().green())?;
+        let state = enabled_str(self.enabled);
+        writeln!(w, "UMH{state}: {}", "started".bold().green())?;
         Ok(w)
     }
 }
@@ -1898,9 +1904,10 @@ struct AgentXStatus {
 impl AgentXStatus {
     fn terminal(&self, _verbose: bool) -> Result<String> {
         let mut w = String::new();
+        let state = enabled_str(self.enabled);
         writeln!(
             w,
-            "AgentX: connecting to main agent at {}",
+            "AgentX{state}: connecting to main agent at {}",
             self.address.bold().green()
         )?;
         Ok(w)
