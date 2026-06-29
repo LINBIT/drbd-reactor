@@ -1,3 +1,37 @@
+drbd-reactor (1.12.0~rc.1-1) experimental; urgency=medium
+
+  [ Christoph Böhmwalder ]
+  * debian: update mailing list address
+
+  [ Joel Colledge ]
+  * all: add context when spawning external commands
+
+  [ Moritz Tanner ]
+  * ci: update virter and vmshed
+
+  [ Roland Kammerer ]
+  * .gitignore: add CLAUDE.local.md
+  * core: convert Resource.devices to BTreeMap
+  * core: convert Connection.peerdevices to BTreeMap
+  * core: convert Connection.paths to BTreeMap
+  * core: convert Resource.connections to BTreeMap
+  * core: report plugin errors on core exit
+  * README.md: focal -> jammy
+  * README.md: fix heading hierarchy to have a single top-level heading
+  * ctl,status: report disabled promoter configs and their DRBD role
+  * ctl,ls: drop --disabled
+  * promoter: warn on empty start list
+  * ctl: refactor config snippet path handling
+  * ctl,status: fix for DRBD resources not up
+  * ctl: factor out per-snippet validation
+  * core: dump plugin configs as TOML on SIGUSR1
+  * ctl: improve status
+
+  [ Ryan Ronnander ]
+  * promoter: fix shim path for SUSE/openSUSE
+
+ -- Roland Kammerer <roland.kammerer@linbit.com>  Mon, 29 Jun 2026 13:17:43 +0200
+
 drbd-reactor (1.11.0-1) experimental; urgency=medium
 
   [ Moritz Wanzenböck ]
