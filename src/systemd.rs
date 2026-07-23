@@ -148,7 +148,9 @@ pub fn escaped_ocf_parse_to_env(
     let args = shell_words::split(args)?;
 
     if args.is_empty() {
-        anyhow::bail!("promoter::systemd_ocf: agent needs at least one argument (its name)")
+        return Err(anyhow::anyhow!(
+            "promoter::systemd_ocf: agent needs at least one argument (its name)"
+        ));
     }
 
     let ra_name = &args[0];
@@ -172,10 +174,10 @@ pub fn escaped_ocf_parse_to_env(
     // normalizes it (e.g. a trailing or doubled '/'), keeping OCF_ROOT and AGENT consistent.
     let ocf_root = Path::new(ocf_root);
     if !ocf_root.is_absolute() {
-        anyhow::bail!(
+        return Err(anyhow::anyhow!(
             "promoter::systemd_ocf: ocf-root '{}' is not an absolute path",
             ocf_root.display()
-        );
+        ));
     }
     let ocf_root: PathBuf = ocf_root.components().collect();
     let agent = ocf_root.join("resource.d").join(vendor).join(agent);

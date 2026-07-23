@@ -1,0 +1,3 @@
+disallowed-macros = [
+    { path = "anyhow::bail", reason = "use `return Err(anyhow::anyhow!(...))` or a typed error instead" },
+]
