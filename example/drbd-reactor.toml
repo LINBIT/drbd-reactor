@@ -107,6 +107,11 @@ statistics-poll-interval = 60
 ## triggering a failover to that peer.
 # on-disk-detach = "ignore"
 
+## ocf-root
+## root directory used to locate OCF resource agents (in "$ocf-root/resource.d/").
+## it is also exported to the agent as the OCF_ROOT environment variable.
+# ocf-root = "/usr/lib/ocf"
+
 # Configure a user mode helper filter
 # [[umh]]
 ## Filter type

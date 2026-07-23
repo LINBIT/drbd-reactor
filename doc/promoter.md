@@ -117,6 +117,9 @@ start = [
 OCF agents are expected in `/usr/lib/ocf/resource.d/`. Please make sure to check for `resource-agents`
 packages provided by your distribution or use the packages provided by LINBIT (customers only).
 
+The OCF root can be changed per resource via the `ocf-root` setting (default `/usr/lib/ocf`). It is exported
+to the agent as the `OCF_ROOT` environment variable and used as the prefix for the `resource.d` agent path.
+
 ## Freezing resources
 The default behavior when a DRBD Primary loses quorum is to immediately stop the generated target unit and
 hope that other nodes still having quorum will successfully start the service. This works well if

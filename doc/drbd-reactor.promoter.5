@@ -250,6 +250,20 @@ start = [
   "bar.service"
 ]
 .Ed
+.Pp
+By default OCF agents are looked up below
+.Pa /usr/lib/ocf .
+This can be changed per resource via the
+.Sy ocf-root
+setting, which is exported to the agent as the
+.Sy OCF_ROOT
+environment variable and used as the prefix for the
+.Sy resource.d
+agent path.
+.Bd -literal -offset indent
+[promoter.resources.foo]
+ocf-root = "/usr/lib/ocf"
+.Ed
 .Sh FREEZING RESOURCES
 The default behavior when a DRBD Primary loses quorum is to immediately stop
 the generated target unit and hope that other nodes still having quorum will
@@ -392,7 +406,9 @@ found, triggering a failover to that peer.
 .Sh FILES
 .Bl -tag -compact
 .It Pa /usr/lib/ocf/resource.d/
-Path used for for OCF agents.
+Default path used for OCF agents; configurable via the
+.Sy ocf-root
+setting.
 .El
 .Sh EXAMPLES
 This configures a promoter for resource

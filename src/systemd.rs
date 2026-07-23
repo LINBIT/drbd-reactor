@@ -143,6 +143,7 @@ pub fn escaped_ocf_parse_to_env(
     vendor: &str,
     agent: &str,
     args: &str,
+    ocf_root: &str,
 ) -> Result<(String, Vec<String>)> {
     let args = shell_words::split(args)?;
 
@@ -165,11 +166,25 @@ pub fn escaped_ocf_parse_to_env(
         env.push(add)
     }
 
+    // ocf_root ends up in OCF_ROOT and as the prefix of the AGENT path, which the wrapper
+    // executes via Command::new(). A relative path would generate a bogus AGENT= that could
+    // never be found, so require it to be absolute. Rebuilding it from its components also
+    // normalizes it (e.g. a trailing or doubled '/'), keeping OCF_ROOT and AGENT consistent.
+    let ocf_root = Path::new(ocf_root);
+    if !ocf_root.is_absolute() {
+        anyhow::bail!(
+            "promoter::systemd_ocf: ocf-root '{}' is not an absolute path",
+            ocf_root.display()
+        );
+    }
+    let ocf_root: PathBuf = ocf_root.components().collect();
+    let agent = ocf_root.join("resource.d").join(vendor).join(agent);
+
     env.push(format!(
-        "AGENT=/usr/lib/ocf/resource.d/{}/{}",
-        escape_env(vendor),
-        escape_env(agent)
+        "OCF_ROOT={}",
+        escape_env(&ocf_root.to_string_lossy())
     ));
+    env.push(format!("AGENT={}", escape_env(&agent.to_string_lossy())));
 
     Ok((service_name, env))
 }
@@ -236,6 +251,7 @@ fn test_ocf_parse_to_env() {
         "vendor1",
         "agent1",
         "name1\nk1=v1 \nk2=\"with whitespace\" k3=with\\ different\\ whitespace foo empty='' pass='*pass/'",
+        "/usr/lib/ocf",
     )
     .expect("should work");
 
@@ -249,13 +265,35 @@ fn test_ocf_parse_to_env() {
             "OCF_RESKEY_foo=",
             "OCF_RESKEY_empty=",
             "OCF_RESKEY_pass=\\x2apass/",
+            "OCF_ROOT=/usr/lib/ocf",
             "AGENT=/usr/lib/ocf/resource.d/vendor1/agent1"
         ]
     );
 
     // escaping
-    let (name, _env) = escaped_ocf_parse_to_env("res-1", "vendor1", "agent1", "name-1 do not care")
-        .expect("should work");
+    let (name, _env) = escaped_ocf_parse_to_env(
+        "res-1",
+        "vendor1",
+        "agent1",
+        "name-1 do not care",
+        "/usr/lib/ocf",
+    )
+    .expect("should work");
 
     assert_eq!(name, "ocf.rs@name\\x2d1_res\\x2d1.service");
+
+    // a trailing slash in ocf-root does not produce a double slash
+    let (_name, env) =
+        escaped_ocf_parse_to_env("res1", "vendor1", "agent1", "name1", "/usr/lib/ocf/")
+            .expect("should work");
+    assert_eq!(
+        &env[..],
+        &[
+            "OCF_ROOT=/usr/lib/ocf",
+            "AGENT=/usr/lib/ocf/resource.d/vendor1/agent1"
+        ]
+    );
+
+    // a relative ocf-root is rejected
+    assert!(escaped_ocf_parse_to_env("res1", "vendor1", "agent1", "name1", "usr/lib/ocf").is_err());
 }

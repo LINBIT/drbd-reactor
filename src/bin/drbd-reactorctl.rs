@@ -1179,7 +1179,9 @@ fn service_name(start_entry: &str, drbd_res: &str) -> Result<String> {
     let (service_name, _) = match ocf_pattern.captures(start) {
         Some(ocf) => {
             let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-            systemd::escaped_ocf_parse_to_env(drbd_res, vendor, agent, args)?
+            // ocf_root only influences the OCF_ROOT/AGENT env vars, not the service name we
+            // extract here, so the default is fine.
+            systemd::escaped_ocf_parse_to_env(drbd_res, vendor, agent, args, "/usr/lib/ocf")?
         }
         _ => (start.to_string(), Vec::new()),
     };

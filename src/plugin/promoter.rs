@@ -62,6 +62,7 @@ impl Promoter {
                     &res.start,
                     &systemd_settings,
                     res.secondary_force,
+                    &res.ocf_root,
                 )?;
             }
         }
@@ -231,6 +232,8 @@ pub struct PromoterOptResource {
     pub fencing_promote_delay: u64,
     #[serde(default = "default_adjust_resource_on_start")]
     pub adjust_resource_on_start: bool,
+    #[serde(default = "default_ocf_root")]
+    pub ocf_root: String,
 }
 
 fn default_promote_sleep() -> u32 {
@@ -245,6 +248,10 @@ fn default_fence_delay() -> u64 {
 
 fn default_adjust_resource_on_start() -> bool {
     true
+}
+
+fn default_ocf_root() -> String {
+    "/usr/lib/ocf".to_string()
 }
 
 fn systemd_stop(unit: &str) -> Result<()> {
@@ -661,6 +668,7 @@ fn generate_systemd_templates(
     actions: &[String],
     systemd_settings: &SystemdSettings,
     secondary_force: bool,
+    ocf_root: &str,
 ) -> Result<()> {
     let escaped_name = systemd::escape_name(name);
 
@@ -701,7 +709,7 @@ fn generate_systemd_templates(
         let (service_name, env) = match ocf_pattern.captures(action) {
             Some(ocf) => {
                 let (vendor, agent, args) = (&ocf[1], &ocf[2], &ocf[3]);
-                systemd::escaped_ocf_parse_to_env(name, vendor, agent, args)?
+                systemd::escaped_ocf_parse_to_env(name, vendor, agent, args, ocf_root)?
             }
             _ => (action.to_string(), Vec::new()),
         };
