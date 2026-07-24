@@ -395,7 +395,7 @@ fn process_drbd_event(
             }
         }
         PluginUpdate::PeerDevice(u) => {
-            #[allow(clippy::if_same_then_else)]
+            #[allow(clippy::if_same_then_else)] // distinct guards kept separate for readability
             if res.preferred_nodes.is_empty() {
                 return;
             } else if res.preferred_nodes_policy == PreferredNodesPolicy::StartOnly {
@@ -1073,7 +1073,7 @@ fn get_sleep_before_promote_ms(
     debug!("sleep preferred-nodes ({split_brain_avoidance_policy}): '{sleep_pref_nodes}'");
     sleep_s += sleep_pref_nodes;
 
-    #[allow(clippy::collapsible_if)]
+    #[allow(clippy::collapsible_if)] // kept nested for readability
     if split_brain_avoidance_policy == &SplitBrainAvoidancePolicy::Fencing {
         // when the system is up an running, we can expect current connection state,
         // but during the very initial startup we get an "exists resource may_promote:yes"
