@@ -66,6 +66,8 @@ test:clippy:
     CARGO_HOME: $CI_PROJECT_DIR/.cargo
   script:
     - cargo clippy --no-deps --all-features --message-format=json | clippy2codeclimate codequality.json
+    # the piped command above only generates the report; this one fails the job on any warning
+    - cargo clippy --no-deps --all-features -- -D warnings
   artifacts:
     reports:
       codequality:
