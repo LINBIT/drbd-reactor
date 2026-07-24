@@ -43,7 +43,7 @@ fn main() {
 fn _main() -> Result<ExitCode> {
     setup_logger()?;
 
-    let mut signals = Signals::new(&[libc::SIGINT, libc::SIGTERM])?;
+    let mut signals = Signals::new([libc::SIGINT, libc::SIGTERM])?;
     thread::spawn(move || {
         for _ in signals.forever() {
             TERMINATE.store(true, Ordering::Relaxed);

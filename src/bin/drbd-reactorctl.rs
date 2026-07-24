@@ -106,7 +106,7 @@ struct ClusterConf<'a> {
 }
 
 fn main() -> Result<()> {
-    let mut signals = Signals::new(&[libc::SIGINT, libc::SIGTERM])?;
+    let mut signals = Signals::new([libc::SIGINT, libc::SIGTERM])?;
     thread::spawn(move || {
         for _ in signals.forever() {
             TERMINATE.store(true, Ordering::Relaxed);
@@ -246,14 +246,16 @@ fn main() -> Result<()> {
                 .values_of("configs")
                 .map(|v| v.map(String::from).collect());
             let (enabled, disabled) = resolve_and_warn_both(&snippets_path, cfgs.as_deref());
-            status(enabled, disabled, &resources, &cluster)
-                .and_then(|s| Ok(print!("{}", s.format(&format, verbose)?)))
+            let s = status(enabled, disabled, &resources, &cluster)?;
+            print!("{}", s.format(&format, verbose)?);
+            Ok(())
         }
         _ => {
             // pretend it is status
             let (enabled, disabled) = resolve_and_warn_both(&snippets_path, None);
-            status(enabled, disabled, &vec![], &cluster)
-                .and_then(|s| Ok(print!("{}", s.format(&Format::Terminal, false)?)))
+            let s = status(enabled, disabled, &[], &cluster)?;
+            print!("{}", s.format(&Format::Terminal, false)?);
+            Ok(())
         }
     }
 }
@@ -660,7 +662,7 @@ fn tagged_snippets<'a, T>(
 fn status(
     enabled_snippets_paths: Vec<PathBuf>,
     disabled_snippets_paths: Vec<PathBuf>,
-    resources: &Vec<String>,
+    resources: &[String],
     cluster: &ClusterConf,
 ) -> Result<Status> {
     let mut status = Status {
@@ -671,7 +673,7 @@ fn status(
     }
 
     for (enabled, snippet) in tagged_snippets(&enabled_snippets_paths, &disabled_snippets_paths) {
-        let conf = read_config(&snippet)?;
+        let conf = read_config(snippet)?;
         let plugins = conf.plugins;
         for promoter in plugins.promoter {
             for (drbd_res, config) in promoter.resources {
@@ -751,7 +753,7 @@ fn cat(snippets_paths: Vec<PathBuf>, cluster: &ClusterConf) -> Result<()> {
             continue;
         }
         eprintln!("Displaying {}...", snippet.display());
-        for catter in vec!["bat", "batcat", "cat"] {
+        for catter in ["bat", "batcat", "cat"] {
             if plugin::map_status(Command::new(catter).arg(&snippet).status()).is_ok() {
                 break;
             }
@@ -950,7 +952,7 @@ fn ls(
             ));
             continue;
         }
-        let conf = read_config(&snippet)?;
+        let conf = read_config(snippet)?;
         let plugins = conf.plugins;
         for promoter in plugins.promoter {
             for (drbd_res, resource) in promoter.resources {
@@ -1007,7 +1009,7 @@ fn restart(snippets_paths: Vec<PathBuf>, with_targets: bool, cluster: &ClusterCo
 }
 
 fn read_config(snippet_path: &Path) -> Result<config::Config> {
-    let content = config::read_snippets(&[snippet_path])?;
+    let content = config::read_snippets([snippet_path])?;
     let config = toml::from_str(&content).with_context(|| {
         format!("Could not parse config files including snippets; content: {content}")
     })?;
@@ -1106,7 +1108,7 @@ fn warn_if_both_exist<'a>(paths: impl IntoIterator<Item = &'a PathBuf>) {
     }
 }
 
-fn validate_snippet(snippets_path: &Path, path: &PathBuf, require_exists: bool) -> Result<()> {
+fn validate_snippet(snippets_path: &Path, path: &Path, require_exists: bool) -> Result<()> {
     if snippet_state_of(path).is_none() {
         return Err(anyhow::anyhow!(
             "File '{}' does not have a recognized extension (.toml or .toml.disabled), \

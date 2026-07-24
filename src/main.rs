@@ -264,7 +264,7 @@ fn main() -> Result<()> {
 }
 
 fn setup_signals(events: crossbeam_channel::Sender<EventUpdate>) -> Result<()> {
-    let mut signals = Signals::new(&[libc::SIGHUP, libc::SIGINT, libc::SIGTERM, libc::SIGUSR1])?;
+    let mut signals = Signals::new([libc::SIGHUP, libc::SIGINT, libc::SIGTERM, libc::SIGUSR1])?;
     debug!("signal-handler: set up done");
 
     thread::spawn(move || {

@@ -367,7 +367,7 @@ fn monitor_run(cfgs: &[PluginCfg], snippets_path: &Option<PathBuf>, last_reload:
         Some(ref p) => p,
         None => return,
     };
-    let snippets_paths = match config::files_with_extension_in(&snippets_path, "toml") {
+    let snippets_paths = match config::files_with_extension_in(snippets_path, "toml") {
         Ok(ps) => ps,
         Err(_) => return,
     };
@@ -408,7 +408,7 @@ fn monitor_run(cfgs: &[PluginCfg], snippets_path: &Option<PathBuf>, last_reload:
                     .filter(|&(_, v)| v.runner == promoter::Runner::Systemd)
                 {
                     let target_path =
-                        systemd::escaped_services_target_dir(&res).join(promoter::SYSTEMD_CONF);
+                        systemd::escaped_services_target_dir(res).join(promoter::SYSTEMD_CONF);
                     let target_elapsed = fs::metadata(&target_path)
                         .and_then(|md| md.modified())
                         .map(|m| now.duration_since(m));

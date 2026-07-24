@@ -150,8 +150,9 @@ pub struct Path {
 }
 
 make_matchable![
-    #[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
+    #[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone, Default)]
     pub enum Role {
+        #[default]
         Unknown,
         Primary,
         Secondary,
@@ -188,14 +189,9 @@ impl fmt::Display for Role {
         }
     }
 }
-impl Default for Role {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
 
 make_matchable![
-    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq)]
+    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq, Default)]
     pub enum DiskState {
         Diskless,
         Attaching,
@@ -204,6 +200,7 @@ make_matchable![
         Negotiating,
         Inconsistent,
         Outdated,
+        #[default]
         DUnknown,
         Consistent,
         UpToDate,
@@ -264,15 +261,11 @@ impl fmt::Display for DiskState {
         }
     }
 }
-impl Default for DiskState {
-    fn default() -> Self {
-        Self::DUnknown
-    }
-}
 
 make_matchable![
-    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq)]
+    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq, Default)]
     pub enum ConnectionState {
+        #[default]
         StandAlone,
         Disconnecting,
         Unconnected,
@@ -343,15 +336,11 @@ impl fmt::Display for ConnectionState {
         }
     }
 }
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self::StandAlone
-    }
-}
 
 make_matchable![
-    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq)]
+    #[derive(Serialize, Deserialize, Hash, Debug, Clone, PartialEq, Eq, Default)]
     pub enum ReplicationState {
+        #[default]
         Off,
         Established,
         StartingSyncS,
@@ -440,11 +429,6 @@ impl fmt::Display for ReplicationState {
             Self::Ahead => write!(f, "Ahead"),
             Self::Behind => write!(f, "Behind"),
         }
-    }
-}
-impl Default for ReplicationState {
-    fn default() -> Self {
-        Self::Off
     }
 }
 

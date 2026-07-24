@@ -58,7 +58,7 @@ impl Promoter {
                     failure_action: res.on_drbd_demote_failure.clone(),
                 };
                 generate_systemd_templates(
-                    &name,
+                    name,
                     &res.start,
                     &systemd_settings,
                     res.secondary_force,
@@ -106,7 +106,7 @@ impl super::Plugin for Promoter {
                 // calculate a position in the preferred nodes. We also try to avoid starting on a
                 // Diskless node.
                 let mut sleep_s = 0;
-                let sleep_disk_s = match get_backing_devices(&name) {
+                let sleep_disk_s = match get_backing_devices(name) {
                     Ok(devices) if devices.contains(&"none".into()) => 6, // Diskless
                     _ => 0,
                 };
@@ -383,7 +383,7 @@ fn process_drbd_event(
                     .flat_map(|c| c.peerdevices.values())
                 {
                     // check if we find an UpToDate peer
-                    if pd.peer_client == false && pd.peer_disk_state == DiskState::UpToDate {
+                    if !pd.peer_client && pd.peer_disk_state == DiskState::UpToDate {
                         info!("resource '{name}' lost local disk, found UpToDate peer");
                         if let Err(e) = stop_actions(&name, &res.stop, &res.runner) {
                             warn!("Stopping '{name}' failed: {e}");
@@ -913,17 +913,13 @@ enum State {
     Thaw,
 }
 
-#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone, Default)]
 pub enum SystemdDependency {
     Wants,
+    #[default]
     Requires,
     Requisite,
     BindsTo,
-}
-impl Default for SystemdDependency {
-    fn default() -> Self {
-        Self::Requires
-    }
 }
 impl fmt::Display for SystemdDependency {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -938,7 +934,9 @@ impl fmt::Display for SystemdDependency {
 
 #[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "kebab-case")]
+#[derive(Default)]
 pub enum SystemdFailureAction {
+    #[default]
     None,
     Reboot,
     RebootForce,
@@ -948,11 +946,6 @@ pub enum SystemdFailureAction {
     PoweroffImmediate,
     Exit,
     ExitForce,
-}
-impl Default for SystemdFailureAction {
-    fn default() -> Self {
-        Self::None
-    }
 }
 impl fmt::Display for SystemdFailureAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -976,17 +969,13 @@ struct SystemdSettings {
     failure_action: SystemdFailureAction,
 }
 
-#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone, Default)]
 pub enum QuorumLossPolicy {
     #[serde(rename = "shutdown")]
+    #[default]
     Shutdown,
     #[serde(rename = "freeze")]
     Freeze,
-}
-impl Default for QuorumLossPolicy {
-    fn default() -> Self {
-        Self::Shutdown
-    }
 }
 impl fmt::Display for QuorumLossPolicy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -997,17 +986,13 @@ impl fmt::Display for QuorumLossPolicy {
     }
 }
 
-#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone, Default)]
 pub enum DiskDetachPolicy {
     #[serde(rename = "ignore")]
+    #[default]
     Ignore,
     #[serde(rename = "fail-over")]
     FailOver,
-}
-impl Default for DiskDetachPolicy {
-    fn default() -> Self {
-        Self::Ignore
-    }
 }
 impl fmt::Display for DiskDetachPolicy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1034,29 +1019,22 @@ impl fmt::Display for SplitBrainAvoidancePolicy {
     }
 }
 
-#[derive(Serialize, Deserialize, Eq, Hash, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Eq, Hash, Debug, PartialEq, Clone, Default)]
 pub enum Runner {
     #[serde(rename = "systemd")]
+    #[default]
     Systemd,
     #[serde(rename = "shell")]
     Shell,
 }
-impl Default for Runner {
-    fn default() -> Self {
-        Self::Systemd
-    }
-}
 
 #[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "kebab-case")]
+#[derive(Default)]
 pub enum PreferredNodesPolicy {
+    #[default]
     Always,
     StartOnly,
-}
-impl Default for PreferredNodesPolicy {
-    fn default() -> Self {
-        Self::Always
-    }
 }
 
 fn get_sleep_before_promote_ms(
@@ -1267,6 +1245,7 @@ fn get_preferred_nodes_sleep_s(preferred_nodes: &[String]) -> u64 {
 fn try_initial_target_start(name: &str) -> bool {
     // if we know for sure that a remote is Primary, then we don't try
     // in all other cases, even if unsure, we can try
+    #[allow(clippy::match_like_matches_macro)] // spelled out for readability
     match get_primary(name) {
         Ok(PrimaryOn::Remote(_)) => false,
         _ => true,
