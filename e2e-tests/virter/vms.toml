@@ -5,7 +5,7 @@ provision_file = "provision-test.toml"
 [[vms]]
 # Borrow the base image from the DRBD tests:
 # https://github.com/LINBIT/drbd9-tests
-base_image = "alma-9-drbd-k70"
+base_image = "rhel-9-drbd-k70"
 
 [vms.values]
 RepositoryURL = "https://pulp.at.linbit.com/pulp/content/rpm/rhel9/"

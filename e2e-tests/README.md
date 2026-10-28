@@ -19,7 +19,7 @@ Then run:
 ```
 # Build base image
 git clone https://github.com/LINBIT/drbd9-tests.git
-make -C drbd9-tests/virter base_image_alma-9-drbd-k70
+make -C drbd9-tests/virter base_image_rhel-9-drbd-k70
 
 # Build test image
 ./virter/provision-test.sh
@@ -28,7 +28,7 @@ make -C drbd9-tests/virter base_image_alma-9-drbd-k70
 make e2e_docker_image
 
 # Start VMs
-virter vm run --count 3 --name d --id 10 --disk name=data,size=2G,bus=scsi --wait-ssh alma-9-drbd-k70-r
+virter vm run --count 3 --name d --id 10 --disk name=data,size=2G,bus=scsi --wait-ssh rhel-9-drbd-k70-r
 parallel --tag virsh snapshot-create-as --name base {} ::: d-{10..12}
 
 # Run test

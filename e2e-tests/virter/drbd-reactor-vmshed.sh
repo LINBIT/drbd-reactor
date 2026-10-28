@@ -2,7 +2,7 @@
 
 set -e
 
-repository_packages="drbd-utils=${DRBD_UTILS_VERSION:-9.29.0}"
+repository_packages="drbd-utils=${DRBD_UTILS_VERSION:-9.35.0}"
 
 # Escape the comma so that it is part of the override value. An unescaped comma
 # separates key-value pairs in the override.
@@ -12,7 +12,7 @@ vmshed \
 	--nvms "${LINBIT_CI_MAX_CPUS:-$(nproc)}" \
 	--vms virter/vms.toml \
 	--tests virter/tests.toml \
-	--set "values.DrbdVersion=${DRBD_VERSION:-9.1.16}" \
+	--set "values.DrbdVersion=${DRBD_VERSION:-9.3.4}" \
 	--set "values.RepositoryPackages=${repository_packages}" \
 	${REACTOR_TEST_IMAGE:+--set "values.TestSuiteImage=${REACTOR_TEST_IMAGE}"} \
 	${LINBIT_PULP_BASE_URL:+--set "values.RepositoryURL=${LINBIT_PULP_BASE_URL}/pulp/content/rpm/rhel9/"} \
