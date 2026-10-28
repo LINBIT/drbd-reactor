@@ -1,5 +1,5 @@
 variables:
-  BUILD_HELPERS_VERSION: c2fe128ed6ed1498314589a0f2e28e509c48c144
+  BUILD_HELPERS_VERSION: 0fa86e05314b906db34862d95e81b598dc029fa1
   DRBD_REACTOR_VERSION: 1.0.0.$CI_COMMIT_SHA
   REACTOR_TEST_IMAGE: $LINBIT_DOCKER_REGISTRY/drbd-reactor-e2e:latest
   VIRTER_VERSION: v1.1.0
@@ -60,12 +60,9 @@ e2e:build_reactor:
     - install /dev/null $(which lbvers.py)
 
     - make debrelease VERSION="$version"
-    - curl -isSf -u $LINBIT_REGISTRY_USER:$LINBIT_REGISTRY_PASSWORD --upload-file drbd-reactor-*.tar.gz $LINBIT_REGISTRY_URL/repository/lbbuild-upstream/
-    - >-
-      lbbuildctl build drbd-reactor --ci --arch amd64 -v "$version" -d rhel9.0
-      -e LINBIT_REGISTRY_USER=$LINBIT_REGISTRY_USER
-      -e LINBIT_REGISTRY_PASSWORD=$LINBIT_REGISTRY_PASSWORD
-      -e LINBIT_REGISTRY_URL=$LINBIT_REGISTRY_URL
+    - tarball=$(ls drbd-reactor-*.tar.gz)
+    - pulp file content upload --repository lbbuild-upstream --file "$tarball" --relative-path "$tarball"
+    - lbbuildctl build drbd-reactor --ci --arch amd64 -v "$version" -d rhel9.0
   cache:
     key: $CI_JOB_NAME
     paths:

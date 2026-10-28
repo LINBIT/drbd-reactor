@@ -8,5 +8,5 @@ provision_file = "provision-test.toml"
 base_image = "alma-9-drbd-k70"
 
 [vms.values]
-RepositoryURL = "https://nexus.at.linbit.com/repository/ci-yum/rhel9/"
-ReleaseRepositoryURL = "https://nexus.at.linbit.com/repository/packages-linbit-com/yum/rhel9.0/drbd-9/$basearch/"
+RepositoryURL = "https://pulp.at.linbit.com/pulp/content/rpm/rhel9/"
+ReleaseRepositoryURL = "http://pkg-linbit.at.linbit.com/yum/rhel9.0/drbd-9/$basearch/"

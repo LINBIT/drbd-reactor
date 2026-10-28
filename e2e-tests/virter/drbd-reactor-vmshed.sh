@@ -15,4 +15,5 @@ vmshed \
 	--set "values.DrbdVersion=${DRBD_VERSION:-9.1.16}" \
 	--set "values.RepositoryPackages=${repository_packages}" \
 	${REACTOR_TEST_IMAGE:+--set "values.TestSuiteImage=${REACTOR_TEST_IMAGE}"} \
+	${LINBIT_PULP_BASE_URL:+--set "values.RepositoryURL=${LINBIT_PULP_BASE_URL}/pulp/content/rpm/rhel9/"} \
 	"$@"

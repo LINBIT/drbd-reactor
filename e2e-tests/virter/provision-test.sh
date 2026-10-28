@@ -14,6 +14,6 @@ repository_packages="${repository_packages}\\,drbd-reactor=${DRBD_REACTOR_VERSIO
 virter image build --provision virter/provision-test.toml \
 	--set "values.DrbdVersion=${DRBD_VERSION:-9.1.16}" \
 	--set "values.RepositoryPackages=${repository_packages}" \
-	--set 'values.RepositoryURL=https://nexus.at.linbit.com/repository/ci-yum/rhel9/' \
-	--set 'values.ReleaseRepositoryURL=https://nexus.at.linbit.com/repository/packages-linbit-com/yum/rhel9.0/drbd-9/$basearch/' \
+	--set "values.RepositoryURL=${LINBIT_PULP_BASE_URL:-https://pulp.at.linbit.com}/pulp/content/rpm/rhel9/" \
+	--set 'values.ReleaseRepositoryURL=http://pkg-linbit.at.linbit.com/yum/rhel9.0/drbd-9/$basearch/' \
 	alma-9-drbd-k70 alma-9-drbd-k70-r
