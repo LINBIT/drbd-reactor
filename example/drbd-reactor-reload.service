@@ -5,7 +5,11 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/systemctl reload drbd-reactor.service
+# Reloads a running drbd-reactor and does nothing while it is stopped.
+# This should be "try-reload-or-restart", but that name only exists since
+# systemd 229. XCP-ng (CentOS 7 based dom0, systemd 219) only knows the
+# legacy spelling, which is the same operation.
+ExecStart=/usr/bin/systemctl reload-or-try-restart drbd-reactor.service
 
 [Install]
 WantedBy=multi-user.target
