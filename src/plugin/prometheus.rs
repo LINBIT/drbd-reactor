@@ -6,6 +6,7 @@ use std::net::{TcpListener, TcpStream};
 use std::os::unix::io::AsRawFd;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use log::{debug, error, trace, warn};
@@ -15,6 +16,10 @@ use crate::config::LocalAddress;
 use crate::drbd;
 use crate::drbd::{ConnectionState, DiskState, EventType, PluginUpdate, Resource, Role};
 use crate::plugin::PluginCfg;
+
+// A client that connects but never sends its request (or never reads the
+// response) must not block the single handler thread forever.
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct Prometheus {
     cfg: PrometheusConfig,
@@ -35,7 +40,7 @@ impl Prometheus {
         let thread_handle = {
             let listener_clone = listener.try_clone().context("failed to clone socket")?;
             let metrics_clone = metrics.clone();
-            thread::spawn(move || tcp_handler(listener_clone, &metrics_clone))
+            thread::spawn(move || tcp_handler(listener_clone, &metrics_clone, CLIENT_TIMEOUT))
         };
 
         Ok(Prometheus {
@@ -98,11 +103,15 @@ impl super::Plugin for Prometheus {
     }
 }
 
-fn tcp_handler(listener: TcpListener, metrics: &Arc<Mutex<Metrics>>) -> Result<()> {
+fn tcp_handler(
+    listener: TcpListener,
+    metrics: &Arc<Mutex<Metrics>>,
+    timeout: Duration,
+) -> Result<()> {
     for stream in listener.incoming() {
         let stream = stream.context("closed socket")?;
 
-        if let Err(e) = handle_connection(stream, metrics) {
+        if let Err(e) = handle_connection(stream, metrics, timeout) {
             // warn but continue processing
             warn!("tcp_handler: could not handle connection: {e}");
         }
@@ -111,7 +120,14 @@ fn tcp_handler(listener: TcpListener, metrics: &Arc<Mutex<Metrics>>) -> Result<(
     Ok(())
 }
 
-fn handle_connection(mut stream: TcpStream, metrics: &Arc<Mutex<Metrics>>) -> Result<()> {
+fn handle_connection(
+    mut stream: TcpStream,
+    metrics: &Arc<Mutex<Metrics>>,
+    timeout: Duration,
+) -> Result<()> {
+    stream.set_read_timeout(Some(timeout))?;
+    stream.set_write_timeout(Some(timeout))?;
+
     // read request body
     // we have to, otherwise we will get a connection reset by peer
     let mut discard = [0u8; 4096];
@@ -476,4 +492,36 @@ pub struct PrometheusConfig {
 
 fn default_address() -> LocalAddress {
     LocalAddress::Unspecified(9942)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Instant;
+
+    #[test]
+    fn idle_client_does_not_block_handler() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let metrics = Arc::new(Mutex::new(Metrics {
+            dirty: true,
+            ..Default::default()
+        }));
+        thread::spawn(move || tcp_handler(listener, &metrics, Duration::from_secs(1)));
+
+        // connects, never sends a request, keeps the socket open
+        let _idle = TcpStream::connect(addr).unwrap();
+
+        let start = Instant::now();
+        let mut client = TcpStream::connect(addr).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        client.write_all(b"GET /metrics HTTP/1.1\r\n\r\n").unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(start.elapsed() < Duration::from_secs(5));
+    }
 }
