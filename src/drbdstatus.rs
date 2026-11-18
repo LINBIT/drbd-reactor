@@ -8,6 +8,10 @@ use std::process::{Command, Stdio};
 pub struct Resource {
     pub resource: String,
     pub options: Options,
+    // A peer-less (single-node) resource has no connection stanzas, so
+    // `drbdsetup show --json` omits `connections` entirely rather than
+    // emitting an empty array; tolerate that instead of failing to parse.
+    #[serde(default)]
     pub connections: Vec<Connection>,
 }
 
